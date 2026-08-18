@@ -1,0 +1,23 @@
+// Config/Release.xcconfig — settings shared by every Release build of Backglance.
+//
+// As in Debug, the two version numbers stay in project.pbxproj because that is the
+// only file `agvtool` edits. Release does not include Local.xcconfig: a release is
+// signed by Scripts/sign_and_notarize.sh with an explicit Developer ID identity,
+// never with whatever team happens to be on the machine.
+
+VERSIONING_SYSTEM = apple-generic
+VERSION_INFO_PREFIX =
+
+SDKROOT = macosx
+MACOSX_DEPLOYMENT_TARGET = 14.0
+
+SWIFT_VERSION = 5.0
+SWIFT_STRICT_CONCURRENCY = complete
+SWIFT_COMPILATION_MODE = wholemodule
+SWIFT_OPTIMIZATION_LEVEL = -O
+
+ONLY_ACTIVE_ARCH = NO
+ENABLE_NS_ASSERTIONS = NO
+DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
+
+ENABLE_HARDENED_RUNTIME = YES

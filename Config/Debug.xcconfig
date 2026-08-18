@@ -1,0 +1,31 @@
+// Config/Debug.xcconfig — settings shared by every Debug build of Backglance.
+//
+// MARKETING_VERSION and CURRENT_PROJECT_VERSION deliberately do NOT live here:
+// `agvtool` rewrites them in Backglance.xcodeproj/project.pbxproj, and it cannot
+// see an xcconfig. What lives here is the versioning system that makes agvtool
+// work at all (see DEPLOYMENT_GUIDE.md, Step 1 — version bump and tag).
+
+// Personal-team signing for local development. Created by Scripts/bootstrap.sh and
+// git-ignored, so a clone without it — CI, for instance — still configures cleanly.
+#include? "Local.xcconfig"
+
+VERSIONING_SYSTEM = apple-generic
+VERSION_INFO_PREFIX =
+
+SDKROOT = macosx
+MACOSX_DEPLOYMENT_TARGET = 14.0
+
+SWIFT_VERSION = 5.0
+SWIFT_STRICT_CONCURRENCY = complete
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) DEBUG
+SWIFT_OPTIMIZATION_LEVEL = -Onone
+GCC_OPTIMIZATION_LEVEL = 0
+GCC_PREPROCESSOR_DEFINITIONS = $(inherited) DEBUG=1
+
+ONLY_ACTIVE_ARCH = YES
+ENABLE_TESTABILITY = YES
+DEBUG_INFORMATION_FORMAT = dwarf
+
+// On in Debug too: notarization requires the hardened runtime, and a debug build
+// that behaves differently about library loading is a debug build that lies.
+ENABLE_HARDENED_RUNTIME = YES
