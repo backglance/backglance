@@ -261,7 +261,7 @@ codesign -d --entitlements - --xml \
     <key>SUFeedURL</key>
     <string>https://backglance.github.io/backglance/appcast.xml</string>
     <key>SUPublicEDKey</key>
-    <string>REPLACE_WITH_OUTPUT_OF_generate_keys_-p</string>
+    <string>$(SU_PUBLIC_ED_KEY)</string>
     <!-- Sparkle would otherwise show its own "check automatically?" prompt on second launch.
          Backglance owns that decision (onboarding + Settings ▸ Updates); default is on. -->
     <key>SUEnableAutomaticChecks</key>
@@ -297,7 +297,7 @@ codesign -d --entitlements - --xml \
 
 Notes:
 
-- `SUPublicEDKey` is present only in the Release Info.plist. Debug builds omit it (an `INFOPLIST_KEY_` override per configuration), so `SparkleUpdaterController` skips startup and a debug build never contacts the network by accident ([SETUP_GUIDE.md](../getting-started/SETUP_GUIDE.md)).
+- `SUPublicEDKey` is a build-setting substitution, and only `Config/Release.xcconfig` defines `SU_PUBLIC_ED_KEY` (with the output of `generate_keys -p`). A Debug build resolves it to the empty string, which `SparkleUpdaterController` treats exactly like a missing key: it skips startup, so a debug build never contacts the network by accident ([SETUP_GUIDE.md](../getting-started/SETUP_GUIDE.md)). The substitution is what makes this per-configuration — `INFOPLIST_KEY_*` overrides only apply to a *generated* Info.plist, and Backglance authors its own.
 - No `NSAppTransportSecurity` dictionary: the appcast and release assets are `https`, so no exception is needed, and its absence is part of the "only Sparkle talks to the network" story ([FAQ.md](../reference/FAQ.md)).
 - `LSMinimumSystemVersion` is what `generate_appcast` copies into `sparkle:minimumSystemVersion`; keep it equal to the deployment target.
 

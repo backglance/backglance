@@ -21,3 +21,9 @@ ENABLE_NS_ASSERTIONS = NO
 DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
 
 ENABLE_HARDENED_RUNTIME = YES
+
+// Sparkle's EdDSA public key, substituted into Info.plist. Release only: a Debug build
+// resolves $(SU_PUBLIC_ED_KEY) to an empty string, which SparkleUpdaterController reads
+// as "no updater configured", so a debug build makes no network call at all.
+// Replaced with the output of `generate_keys -p` when the release keypair is created.
+SU_PUBLIC_ED_KEY = REPLACE_WITH_OUTPUT_OF_generate_keys_-p

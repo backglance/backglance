@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>app.backglance.Backglance</string>
+    <key>CFBundleName</key>
+    <string>Backglance</string>
+    <key>CFBundleDisplayName</key>
+    <string>Backglance</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$(MARKETING_VERSION)</string>
+    <key>CFBundleVersion</key>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.utilities</string>
+
+    <!-- Menu bar app: no Dock icon, no app menu when it is frontmost. Onboarding and the
+         timeline window still work; they are ordinary windows opened by the status item. -->
+    <key>LSUIElement</key>
+    <true/>
+
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright (C) 2026 the Backglance authors. GPL-3.0.</string>
+
+    <!-- Sparkle 2. SUFeedURL moves to https://backglance.app/appcast.xml once the domain is confirmed;
+         that is an app update, not a server-side switch, so old builds keep reading GitHub Pages. -->
+    <key>SUFeedURL</key>
+    <string>https://backglance.github.io/backglance/appcast.xml</string>
+    <!-- Substituted from SU_PUBLIC_ED_KEY, which only Config/Release.xcconfig defines. A Debug
+         build therefore carries an empty string here, and SparkleUpdaterController treats an
+         empty key exactly like a missing one: no updater, no network. -->
+    <key>SUPublicEDKey</key>
+    <string>$(SU_PUBLIC_ED_KEY)</string>
+    <!-- Sparkle would otherwise show its own "check automatically?" prompt on second launch.
+         Backglance owns that decision (onboarding + Settings ▸ Updates); default is on. -->
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <!-- Never download silently; the user sees release notes and confirms. -->
+    <key>SUAutomaticallyUpdate</key>
+    <false/>
+    <!-- Sparkle's optional anonymous system profile is off and stays off. -->
+    <key>SUEnableSystemProfiling</key>
+    <false/>
+
+    <!-- backglance://search?q=… · open?id=… · digest · pause?minutes=… · resume (URLSchemeHandler.swift) -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>CFBundleURLName</key>
+            <string>app.backglance.Backglance.url</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>backglance</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>
