@@ -1,0 +1,31 @@
+# Normalize line endings for text files
+* text=auto eol=lf
+
+# Xcode project files — avoid noisy merges
+*.pbxproj text eol=lf -merge=union
+*.xcworkspacedata text eol=lf
+*.xcscheme text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.icns binary
+*.zip binary
+*.dmg binary
+*.sqlite binary
+*.db binary
+*.p12 binary
+*.mlmodel binary
+*.mlmodelc binary
+
+# Fixtures are synthetic SQLite databases — never diff them
+Tests/Fixtures/** binary linguist-generated=true
+
+# Keep documentation out of language statistics
+docs/** linguist-documentation=true
+
+# GitHub language detection
+*.swift linguist-language=Swift

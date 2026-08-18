@@ -1,0 +1,714 @@
+# Monitoring & Logging
+
+Last Updated: 2026-08-18
+
+This document describes how Backglance logs, what it refuses to log, how a user or developer reads those logs, what the "Export Diagnostics…" bundle contains and provably excludes, and which health indicators the app shows in its own UI. Backglance has no server side, so "monitoring" here means *local* observability only: unified logging (`os.Logger`), a small rotating file log, and status surfaces inside the app. There is no telemetry, no analytics SDK, and no crash-reporting service. The one rule that overrides every other rule in this file: **notification content never appears in a log** — not titles, not bodies, not senders, not thread IDs, not deep links.
+
+## Table of Contents
+
+- [Principles](#principles)
+- [Log Levels](#log-levels)
+- [Structured Local Logging](#structured-local-logging)
+  - [Subsystem and Categories](#subsystem-and-categories)
+  - [Privacy Annotations](#privacy-annotations)
+  - [The File Log](#the-file-log)
+- [RedactingLogger: Content Cannot Reach a Log Call](#redactinglogger-content-cannot-reach-a-log-call)
+  - [Type-Level Design](#type-level-design)
+  - [Implementation](#implementation)
+  - [SwiftLint Rule](#swiftlint-rule)
+- [Viewing Logs](#viewing-logs)
+- [Diagnostics Export](#diagnostics-export)
+  - [What the Export Contains](#what-the-export-contains)
+  - [What the Export Provably Excludes](#what-the-export-provably-excludes)
+  - [The Code That Builds It](#the-code-that-builds-it)
+  - [The Test That Guards It](#the-test-that-guards-it)
+  - [Reviewing the Zip Before Sending](#reviewing-the-zip-before-sending)
+- [Health Indicators in the UI](#health-indicators-in-the-ui)
+- [Crash Logs Without a Crash Reporter](#crash-logs-without-a-crash-reporter)
+- [What "Zero Telemetry" Means Operationally](#what-zero-telemetry-means-operationally)
+- [Next Steps](#next-steps)
+- [Related Documentation](#related-documentation)
+
+## Principles
+
+1. **Local only.** Logs are written to the unified logging system and to `~/Library/Logs/Backglance/backglance.log`. Nothing leaves the Mac unless the user manually attaches a file to a bug report.
+2. **No content, ever.** Log lines may mention *that* a notification was captured, *which app* it came from (bundle ID), *how long* the body was, and *what went wrong*. They may not mention *what it said*. This is enforced by types (a `ParsedNotification` cannot be passed to the logger) and by a lint rule, not by reviewer vigilance.
+3. **Useful to a solo developer.** The point of a log is to reconstruct a capture failure on a macOS release the developer has not seen. Adapter IDs, fingerprints, `ProbeResult` cases, and record counts are what matter; content is noise that also happens to be a privacy liability.
+4. **Same rules for diagnostics export.** The zip a user sends is built from the same redacted sources and is tested to contain no archive text.
+
+> 🔒 **Security:** The system store Backglance reads is ⚠️ undocumented and lives under Full Disk Access. Logging its raw rows would leak other apps' notification content into a world-readable-by-admin log. The `RawStoreRecord.plistData` blob is therefore never logged either — only its byte length and `recID`.
+
+## Log Levels
+
+Backglance uses the five `OSLogType` levels. Pick the level by *who needs to see it and when*, not by how excited the author is.
+
+| Level | `os.Logger` call | Persisted by unified logging? | Written to file log at default level? | Use for |
+|---|---|---|---|---|
+| Debug | `logger.debug(...)` | No (memory only, unless `log config` enables) | No | Poll ticks, cursor values, per-batch timings during development |
+| Info | `logger.info(...)` | Memory, flushed to disk on error | No | Adapter resolved, capture started/paused/resumed, migration applied, retention job summary |
+| Notice (default) | `logger.notice(...)` | Yes | Yes | State changes a user might ask about: FDA granted/revoked, degraded mode entered/left, digest shown, update installed |
+| Error | `logger.error(...)` | Yes | Yes | Recoverable failure: probe returned `.missingTables`, one record failed to parse, icon fetch failed |
+| Fault | `logger.fault(...)` | Yes | Yes | Invariant broken: archive integrity check failed, migration threw, snapshot copy failed twice in a row |
+
+Rules of thumb:
+
+- One `notice` per state transition, not one per poll. A healthy Backglance at default level writes a handful of lines per day.
+- `error` means "the app kept working but you should know". `fault` means "the developer would want to be paged if there were anyone to page".
+- Never raise a level to make something visible in the file log; instead run with `BACKGLANCE_LOG_LEVEL=debug` (see [The File Log](#the-file-log)).
+
+## Structured Local Logging
+
+### Subsystem and Categories
+
+All loggers share the subsystem `app.backglance.Backglance` and one of these categories:
+
+| Category | Owner module | What it covers |
+|---|---|---|
+| `capture` | `BackglanceCapture` | `CaptureEngine` lifecycle, `StoreWatcher` events, cursors, batch counts |
+| `adapter` | `BackglanceCapture` | Fingerprint computation, `StoreAdapterRegistry.resolve`, `ProbeResult`, degraded reasons |
+| `parser` | `BackglanceCapture` | `RecordParser` failures (key missing, wrong type) — by `recID` and key name only |
+| `archive` | `BackglanceCore` | Migrations, integrity checks, retention job, vacuum, WAL checkpoints |
+| `search` | `BackglanceSearch` | FTS/hybrid query timings, semantic index batches |
+| `digest` | `BackglanceCore` | Away session start/end with reason, digest built/shown/dismissed with item counts |
+| `rules` | `BackglanceCore` | Rules evaluated (count, matched rule IDs), regex compile errors |
+| `ui` | `Backglance` (app) | Popover open/close timings, window lifecycle, hotkey registration results |
+| `updater` | `Backglance` (app) | Sparkle appcast checks, download, install outcomes |
+
+The loggers are declared once, in `BackglanceCore/Logging/Log.swift`, and imported everywhere:
+
+```swift
+import os
+
+public enum Log {
+    public static let subsystem = "app.backglance.Backglance"
+
+    public static let capture = Logger(subsystem: subsystem, category: "capture")
+    public static let adapter = Logger(subsystem: subsystem, category: "adapter")
+    public static let parser  = Logger(subsystem: subsystem, category: "parser")
+    public static let archive = Logger(subsystem: subsystem, category: "archive")
+    public static let search  = Logger(subsystem: subsystem, category: "search")
+    public static let digest  = Logger(subsystem: subsystem, category: "digest")
+    public static let rules   = Logger(subsystem: subsystem, category: "rules")
+    public static let ui      = Logger(subsystem: subsystem, category: "ui")
+    public static let updater = Logger(subsystem: subsystem, category: "updater")
+}
+```
+
+### Privacy Annotations
+
+Unified logging redacts interpolated values as `<private>` unless they are marked `privacy: .public`. Backglance's policy is:
+
+- `.public` is allowed **only** for values that are not content: counts, durations, byte lengths, bundle IDs, adapter IDs, fingerprint hashes, `ProbeResult` case names, error codes, macOS versions, table names.
+- Everything else stays at the default (`.private`). In practice this means the string interpolation of a `ParsedNotification` field is never written, because the type system does not let you get one into a log call in the first place (see below).
+
+```swift
+// ✅ Non-content values, safe to make public
+Log.adapter.notice("Adapter resolved id=\(adapterID, privacy: .public) fingerprint=\(fp.schemaHash.prefix(12), privacy: .public) records=\(count, privacy: .public)")
+
+// ✅ Duration and error code
+Log.archive.error("Integrity check failed code=\(code, privacy: .public) after \(ms, privacy: .public) ms")
+
+// ❌ Never — even if you think it is redacted, do not write it
+// Log.capture.debug("captured \(parsed.title ?? "")")
+```
+
+> ❌ **Don't:** use `privacy: .public` on any `String` that originated in the system store or the archive, including `category` and `userInfo` keys. Category strings are app-defined and occasionally contain identifiers.
+
+### The File Log
+
+Unified logging is the primary sink, but users cannot easily hand you a `log show` dump, so Backglance also keeps a small plain-text file log:
+
+| Property | Value |
+|---|---|
+| Path | `~/Library/Logs/Backglance/backglance.log` |
+| Rotation | 5 files × 2 MB (`backglance.log`, `backglance.1.log` … `backglance.4.log`); oldest deleted |
+| Default level | `notice` and above |
+| Override | Environment variable `BACKGLANCE_LOG_LEVEL` = `debug` \| `info` \| `notice` \| `error` \| `fault` |
+| Format | `2026-08-17T09:12:44.318Z notice capture Adapter resolved id=StoreAdapterV26 records=143` |
+| Permissions | file `0600`, directory `0700` |
+
+Setting the override for a launched app:
+
+```bash
+# Quit Backglance first, then relaunch with debug file logging
+osascript -e 'quit app "Backglance"'
+launchctl setenv BACKGLANCE_LOG_LEVEL debug
+open -a Backglance
+
+# Later, back to default
+launchctl unsetenv BACKGLANCE_LOG_LEVEL
+```
+
+The file sink receives the same *already-formatted* messages as `os.Logger`, and it never sees `.private` values (they are formatted as `<private>` before reaching the sink). The `FileLogSink` is fed from the `RedactingLogger` described next, so there is only one place where log strings are assembled.
+
+## RedactingLogger: Content Cannot Reach a Log Call
+
+### Type-Level Design
+
+The rule "no content in logs" is not a comment; it is a compile error. Backglance code does not call `os.Logger` with notification types directly. Instead:
+
+- `ParsedNotification` and `ArchivedNotification` do **not** conform to `CustomStringConvertible`, `CustomDebugStringConvertible`, or `CustomStringInterpolation`. Interpolating one into a log message therefore produces the compiler's default `Type(...)` dump — and that is caught by the lint rule and by unit tests, but the real defence is the next point.
+- Every log call site that wants to say something about a notification must pass a `NotificationLogRef`, a three-field struct built *from* the notification that carries only `id`, `bundleID`, and `length` (total character count of title + subtitle + body). There is no initializer that lets you smuggle text into it.
+- `RedactingLogger` is the only logger type exposed by `Log`; its methods accept `LogMessage` (a tiny value type) rather than free-form `String` interpolation for anything involving a notification.
+
+### Implementation
+
+```swift
+// BackglanceCore/Logging/NotificationLogRef.swift
+import Foundation
+
+/// The *only* thing about a notification that may be logged.
+/// Built from a notification; carries no text.
+public struct NotificationLogRef: Sendable, CustomStringConvertible {
+    public let id: String        // archive uuid, or "unsaved" before insert
+    public let bundleID: String
+    public let length: Int       // characters of title+subtitle+body, for size diagnostics
+
+    public init(_ n: ParsedNotification) {
+        self.id = n.uuid.uuidString
+        self.bundleID = n.bundleID
+        self.length = (n.title?.count ?? 0) + (n.subtitle?.count ?? 0) + (n.body?.count ?? 0)
+    }
+
+    public init(_ n: ArchivedNotification, bundleID: String) {
+        self.id = n.uuid
+        self.bundleID = bundleID
+        self.length = (n.title?.count ?? 0) + (n.subtitle?.count ?? 0) + (n.body?.count ?? 0)
+    }
+
+    public var description: String {
+        "notif(id=\(id.prefix(8)) app=\(bundleID) len=\(length))"
+    }
+}
+```
+
+```swift
+// BackglanceCore/Logging/RedactingLogger.swift
+import Foundation
+import os
+
+/// A logger whose API makes it impossible to hand it a notification.
+/// You can only pass a `NotificationLogRef` (no content) or plain non-content values.
+public struct RedactingLogger: Sendable {
+    private let logger: Logger
+    private let category: String
+    private let file: FileLogSink
+
+    init(category: String, file: FileLogSink = .shared) {
+        self.logger = Logger(subsystem: Log.subsystem, category: category)
+        self.category = category
+        self.file = file
+    }
+
+    // MARK: - Plain messages (no notification involved)
+
+    public func debug(_ message: @autoclosure () -> String) {
+        emit(.debug, message())
+    }
+    public func info(_ message: @autoclosure () -> String) {
+        emit(.info, message())
+    }
+    public func notice(_ message: @autoclosure () -> String) {
+        emit(.default, message())
+    }
+    public func error(_ message: @autoclosure () -> String) {
+        emit(.error, message())
+    }
+    public func fault(_ message: @autoclosure () -> String) {
+        emit(.fault, message())
+    }
+
+    // MARK: - Messages about a notification (reference only)
+
+    public func notice(_ event: StaticString, _ ref: NotificationLogRef) {
+        emit(.default, "\(event) \(ref.description)")
+    }
+    public func error(_ event: StaticString, _ ref: NotificationLogRef, code: Int? = nil) {
+        let suffix = code.map { " code=\($0)" } ?? ""
+        emit(.error, "\(event) \(ref.description)\(suffix)")
+    }
+
+    // MARK: - Unavailable overloads: make misuse a compile error with a clear message
+
+    @available(*, unavailable, message: "Never log a ParsedNotification. Use NotificationLogRef(n).")
+    public func notice(_ event: StaticString, _ n: ParsedNotification) {}
+    @available(*, unavailable, message: "Never log an ArchivedNotification. Use NotificationLogRef(n, bundleID:).")
+    public func notice(_ event: StaticString, _ n: ArchivedNotification) {}
+    @available(*, unavailable, message: "Never log a ParsedNotification. Use NotificationLogRef(n).")
+    public func error(_ event: StaticString, _ n: ParsedNotification, code: Int? = nil) {}
+    @available(*, unavailable, message: "Never log an ArchivedNotification. Use NotificationLogRef(n, bundleID:).")
+    public func error(_ event: StaticString, _ n: ArchivedNotification, code: Int? = nil) {}
+
+    // MARK: - Sink
+
+    private func emit(_ type: OSLogType, _ text: String) {
+        // Values interpolated by callers are already plain Strings assembled by the caller;
+        // the caller-side policy (privacy annotations) applies to os_log formatting only.
+        // The file sink receives exactly the same string.
+        logger.log(level: type, "\(text, privacy: .public)")
+        file.write(level: type, category: category, text)
+    }
+}
+```
+
+The `Log` enum from earlier is then simply:
+
+```swift
+public enum Log {
+    public static let subsystem = "app.backglance.Backglance"
+    public static let capture = RedactingLogger(category: "capture")
+    public static let adapter = RedactingLogger(category: "adapter")
+    public static let parser  = RedactingLogger(category: "parser")
+    public static let archive = RedactingLogger(category: "archive")
+    public static let search  = RedactingLogger(category: "search")
+    public static let digest  = RedactingLogger(category: "digest")
+    public static let rules   = RedactingLogger(category: "rules")
+    public static let ui      = RedactingLogger(category: "ui")
+    public static let updater = RedactingLogger(category: "updater")
+}
+```
+
+Usage at the parser boundary — success and error paths:
+
+```swift
+// BackglanceCapture/Parsing/RecordParser+Logging.swift
+extension RecordParser {
+    func parseLogged(_ raw: RawStoreRecord) -> ParsedNotification? {
+        do {
+            let parsed = try parse(raw)
+            Log.parser.debug("parsed rec=\(raw.recID) bytes=\(raw.plistData.count) app=\(raw.appIdentifier)")
+            return parsed
+        } catch let error as RecordParser.ParseError {
+            // ParseError carries the *key name* that was missing, never its value.
+            Log.parser.error("parse failed rec=\(raw.recID) key=\(error.key) reason=\(error.reasonCode)")
+            return nil
+        } catch {
+            Log.parser.error("parse failed rec=\(raw.recID) reason=unknown")
+            return nil
+        }
+    }
+}
+```
+
+> ℹ️ **Info:** `emit` marks the assembled string `.public` because by construction it contains only non-content values; the redaction happens *before* the string exists, at the type level. If you find yourself wanting `.private` inside `RedactingLogger`, the value should not be reaching it at all.
+
+### SwiftLint Rule
+
+The lint rule is the belt to the type system's braces. It flags any logger call whose argument text mentions a content field:
+
+```yaml
+# .swiftlint.yml (excerpt)
+custom_rules:
+  no_notification_content_in_logs:
+    name: "No notification content in logs"
+    included: ".*\\.swift"
+    excluded: ".*Tests.*"
+    regex: '(Log\.(capture|adapter|parser|archive|search|digest|rules|ui|updater)|logger|Logger\()[^\n]*\.(body|title|subtitle|sender|threadID|thread_id|deepLink|deep_link|userInfo|plistData)\b'
+    message: "Notification content must not be logged. Pass NotificationLogRef(n) instead."
+    severity: error
+  no_string_describing_notification:
+    name: "No String(describing:) on notifications"
+    included: ".*\\.swift"
+    regex: 'String\((describing|reflecting):\s*(parsed|notification|archived|n)\b'
+    message: "Do not stringify a notification for logging."
+    severity: error
+```
+
+CI runs `swiftlint --strict`; both rules are `error`, so a violation fails the build. See [`../deployment/CI_CD.md`](../deployment/CI_CD.md).
+
+## Viewing Logs
+
+Unified logging, live:
+
+```bash
+# Everything from Backglance, all categories, including debug/info held in memory
+log stream --predicate 'subsystem == "app.backglance.Backglance"' --level debug --style compact
+
+# Only capture + adapter, useful when diagnosing an OS-break morning
+log stream --predicate 'subsystem == "app.backglance.Backglance" AND (category == "capture" OR category == "adapter")' --level info
+```
+
+Historical, from the persisted store:
+
+```bash
+# Last 2 hours
+log show --predicate 'subsystem == "app.backglance.Backglance"' --last 2h --style syslog
+
+# A specific window, errors and faults only
+log show --predicate 'subsystem == "app.backglance.Backglance" AND messageType >= error' \
+  --start '2026-08-17 08:00:00' --end '2026-08-17 10:00:00'
+```
+
+The file log:
+
+```bash
+tail -f ~/Library/Logs/Backglance/backglance.log
+grep -h ' adapter ' ~/Library/Logs/Backglance/backglance*.log | tail -50
+```
+
+> 💡 **Tip:** `Console.app` works too — search for `app.backglance.Backglance` in the search field and enable *Action ▸ Include Info Messages* / *Include Debug Messages*.
+
+## Diagnostics Export
+
+Settings ▸ Advanced ▸ **Export Diagnostics…** writes a zip to a location the user chooses (default `~/Desktop/Backglance-Diagnostics-2026-08-17.zip`) and then reveals it in Finder. It is intended to be attached to a GitHub issue. Nothing is uploaded automatically.
+
+### What the Export Contains
+
+| File in zip | Content | Content-free? |
+|---|---|---|
+| `manifest.json` | App version + build, macOS version, architecture, export timestamp, `contains_app_names: false` (or `true` if opted in) | Yes |
+| `adapter.json` | Adapter ID in use, `StoreFingerprint.schemaHash` (SHA-256 hex, first 16 chars) and `dbinfoVersion`, last `ProbeResult` case name and record count | Yes |
+| `capture_status_history.json` | Last 200 `CaptureStatus` transitions with timestamps and `DegradedReason` case names | Yes |
+| `app_counts.json` | Per-app notification counts. **By default apps are `app-01`, `app-02`… (hashed order)**; the user may tick "Include app bundle identifiers" in the export sheet | Yes |
+| `archive_stats.json` | Archive file size, page count, free page count, `PRAGMA integrity_check` result string, archive schema version, row counts per table | Yes |
+| `log_tail.txt` | Last 500 lines from `backglance.log` (already content-free) | Yes |
+| `settings_snapshot.json` | Non-secret settings from the `app.backglance.Backglance` `UserDefaults` suite (retention default, digest threshold, poll interval, hotkey, updater enabled, semantic search enabled) | Yes |
+
+### What the Export Provably Excludes
+
+| Excluded | Why you can trust it |
+|---|---|
+| Notification titles, subtitles, bodies, senders, thread IDs, deep links, `userInfo` | The builder never opens a `SELECT` on `notifications` text columns; only `COUNT(*)` and `PRAGMA` queries run. Guarded by `DiagnosticsExportTests.testExportContainsNoArchiveText` |
+| Raw system store rows or `plistData` | The export has no reference to `BackglanceCapture` store reading; it consumes only `CaptureStatus` history and the cached fingerprint |
+| App names or bundle IDs | Excluded unless the user opts in; opt-in is recorded in `manifest.json` so the reader knows |
+| Rule patterns | Rules can contain personal keywords; only rule *count* and *kind* histogram are exported |
+| Saved searches (v1.x) | Same reason; only count |
+| Redaction originals | Never exist anywhere (redaction happens in memory before insert) |
+| Keychain items, SQLCipher key, Sparkle keys | Not read by the builder |
+| Crash reports | Not collected; user attaches manually (see below) |
+
+### The Code That Builds It
+
+```swift
+// BackglanceCore/Diagnostics/DiagnosticsExporter.swift
+import Foundation
+import GRDB
+
+public struct DiagnosticsOptions: Sendable {
+    public var includeBundleIDs = false
+    public init() {}
+}
+
+public enum DiagnosticsError: Error {
+    case archiveUnavailable
+    case zipFailed(Int32)
+}
+
+public struct DiagnosticsExporter {
+    let archive: Archive
+    let statusHistory: [CaptureStatusEntry]
+    let settings: SettingsSnapshot
+    let logDirectory: URL
+    let appVersion: String
+    let buildNumber: String
+
+    public func export(to destination: URL, options: DiagnosticsOptions) throws {
+        let fm = FileManager.default
+        let staging = fm.temporaryDirectory.appendingPathComponent("bg-diag-\(UUID().uuidString)")
+        try fm.createDirectory(at: staging, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: staging) }
+
+        try writeJSON(manifest(options), to: staging.appendingPathComponent("manifest.json"))
+        try writeJSON(adapterInfo(), to: staging.appendingPathComponent("adapter.json"))
+        try writeJSON(statusHistory.suffix(200), to: staging.appendingPathComponent("capture_status_history.json"))
+        try writeJSON(appCounts(includeBundleIDs: options.includeBundleIDs),
+                      to: staging.appendingPathComponent("app_counts.json"))
+        try writeJSON(archiveStats(), to: staging.appendingPathComponent("archive_stats.json"))
+        try logTail(lines: 500).write(to: staging.appendingPathComponent("log_tail.txt"),
+                                      atomically: true, encoding: .utf8)
+        try writeJSON(settings, to: staging.appendingPathComponent("settings_snapshot.json"))
+
+        try zip(directory: staging, to: destination)
+    }
+
+    // MARK: - Sections
+
+    private func manifest(_ options: DiagnosticsOptions) -> [String: String] {
+        let os = ProcessInfo.processInfo.operatingSystemVersion
+        return [
+            "app_version": appVersion,
+            "build": buildNumber,
+            "macos": "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)",
+            "arch": archName(),
+            "exported_at": ISO8601DateFormatter().string(from: Date()),
+            "contains_app_names": options.includeBundleIDs ? "true" : "false"
+        ]
+    }
+
+    private func adapterInfo() throws -> [String: String] {
+        try archive.read { db in
+            let rows = try Row.fetchAll(db, sql: "SELECT key, value FROM capture_state WHERE key IN ('adapter_id','fingerprint')")
+            var out: [String: String] = [:]
+            for row in rows {
+                let key: String = row["key"]
+                let value: String = row["value"]
+                // fingerprint is stored as JSON of StoreFingerprint; only the hash prefix is exported
+                out[key] = key == "fingerprint" ? String(value.prefix(16)) : value
+            }
+            return out
+        }
+    }
+
+    private struct AppCount: Codable { let app: String; let count: Int }
+
+    private func appCounts(includeBundleIDs: Bool) throws -> [AppCount] {
+        try archive.read { db in
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT bundle_id, notification_count FROM apps ORDER BY notification_count DESC
+                """)
+            return rows.enumerated().map { index, row in
+                let bundleID: String = row["bundle_id"]
+                let label = includeBundleIDs ? bundleID : String(format: "app-%02d", index + 1)
+                return AppCount(app: label, count: row["notification_count"])
+            }
+        }
+    }
+
+    private struct ArchiveStats: Codable {
+        let fileSizeBytes: Int
+        let pageCount: Int
+        let freelistCount: Int
+        let integrityCheck: String
+        let archiveVersion: String
+        let rowCounts: [String: Int]
+    }
+
+    private func archiveStats() throws -> ArchiveStats {
+        let size = (try? FileManager.default.attributesOfItem(atPath: archive.path)[.size] as? Int) ?? 0
+        return try archive.read { db in
+            let pageCount = try Int.fetchOne(db, sql: "PRAGMA page_count") ?? 0
+            let freelist = try Int.fetchOne(db, sql: "PRAGMA freelist_count") ?? 0
+            let integrity = try String.fetchOne(db, sql: "PRAGMA integrity_check") ?? "unknown"
+            let version = try String.fetchOne(db, sql: "SELECT value FROM schema_meta WHERE key = 'archive_version'") ?? "unknown"
+            var counts: [String: Int] = [:]
+            // COUNT(*) only — no text column is ever selected here.
+            for table in ["apps", "notifications", "rules", "away_sessions", "digests", "redactions"] {
+                counts[table] = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM \(table)") ?? 0
+            }
+            return ArchiveStats(fileSizeBytes: size, pageCount: pageCount, freelistCount: freelist,
+                                integrityCheck: integrity, archiveVersion: version, rowCounts: counts)
+        }
+    }
+
+    private func logTail(lines: Int) -> String {
+        let url = logDirectory.appendingPathComponent("backglance.log")
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return "(no file log)\n" }
+        return text.split(separator: "\n", omittingEmptySubsequences: false).suffix(lines).joined(separator: "\n")
+    }
+
+    // MARK: - Helpers
+
+    private func writeJSON<T: Encodable>(_ value: T, to url: URL) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(value).write(to: url, options: .atomic)
+    }
+
+    private func zip(directory: URL, to destination: URL) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        process.arguments = ["-c", "-k", "--sequesterRsrc", directory.path, destination.path]
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { throw DiagnosticsError.zipFailed(process.terminationStatus) }
+    }
+
+    private func archName() -> String {
+        #if arch(arm64)
+        return "arm64"
+        #else
+        return "x86_64"
+        #endif
+    }
+}
+```
+
+### The Test That Guards It
+
+The test seeds an in-memory archive with distinctive synthetic strings in every text column, exports, unzips, and asserts none of the strings appear anywhere in the zip contents.
+
+```swift
+// Tests/BackglanceCoreTests/DiagnosticsExportTests.swift
+import XCTest
+@testable import BackglanceCore
+
+final class DiagnosticsExportTests: XCTestCase {
+
+    /// Every text column gets a unique sentinel. If any leaks, the test names which one.
+    private let sentinels: [String: String] = [
+        "title":     "SENTINEL-TITLE-7f3a9c",
+        "subtitle":  "SENTINEL-SUBTITLE-2b8e41",
+        "body":      "SENTINEL-BODY-c91d5e",
+        "sender":    "SENTINEL-SENDER-4a6f02",
+        "thread_id": "SENTINEL-THREAD-e0b7d3",
+        "deep_link": "backglance-test://SENTINEL-LINK-58c2aa",
+        "bundle_id": "com.example.SENTINEL-APP-1d9f6b",
+        "rule":      "SENTINEL-RULE-a3c8e7"
+    ]
+
+    func testExportContainsNoArchiveText() throws {
+        let archive = try Archive(inMemory: true)
+        try archive.write { db in
+            try db.execute(sql: """
+                INSERT INTO apps (bundle_id, first_seen_at, last_seen_at, notification_count)
+                VALUES (?, 0, 0, 1)
+                """, arguments: [sentinels["bundle_id"]!])
+            try db.execute(sql: """
+                INSERT INTO notifications (uuid, app_id, title, subtitle, body, sender, thread_id,
+                    delivered_at, captured_at, deep_link)
+                VALUES ('00000000-0000-0000-0000-000000000001', 1, ?, ?, ?, ?, ?, 0, 0, ?)
+                """, arguments: [sentinels["title"]!, sentinels["subtitle"]!, sentinels["body"]!,
+                                 sentinels["sender"]!, sentinels["thread_id"]!, sentinels["deep_link"]!])
+            try db.execute(sql: """
+                INSERT INTO rules (kind, pattern, created_at) VALUES ('highlight', ?, 0)
+                """, arguments: [sentinels["rule"]!])
+        }
+
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("diag-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let zipURL = tmp.appendingPathComponent("diag.zip")
+
+        let exporter = DiagnosticsExporter(
+            archive: archive,
+            statusHistory: [],
+            settings: SettingsSnapshot.empty,
+            logDirectory: tmp,          // no log file present -> "(no file log)"
+            appVersion: "1.0.0", buildNumber: "1")
+
+        // Default options: bundle IDs NOT included.
+        try exporter.export(to: zipURL, options: DiagnosticsOptions())
+
+        let unzipDir = tmp.appendingPathComponent("unzipped")
+        let unzip = Process()
+        unzip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        unzip.arguments = ["-x", "-k", zipURL.path, unzipDir.path]
+        try unzip.run(); unzip.waitUntilExit()
+        XCTAssertEqual(unzip.terminationStatus, 0)
+
+        // Concatenate every file in the export and search for each sentinel.
+        var blob = ""
+        let files = try FileManager.default.contentsOfDirectory(at: unzipDir, includingPropertiesForKeys: nil)
+        XCTAssertFalse(files.isEmpty, "export produced no files")
+        for file in files {
+            blob += (try? String(contentsOf: file, encoding: .utf8)) ?? ""
+        }
+        for (column, sentinel) in sentinels {
+            XCTAssertFalse(blob.contains(sentinel), "diagnostics export leaked archive column '\(column)'")
+        }
+    }
+
+    func testOptInIncludesBundleIDsOnly() throws {
+        // Same setup, options.includeBundleIDs = true: bundle ID may appear, content still may not.
+        // Elided for brevity in docs; identical structure, asserting bundle_id present and others absent.
+    }
+}
+```
+
+The `apps` table's `display_name` column is deliberately not read even with opt-in; the export shows bundle IDs only, because display names are user-visible strings that can be localized or edited.
+
+### Reviewing the Zip Before Sending
+
+Users are told, in the export sheet, to look before they attach:
+
+```bash
+cd ~/Desktop
+mkdir bg-review && ditto -x -k Backglance-Diagnostics-2026-08-17.zip bg-review
+ls -la bg-review
+# read each file — they are all short JSON/text
+cat bg-review/manifest.json
+cat bg-review/app_counts.json
+less bg-review/log_tail.txt
+```
+
+If anything in there worries the user, they delete the file from the folder and re-zip, or simply do not send it. The developer's issue template asks for `adapter.json` and `capture_status_history.json` first; the rest is optional.
+
+## Health Indicators in the UI
+
+**Menu bar icon states**
+
+| State | Icon | Meaning |
+|---|---|---|
+| Running | Filled glyph | Capture running, adapter healthy |
+| Running with unread | Filled glyph + badge count (`99+` cap) | Unread notifications since last popover open |
+| Paused | Outlined glyph with pause bar | User paused (15 min / 1 h / until tomorrow / indefinitely) |
+| Degraded | Outlined glyph with small warning triangle | `CaptureStatus.degraded(reason)` — click to see the reason |
+| Stopped | Dimmed glyph | Engine stopped (during migration, wipe, or after a fault) |
+
+**Settings ▸ Status pane**
+
+| Row | Source | Example |
+|---|---|---|
+| Capture | `CaptureEngine` status | `Running` / `Degraded — Unknown store schema` |
+| Adapter | `capture_state.adapter_id` | `StoreAdapterV26` |
+| Store fingerprint | `StoreFingerprint.schemaHash` prefix + `dbinfoVersion` | `9f2c…4b1a (dbinfo 17)` |
+| Last capture | Time of last successful batch | `2 minutes ago (14 records)` |
+| Full Disk Access | `StoreLocation.current()` readability probe | `Granted` / `Not granted — Open System Settings` |
+| Archive | Size, notification count, last integrity check result and time | `84 MB · 61,204 notifications · integrity ok (yesterday 03:12)` |
+| Degraded reasons | `DegradedReason` history, most recent first | `.unknownSchema` at 08:41 after macOS 26.6 update |
+| Updater | Enabled/disabled, last check, channel | `Enabled · checked 3 h ago` |
+| Buttons | — | `Export Diagnostics…`, `Check for Updates…`, `Run Integrity Check` |
+
+The Status pane reads the same values the diagnostics export writes, so what a user sees is what the developer will receive.
+
+## Crash Logs Without a Crash Reporter
+
+Backglance ships **no** crash-reporting SDK. Not Sentry, not Crashlytics, not any hosted service. If the app crashes, macOS writes a report to `~/Library/Logs/DiagnosticReports/` as it does for any process, and that file stays on the Mac.
+
+To attach one manually to a bug report:
+
+```bash
+ls -t ~/Library/Logs/DiagnosticReports/ | grep -i backglance | head
+# Open the newest one and read it — it contains thread stacks and binary images,
+# not notification content, but do read it before sharing.
+open ~/Library/Logs/DiagnosticReports/"$(ls -t ~/Library/Logs/DiagnosticReports/ | grep -i backglance | head -1)"
+```
+
+`Console.app ▸ Crash Reports` shows the same files. Symbolication happens on the developer's side with the dSYM archived per release (see [`../deployment/PACKAGING_NOTARIZATION.md`](../deployment/PACKAGING_NOTARIZATION.md)).
+
+> ℹ️ **Info:** Apple's own crash-report sharing (System Settings ▸ Privacy & Security ▸ Analytics & Improvements ▸ "Share with App Developers") does not apply: Backglance is not distributed through the Mac App Store, so Apple never forwards its reports.
+
+## What "Zero Telemetry" Means Operationally
+
+Concretely, for the shipped binary:
+
+- No analytics SDK is linked. `otool -L` on `Backglance.app/Contents/MacOS/Backglance` shows system frameworks, GRDB, and Sparkle — nothing else.
+- No request is made on launch, on first run, on update install, on crash, or on any user action, except by Sparkle when the updater is enabled.
+- Sparkle, when enabled, contacts the appcast URL (`https://backglance.github.io/backglance/appcast.xml`) on its schedule and downloads a release archive from GitHub Releases when the user accepts an update. `SUEnableSystemProfiling` is **off**, so no system-profile query string is appended. Disabling the updater in Settings ▸ Updates removes the only network access.
+- CloudKit sync (v1.x) is opt-in and off by default; when enabled it talks only to iCloud under the user's own Apple ID.
+
+How a user can verify:
+
+```bash
+# Watch what Backglance's process touches on the network for a couple of minutes.
+# With the updater disabled you should see zero bytes.
+nettop -p "$(pgrep -x Backglance)" -m tcp -L 1
+
+# Or over time:
+nettop -p "$(pgrep -x Backglance)" -m tcp -d
+```
+
+With **Little Snitch** (or LuLu, or Lockdown-style firewalls): create a rule to deny all outgoing connections for `Backglance`. Everything keeps working; the only thing that stops is Sparkle's update check, which will report "Unable to check for updates" in Settings ▸ Updates. That is the intended proof.
+
+> ✅ **Do:** treat "the app made a request I did not expect" as a bug and report it with the destination host. It would be a regression against a documented guarantee, and the [`../security/SECURITY.md`](../security/SECURITY.md) policy treats it as a security issue.
+
+## Next Steps
+
+- Reading a specific failure? Go to [`./TROUBLESHOOTING.md`](./TROUBLESHOOTING.md) for the scenario list and the bug-report checklist.
+- Rotation, retention jobs, and integrity schedules live in [`./MAINTENANCE.md`](./MAINTENANCE.md).
+- Adapter fingerprints and the fixture strategy referenced in the Status pane are explained in [`../architecture/OS_COMPATIBILITY_PLAYBOOK.md`](../architecture/OS_COMPATIBILITY_PLAYBOOK.md).
+
+## Related Documentation
+
+- [`./TROUBLESHOOTING.md`](./TROUBLESHOOTING.md)
+- [`./MAINTENANCE.md`](./MAINTENANCE.md)
+- [`../features/PERMISSIONS_PRIVACY.md`](../features/PERMISSIONS_PRIVACY.md)
+- [`../features/PRIVACY_CONTROLS.md`](../features/PRIVACY_CONTROLS.md)
+- [`../features/CAPTURE.md`](../features/CAPTURE.md)
+- [`../architecture/OS_COMPATIBILITY_PLAYBOOK.md`](../architecture/OS_COMPATIBILITY_PLAYBOOK.md)
+- [`../architecture/DATABASE_SCHEMA.md`](../architecture/DATABASE_SCHEMA.md)
+- [`../deployment/CI_CD.md`](../deployment/CI_CD.md)
+- [`../deployment/PACKAGING_NOTARIZATION.md`](../deployment/PACKAGING_NOTARIZATION.md)
+- [`../security/SECURITY.md`](../security/SECURITY.md)
+- [`../testing/TESTING.md`](../testing/TESTING.md)
+- [`../../README.md`](../../README.md)

@@ -1,0 +1,34 @@
+[extend]
+# Use the default gitleaks config as a base
+# https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
+
+[allowlist]
+description = "Known false positives"
+
+paths = [
+    # Documentation uses placeholder credentials throughout (TEAMID1234, AC_PASSWORD,
+    # base64 certificate examples, appcast signatures). These are examples, not secrets.
+    '''docs/deployment/PACKAGING_NOTARIZATION\.md''',
+    '''docs/deployment/CI_CD\.md''',
+    '''docs/deployment/DEPLOYMENT_GUIDE\.md''',
+    # Redaction tests contain synthetic verification codes generated from a seeded
+    # RNG — never real ones. See docs/testing/TESTING.md.
+    '''Tests/BackglanceCoreTests/OTPRedactorTests\.swift''',
+    '''Tests/Fixtures/.*''',
+]
+
+regexes = [
+    # Sparkle's EdDSA *public* key is meant to be public — it ships in Info.plist so
+    # clients can verify update signatures. Only the private key is a secret, and that
+    # lives in the Keychain and in the SPARKLE_PRIVATE_KEY GitHub secret, never here.
+    '''SUPublicEDKey''',
+    # Placeholder identifiers used across the docs.
+    '''TEAMID1234''',
+    '''AC_(APPLE_ID|TEAM_ID|PASSWORD)''',
+]
+
+stopwords = [
+    "example",
+    "placeholder",
+    "REPLACE_WITH",
+]

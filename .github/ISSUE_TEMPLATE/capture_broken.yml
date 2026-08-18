@@ -1,0 +1,91 @@
+name: Capture Stopped After a macOS Update
+description: Backglance stopped archiving notifications after updating macOS
+title: "[Capture]: stopped on macOS "
+labels: ["capture-degraded", "adapter"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Backglance reads a database Apple does not document, and its format can change in any macOS release. When that happens Backglance detects it, pauses capture, and **leaves your existing archive untouched** — nothing is lost.
+
+        This template collects exactly what is needed to ship an adapter fix. See [the OS compatibility playbook](https://github.com/backglance/backglance/blob/main/docs/architecture/OS_COMPATIBILITY_PLAYBOOK.md).
+
+        **Never attach a copy of the store itself.** It contains your private messages and verification codes. The fingerprint hash below is all that is needed.
+
+  - type: input
+    id: macos
+    attributes:
+      label: macOS Version and Build
+      description: "Run: sw_vers"
+      placeholder: "26.6 (25G12)"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Backglance Version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: status
+    attributes:
+      label: What does Settings ▸ Status say?
+      options:
+        - "Degraded — unknown store schema"
+        - "Degraded — store not found"
+        - "Degraded — read error"
+        - "Degraded — Full Disk Access not granted"
+        - "Running, but no new notifications appear"
+    validations:
+      required: true
+
+  - type: input
+    id: fingerprint
+    attributes:
+      label: Store Fingerprint
+      description: Settings ▸ Status ▸ Copy Diagnostic Info. This is a SHA-256 prefix of the schema DDL — it contains no notification data.
+      placeholder: "a1b2c3d4e5f60718"
+    validations:
+      required: true
+
+  - type: input
+    id: adapter
+    attributes:
+      label: Adapter Backglance Selected
+      placeholder: "StoreAdapterV26 (or 'none')"
+
+  - type: checkboxes
+    id: fda
+    attributes:
+      label: Full Disk Access
+      options:
+        - label: Backglance still appears in System Settings ▸ Privacy & Security ▸ Full Disk Access with the toggle on
+          required: true
+        - label: I quit and relaunched Backglance after checking
+          required: true
+
+  - type: textarea
+    id: schema
+    attributes:
+      label: Store Schema (optional, very helpful)
+      description: |
+        The table definitions only — no rows, no content. Safe to share:
+
+        ```
+        cp ~/Library/Group\ Containers/group.com.apple.usernoted/db2/db /tmp/bg-schema.db
+        sqlite3 -readonly /tmp/bg-schema.db ".schema" ; rm /tmp/bg-schema.db
+        ```
+      render: sql
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      options:
+        - label: I have not attached a copy of the notification store or any notification content
+          required: true
+        - label: I have searched existing issues for my macOS version
+          required: true

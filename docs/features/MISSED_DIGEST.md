@@ -1,0 +1,933 @@
+# Missed Digest — "What did I miss"
+
+Last Updated: 2026-08-18
+
+This document specifies Backglance's signature feature: the digest. When you come back to your Mac — after it was locked, asleep, in a Focus, or being used for a presentation or screen share — Backglance shows one quiet summary of the notifications that arrived while you weren't looking, grouped by app, VIPs first, dismissible with one click, and never repeated. It covers the away-session model, every detection source with an honest account of how reliable it is, session merging, the `DigestEngine` selection and ranking logic, the archive tables it writes, the presentation rules (including the explicit "never nagging" contract), edge cases, error handling and the test strategy.
+
+## Table of Contents
+
+- [Feature Overview](#feature-overview)
+- [Architecture](#architecture)
+- [Archive Tables Involved](#archive-tables-involved)
+- [The Away-Session Model](#the-away-session-model)
+  - [Detection Sources and Their Reliability](#detection-sources-and-their-reliability)
+  - [Session Merging and Thresholds](#session-merging-and-thresholds)
+  - [AwaySessionTracker](#awaysessiontracker)
+  - [FocusAssertionWatcher](#focusassertionwatcher)
+  - [Presenting and Screen-Share Detection](#presenting-and-screen-share-detection)
+- [Business Logic: DigestEngine](#business-logic-digestengine)
+- [UI Components](#ui-components)
+  - [DigestView](#digestview)
+  - [The Local Notification Banner](#the-local-notification-banner)
+  - [Settings](#settings)
+- [Never Nagging Rules](#never-nagging-rules)
+- [Edge Cases and Error Handling](#edge-cases-and-error-handling)
+- [Testing Approach](#testing-approach)
+- [Next Steps](#next-steps)
+- [Related Documentation](#related-documentation)
+
+## Feature Overview
+
+macOS shows a notification once and forgets it. If you were locked, asleep, presenting, or a Focus swallowed the banner, you never knew it happened. Backglance's answer is the digest: at the end of every away session it builds one summary — *"You missed 12 notifications from 4 apps while locked (47 min)"* — and shows it exactly once, on your return.
+
+Design intent, in order:
+
+1. **Trustworthy.** The digest must not miss things. That is why selection uses two independent signals: the away-session time window *and* the system store's own `presented = 0` flag ("this record was delivered but no banner was shown").
+2. **Quiet.** One digest per away session, dismiss is one click, no sound by default, and it never re-surfaces. A notification-history app that itself nags would be absurd.
+3. **Honest about detection.** Lock and sleep detection are rock-solid public APIs. Focus and presenting detection are not — they are marked ⚠️ throughout, degrade gracefully, and their live status is visible in Settings ▸ Status.
+
+| Piece | Type | Where |
+|---|---|---|
+| `AwaySessionTracker` | actor, event-driven session state machine | `BackglanceCore` |
+| `FocusAssertionWatcher` | ⚠️ file watcher on the DND assertions database | `BackglanceCore` |
+| `PresentationDetector` | ⚠️ heuristic frontmost-app + window scan | `BackglanceCore` |
+| `DigestEngine` | pure selection/ranking, writes `digests` + `digest_items` | `BackglanceCore` |
+| `DigestView` | SwiftUI, shown in the popover; also the full timeline entry point | `BackglanceUI` |
+| Banner | optional `UNUserNotificationCenter` local notification | app target |
+
+> ℹ️ **Info:** The digest reads only Backglance's archive. Notifications that were never captured (capture paused, app excluded, FDA revoked — see [CAPTURE.md](./CAPTURE.md) and [PERMISSIONS_PRIVACY.md](./PERMISSIONS_PRIVACY.md)) cannot appear in a digest.
+
+## Architecture
+
+```
+   OS events                                     Backglance
+┌───────────────────────────┐   ┌─────────────────────────────────────────────┐
+│ DistributedNotification-  │   │            AwaySessionTracker (actor)       │
+│ Center                    │   │                                             │
+│  com.apple.screenIsLocked ├──►│  Event stream ──► state machine             │
+│  com.apple.screenIsUnlocked│  │   .idle ⇄ .away(reasons: Set<AwayReason>,   │
+│ NSWorkspace               │   │            since: Date)                     │
+│  willSleepNotification    ├──►│                                             │
+│  didWakeNotification      │   │  merge gap < 60 s │ min duration 5 min      │
+│  screensDidSleep/Wake     │   └─────────┬─────────────────────┬─────────────┘
+│                           │             │ sessionEnded        │ writes
+│ ⚠️ ~/Library/DoNotDisturb/ │             ▼                     ▼
+│   DB/Assertions.json      │   ┌──────────────────┐   ┌──────────────────┐
+│   (FocusAssertionWatcher, ├──►│   DigestEngine   │──►│ archive:         │
+│    DispatchSource)        │   │  select ∪ rank   │   │  away_sessions   │
+│                           │   │  group  ∪ cap    │   │  digests         │
+│ ⚠️ CGWindowList +          │   └────────┬─────────┘   │  digest_items    │
+│   frontmost app           │            │             │  notifications.  │
+│   (PresentationDetector)  ├────────────┘             │   away_session_id│
+└───────────────────────────┘                          └────────┬─────────┘
+                                                                │
+                              ┌─────────────────────────────────┴───────────┐
+                              │  Presentation                               │
+                              │   DigestView (popover, first open on return)│
+                              │   optional UNUserNotificationCenter banner  │
+                              │   "Open timeline at this point"             │
+                              └─────────────────────────────────────────────┘
+```
+
+The store's `presented` flag flows in separately: `CaptureEngine` copies it into `notifications.presented` at insert time ([CAPTURE.md](./CAPTURE.md)), and `DigestEngine` uses it as the second selection signal.
+
+## Archive Tables Involved
+
+Canonical DDL in [DATABASE_SCHEMA.md](../architecture/DATABASE_SCHEMA.md). The digest touches four tables:
+
+```sql
+CREATE TABLE away_sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  started_at REAL NOT NULL, ended_at REAL,
+  reason TEXT NOT NULL                 -- 'locked' | 'asleep' | 'focus' | 'presenting' | 'manual'
+);
+CREATE TABLE digests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  away_session_id INTEGER NOT NULL REFERENCES away_sessions(id) ON DELETE CASCADE,
+  created_at REAL NOT NULL, shown_at REAL, dismissed_at REAL,
+  item_count INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE digest_items (
+  digest_id INTEGER NOT NULL REFERENCES digests(id) ON DELETE CASCADE,
+  notification_id INTEGER NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+  rank INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (digest_id, notification_id)
+);
+-- notifications.away_session_id INTEGER REFERENCES away_sessions(id) ON DELETE SET NULL
+-- notifications.presented INTEGER  -- the store's own "banner was shown" flag
+```
+
+Conventions:
+
+- A session with overlapping causes is **one row**; `reason` stores the primary reason (first cause chronologically) and the full set is recoverable from the tracker log line. The in-memory model carries `Set<AwayReason>`; the column keeps the schema simple for v1.0.
+- `digests.shown_at IS NULL` means "built but the user hasn't seen it yet"; `dismissed_at` set means it will never be shown again. One digest per session is enforced by `DigestEngine` checking for an existing row (`SELECT id FROM digests WHERE away_session_id = ?`) before building.
+- `notifications.away_session_id` is set by the digest build, which also makes `is:missed` in search work ([SEARCH.md](./SEARCH.md)).
+- `ON DELETE CASCADE` on `digest_items.notification_id` means retention pruning shrinks old digests naturally; `item_count` keeps the original headline number.
+
+## The Away-Session Model
+
+```swift
+// Packages/BackglanceCore/Sources/BackglanceCore/Away/AwaySession.swift
+public enum AwayReason: String, Codable, Sendable, CaseIterable {
+    case locked, asleep, focus, presenting, manual
+}
+
+public struct AwaySession: Codable, Sendable, Equatable, Identifiable {
+    public var id: Int64?
+    public var startedAt: Date
+    public var endedAt: Date?
+    public var reasons: Set<AwayReason>       // persisted as the primary reason string
+    public var isPartial: Bool                // app launched mid-session; start = app launch
+    public var isReconstructed: Bool          // rebuilt from store timestamps after the fact
+}
+```
+
+An away session begins when the first reason becomes active and ends when the **last** reason clears. Reasons overlap freely: locking the lid while a Focus is on produces one session with `reasons = {focus, locked, asleep}`.
+
+### Detection Sources and Their Reliability
+
+Stated plainly, source by source. Settings ▸ Status shows a live line per source.
+
+| Source | Signal | Reliability |
+|---|---|---|
+| Screen lock/unlock | `DistributedNotificationCenter` `com.apple.screenIsLocked` / `com.apple.screenIsUnlocked` | **Reliable.** Technically undocumented notification names, but stable since macOS 10.x and fired synchronously with the lock state. |
+| Sleep/wake | `NSWorkspace.willSleepNotification` / `didWakeNotification`, plus `screensDidSleepNotification` / `screensDidWakeNotification` for display-only sleep | **Reliable.** Public API. Wake also triggers an immediate capture poll ([CAPTURE.md](./CAPTURE.md)). |
+| Focus / DND | ⚠️ **No public API on macOS.** We watch `~/Library/DoNotDisturb/DB/Assertions.json` (readable because Backglance has FDA) with a `DispatchSource` and parse it tolerantly for active assertions. Secondarily, the store's `presented = 0` flag on captured records is a strong signal that a Focus suppressed the banner. | **Fragile.** The file's location and format are Apple's private business and have already changed once (Monterey introduced it). When parsing fails, Focus detection degrades to off — sessions still form from lock/sleep — and Settings ▸ Status shows "Focus detection: unavailable". |
+| Presenting / screen sharing | ⚠️ Heuristic: frontmost app is Keynote or PowerPoint in slideshow mode (app active + a full-screen borderless window it owns), or a known "you are sharing" indicator window exists (Zoom's floating share bar, Google Meet / Microsoft Teams share pips) found via `CGWindowListCopyWindowInfo` by owner + window name prefix. Combined with `presented = 0` on records captured meanwhile. | **Heuristic.** Vendors rename windows; a Zoom update can silently break it. False negatives are accepted; false positives are bounded by the 5-minute minimum. Off by default? No — on by default but listed with a ⚠️ in Settings, individually disableable. |
+| Manual | "I'm away" toggle in the menu bar menu | **Exact** — by definition. Ends on toggle-off or on any user input event after 10 s (so people who forget the toggle still get a sane session end). |
+
+> ⚠️ **Warning:** The Focus and presenting detectors read private surfaces (a private JSON database, window titles). This is the same posture as capture itself ([CAPTURE.md](./CAPTURE.md)): observed behaviour, not API. Both are wrapped so total failure costs only granularity — the digest still exists via lock/sleep + `presented = 0`.
+
+> ℹ️ **Info:** `CGWindowListCopyWindowInfo` needs Screen Recording permission to see *other apps'* window **names** on modern macOS. Backglance does **not** request Screen Recording; it matches on the owner bundle plus window geometry where names are unavailable, and simply detects less without the permission. FDA is the only permission Backglance asks for ([PERMISSIONS_PRIVACY.md](./PERMISSIONS_PRIVACY.md)).
+
+### Session Merging and Thresholds
+
+- **Merge gap: 60 s.** Unlocking to glance at the screen and re-locking within a minute does not split the session; the tracker holds a candidate end and cancels it if a new reason activates within 60 s.
+- **Minimum duration: 5 min (default, configurable).** Shorter sessions are recorded in `away_sessions` (they are still useful to `is:missed`) but produce no digest. Options: 5 / 15 min / always / never (see [Settings](#settings)).
+- **Zero notifications → no digest**, whatever the duration.
+
+### AwaySessionTracker
+
+The tracker is an actor consuming a single event enum. All OS callbacks are adapted into events, which is what makes it fully testable with an injected clock and a scripted stream.
+
+```swift
+// Packages/BackglanceCore/Sources/BackglanceCore/Away/AwaySessionTracker.swift
+import Foundation
+import os
+
+public actor AwaySessionTracker {
+    public enum Event: Sendable, Equatable {
+        case screenLocked, screenUnlocked
+        case willSleep, didWake
+        case focusChanged(active: Bool)
+        case presentingChanged(active: Bool)
+        case manualAway(active: Bool)
+        case appLaunched(coldStart: Bool)     // sessions started here are flagged partial
+    }
+
+    public struct EndedSession: Sendable, Equatable {
+        public let session: AwaySession
+        public let meetsDigestThreshold: Bool
+    }
+
+    private enum State: Equatable {
+        case idle
+        case away(reasons: Set<AwayReason>, since: Date, partial: Bool)
+        case ending(reasons: Set<AwayReason>, since: Date, partial: Bool, candidateEnd: Date)
+    }
+
+    private var state: State = .idle
+    private let clock: any AwayClock                 // ContinuousClock-backed in prod, manual in tests
+    private let minDuration: () -> TimeInterval      // reads the setting, default 300
+    private let mergeGap: TimeInterval = 60
+    private var mergeTask: Task<Void, Never>?
+    private let onEnd: @Sendable (EndedSession) async -> Void
+    private let log = Logger(subsystem: "app.backglance.Backglance", category: "away")
+
+    public init(clock: any AwayClock,
+                minDuration: @escaping () -> TimeInterval = { 300 },
+                onEnd: @escaping @Sendable (EndedSession) async -> Void) {
+        self.clock = clock
+        self.minDuration = minDuration
+        self.onEnd = onEnd
+    }
+
+    public func handle(_ event: Event) async {
+        let now = clock.now
+        switch event {
+        case .screenLocked:            await activate(.locked, at: now)
+        case .screenUnlocked:          await deactivate(.locked, at: now)
+        case .willSleep:               await activate(.asleep, at: now)
+        case .didWake:                 await deactivate(.asleep, at: now)
+        case .focusChanged(true):      await activate(.focus, at: now)
+        case .focusChanged(false):     await deactivate(.focus, at: now)
+        case .presentingChanged(true): await activate(.presenting, at: now)
+        case .presentingChanged(false):await deactivate(.presenting, at: now)
+        case .manualAway(true):        await activate(.manual, at: now)
+        case .manualAway(false):       await deactivate(.manual, at: now)
+        case .appLaunched:             break   // reconstruction handled by DigestEngine at launch
+        }
+    }
+
+    private func activate(_ reason: AwayReason, at now: Date) async {
+        mergeTask?.cancel(); mergeTask = nil
+        switch state {
+        case .idle:
+            state = .away(reasons: [reason], since: now, partial: false)
+            log.info("Away session started, reason \(reason.rawValue, privacy: .public)")
+        case .away(var reasons, let since, let partial):
+            reasons.insert(reason)
+            state = .away(reasons: reasons, since: since, partial: partial)
+        case .ending(var reasons, let since, let partial, _):
+            // Re-activated within the merge gap: same session continues.
+            reasons.insert(reason)
+            state = .away(reasons: reasons, since: since, partial: partial)
+            log.debug("Merged: re-activated within gap")
+        }
+    }
+
+    private func deactivate(_ reason: AwayReason, at now: Date) async {
+        guard case .away(var reasons, let since, let partial) = state else {
+            if case .ending = state { return }   // already winding down
+            return                                // deactivation while idle: stray event, ignore
+        }
+        reasons.remove(reason)
+        if reasons.isEmpty {
+            state = .ending(reasons: [reason], since: since, partial: partial, candidateEnd: now)
+            scheduleFinalize()
+        } else {
+            state = .away(reasons: reasons, since: since, partial: partial)
+        }
+    }
+
+    private func scheduleFinalize() {
+        mergeTask = Task { [mergeGap] in
+            try? await clock.sleep(for: mergeGap)
+            guard !Task.isCancelled else { return }
+            await self.finalize()
+        }
+    }
+
+    private func finalize() async {
+        guard case .ending(let reasons, let since, let partial, let end) = state else { return }
+        state = .idle
+        let session = AwaySession(id: nil, startedAt: since, endedAt: end,
+                                  reasons: reasons, isPartial: partial, isReconstructed: false)
+        let duration = end.timeIntervalSince(since)
+        let meets = duration >= minDuration()
+        log.info("Away session ended after \(Int(duration))s, digest eligible: \(meets)")
+        await onEnd(EndedSession(session: session, meetsDigestThreshold: meets))
+    }
+
+    /// Called by AppDelegate when launching while already locked/away (cold start mid-session).
+    public func beginPartial(reason: AwayReason, at now: Date) {
+        if case .idle = state {
+            state = .away(reasons: [reason], since: now, partial: true)
+        }
+    }
+}
+
+public protocol AwayClock: Sendable {
+    var now: Date { get }
+    func sleep(for seconds: TimeInterval) async throws
+}
+```
+
+The `AppDelegate` glue subscribes the OS sources and forwards events:
+
+```swift
+// Backglance/App/AppDelegate.swift (excerpt)
+let dnc = DistributedNotificationCenter.default()
+dnc.addObserver(forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main) { _ in
+    Task { await tracker.handle(.screenLocked) }
+}
+dnc.addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main) { _ in
+    Task { await tracker.handle(.screenUnlocked) }
+}
+let wnc = NSWorkspace.shared.notificationCenter
+wnc.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { _ in
+    Task { await tracker.handle(.willSleep) }
+}
+wnc.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
+    Task { await tracker.handle(.didWake) }
+}
+wnc.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { _ in
+    Task { await tracker.handle(.willSleep) }    // display sleep counts as asleep
+}
+wnc.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { _ in
+    Task { await tracker.handle(.didWake) }
+}
+```
+
+### FocusAssertionWatcher
+
+⚠️ Everything in this section rides a private file. The parser is deliberately paranoid: any structural surprise turns the watcher off for the session rather than guessing.
+
+```swift
+// Packages/BackglanceCore/Sources/BackglanceCore/Away/FocusAssertionWatcher.swift
+import Foundation
+import os
+
+/// Watches ~/Library/DoNotDisturb/DB/Assertions.json for active Focus assertions.
+/// ⚠️ Private file, no API. Requires FDA (which Backglance has for capture anyway).
+/// On any read/parse failure the watcher reports `.unavailable` and stays quiet.
+public final class FocusAssertionWatcher: @unchecked Sendable {
+    public enum Status: Sendable, Equatable { case active, inactive, unavailable(String) }
+
+    private let url: URL
+    private var source: DispatchSourceFileSystemObject?
+    private var fd: CInt = -1
+    private let queue = DispatchQueue(label: "app.backglance.Backglance.focuswatch")
+    private let onChange: @Sendable (Status) -> Void
+    private let log = Logger(subsystem: "app.backglance.Backglance", category: "focus")
+
+    public init(url: URL = FileManager.default.homeDirectoryForCurrentUser
+                    .appendingPathComponent("Library/DoNotDisturb/DB/Assertions.json"),
+                onChange: @escaping @Sendable (Status) -> Void) {
+        self.url = url
+        self.onChange = onChange
+    }
+
+    public func start() {
+        queue.async { [self] in
+            fd = open(url.path, O_EVTONLY)
+            guard fd >= 0 else {
+                // ENOENT: no Focus ever configured, or the format moved. Both mean "can't watch".
+                onChange(.unavailable("Assertions.json not readable (errno \(errno))"))
+                return
+            }
+            let src = DispatchSource.makeFileSystemObjectSource(
+                fileDescriptor: fd, eventMask: [.write, .delete, .rename], queue: queue)
+            src.setEventHandler { [weak self] in
+                guard let self else { return }
+                if self.source?.data.contains(.delete) == true || self.source?.data.contains(.rename) == true {
+                    // The file is replaced atomically on every change; reopen and re-arm.
+                    self.stop(); self.start()
+                }
+                self.onChange(self.readStatus())
+            }
+            src.setCancelHandler { [fd] in close(fd) }
+            source = src
+            src.resume()
+            onChange(readStatus())   // initial state
+        }
+    }
+
+    public func stop() {
+        source?.cancel(); source = nil; fd = -1
+    }
+
+    /// Tolerant parse: we look for a top-level "data" array whose entries contain a
+    /// non-empty "storeAssertionRecords" array — the shape observed on macOS 13–26.
+    /// Anything else → .unavailable, never a crash, never a guess.
+    func readStatus() -> Status {
+        do {
+            let data = try Data(contentsOf: url)
+            guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return .unavailable("Unexpected root shape")
+            }
+            guard let dataArray = root["data"] as? [[String: Any]] else {
+                return .unavailable("Missing 'data' array — format may have changed")
+            }
+            for entry in dataArray {
+                if let records = entry["storeAssertionRecords"] as? [[String: Any]], !records.isEmpty {
+                    return .active
+                }
+            }
+            return .inactive
+        } catch {
+            log.notice("Focus assertions unreadable: \(error.localizedDescription, privacy: .public)")
+            return .unavailable(error.localizedDescription)
+        }
+    }
+}
+```
+
+Wiring: `.active`/`.inactive` become `tracker.handle(.focusChanged(active:))`; `.unavailable` flips the Settings ▸ Status line to "Focus detection: unavailable" and stops feeding focus events. The store's `presented = 0` flag remains as the passive fallback: even with the watcher dead, suppressed notifications are still selected into the next lock/sleep digest by the `presented = 0` clause below.
+
+### Presenting and Screen-Share Detection
+
+⚠️ Heuristic by construction. `PresentationDetector` polls every 15 s (piggybacking the capture poll timer) and reports a boolean:
+
+```swift
+// Packages/BackglanceCore/Sources/BackglanceCore/Away/PresentationDetector.swift
+import AppKit
+import CoreGraphics
+
+public struct PresentationDetector: Sendable {
+    /// Bundle ids that count as "presenting" when frontmost with a fullscreen borderless window.
+    static let presenterApps: Set<String> = [
+        "com.apple.iWork.Keynote", "com.microsoft.Powerpoint",
+    ]
+    /// Owner name prefixes of known "you are sharing" indicator windows.
+    static let shareIndicators: [(owner: String, namePrefix: String?)] = [
+        ("zoom.us", "zoom share"),           // Zoom floating share toolbar
+        ("Google Chrome", "meet.google.com is sharing"),
+        ("Microsoft Teams", "Sharing controls"),
+    ]
+
+    public func isPresenting() -> Bool {
+        // 1. Slideshow heuristic: presenter app frontmost.
+        if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+           Self.presenterApps.contains(front) {
+            return true
+        }
+        // 2. Share-indicator windows. Window *names* need Screen Recording permission,
+        //    which Backglance does not request; without it kCGWindowName is absent and
+        //    we match on owner only for owners that exist solely while sharing.
+        guard let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
+                                                    kCGNullWindowID) as? [[String: Any]] else {
+            return false   // API failure → assume not presenting (false negatives preferred)
+        }
+        for window in info {
+            let owner = window[kCGWindowOwnerName as String] as? String ?? ""
+            let name = (window[kCGWindowName as String] as? String)?.lowercased()
+            for probe in Self.shareIndicators where owner == probe.owner {
+                if let prefix = probe.namePrefix {
+                    if let name, name.hasPrefix(prefix.lowercased()) { return true }
+                } else {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+}
+```
+
+Honesty ledger for this detector: Keynote frontmost during *editing* is a false positive risk, mitigated by also requiring a fullscreen borderless window in the full implementation; a renamed Zoom toolbar is a silent false negative; Meet in Safari is not detected at all. The `presented = 0` flag covers much of the gap — while macOS itself suppresses banners during screen sharing, the store records it, and those notifications enter the digest regardless of whether we noticed the session.
+
+## Business Logic: DigestEngine
+
+`DigestEngine.build(for:)` runs when the tracker reports an eligible session end (and at app launch for reconstruction). Selection, ranking, capping, persistence:
+
+1. **Select** notifications with `delivered_at` inside `[started_at, ended_at]`, **OR** `presented = 0 AND delivered_at` within the session ± 2 min (clock skew between `usernoted`'s timestamps and ours).
+2. **Exclude** what should never surface: `is_deleted = 1`, apps with `is_excluded = 1` (never stored anyway, belt and braces), and notifications already claimed by another digest.
+3. **Triage** through `RulesEngine`: VIP/highlight hits sort first; apps with `is_muted = 1` collapse into a single line at the bottom ("3 more from muted apps").
+4. **Group by app**, apps ordered by their best-ranked item; items within an app newest-first.
+5. **Cap at 50 shown**; the remainder becomes "and *n* more", which opens the timeline filtered to the session.
+6. **Persist**: insert `digests` + `digest_items` (rank = display order) and set `notifications.away_session_id`, all in one transaction.
+
+```swift
+// Packages/BackglanceCore/Sources/BackglanceCore/Digest/DigestEngine.swift
+import Foundation
+import GRDB
+import os
+
+public struct DigestEngine: Sendable {
+    public enum DigestError: Error, LocalizedError {
+        case sessionNotPersisted
+        case alreadyBuilt(digestID: Int64)
+        public var errorDescription: String? {
+            switch self {
+            case .sessionNotPersisted: return "Away session has no archive id yet."
+            case .alreadyBuilt:        return "A digest for this away session already exists."
+            }
+        }
+    }
+
+    public static let shownCap = 50
+    static let skewWindow: TimeInterval = 120     // ± 2 min around the session for presented = 0
+
+    private let archive: Archive
+    private let log = Logger(subsystem: "app.backglance.Backglance", category: "digest")
+
+    public init(archive: Archive) { self.archive = archive }
+
+    /// Builds and persists the digest for a finished, persisted away session.
+    /// Returns nil when the session yields zero notifications (no digest row is written).
+    public func build(for session: AwaySession) async throws -> Digest? {
+        guard let sessionID = session.id, let end = session.endedAt else {
+            throw DigestError.sessionNotPersisted
+        }
+        return try await archive.writer.write { db in
+            // One digest per session, enforced at the data layer.
+            if let existing = try Int64.fetchOne(
+                db, sql: "SELECT id FROM digests WHERE away_session_id = ?", arguments: [sessionID]) {
+                throw DigestError.alreadyBuilt(digestID: existing)
+            }
+
+            let start = session.startedAt.timeIntervalSince1970
+            let endTS = end.timeIntervalSince1970
+            let rows = try ArchivedNotification.fetchAll(db, sql: """
+                SELECT n.* FROM notifications n
+                JOIN apps a ON a.id = n.app_id
+                WHERE n.is_deleted = 0
+                  AND a.is_excluded = 0
+                  AND n.id NOT IN (SELECT notification_id FROM digest_items)
+                  AND ( (n.delivered_at >= ? AND n.delivered_at <= ?)
+                     OR (n.presented = 0 AND n.delivered_at >= ? AND n.delivered_at <= ?) )
+                ORDER BY n.delivered_at DESC
+                """, arguments: [start, endTS,
+                                 start - Self.skewWindow, endTS + Self.skewWindow])
+            guard !rows.isEmpty else {
+                self.log.info("Session \(sessionID): 0 notifications, no digest")
+                return nil
+            }
+
+            // Triage for ranking: VIP/highlight first, muted apps last.
+            let rules = try Rule.filter(Column("is_enabled") == true).fetchAll(db)
+            let mutedAppIDs = try Set(Int64.fetchAll(db, sql: "SELECT id FROM apps WHERE is_muted = 1"))
+            let ranked = rows.sorted { a, b in
+                let ta = RulesEngine.evaluate(a, rules: rules)
+                let tb = RulesEngine.evaluate(b, rules: rules)
+                let aVIP = ta.highlight != nil || ta.pinned
+                let bVIP = tb.highlight != nil || tb.pinned
+                if aVIP != bVIP { return aVIP }
+                let aMuted = mutedAppIDs.contains(a.appID)
+                let bMuted = mutedAppIDs.contains(b.appID)
+                if aMuted != bMuted { return bMuted }
+                return a.deliveredAt > b.deliveredAt
+            }
+
+            var digest = Digest(id: nil, awaySessionID: sessionID,
+                                createdAt: Date(), shownAt: nil, dismissedAt: nil,
+                                itemCount: ranked.count)
+            try digest.insert(db)
+            let digestID = db.lastInsertedRowID
+            digest.id = digestID
+
+            for (rank, n) in ranked.prefix(Self.shownCap).enumerated() {
+                try db.execute(sql: """
+                    INSERT INTO digest_items(digest_id, notification_id, rank) VALUES (?, ?, ?)
+                    """, arguments: [digestID, n.id, rank])
+            }
+            // Tag every selected notification (not just the shown 50) with the session,
+            // so `is:missed` and "Open timeline at this point" cover the tail too.
+            let ids = ranked.compactMap(\.id)
+            try db.execute(sql: """
+                UPDATE notifications SET away_session_id = ?
+                WHERE id IN (\(ids.map { _ in "?" }.joined(separator: ",")))
+                """, arguments: StatementArguments([sessionID] + ids))
+
+            self.log.info("Digest \(digestID) built: \(ranked.count) items, \(min(ranked.count, Self.shownCap)) shown")
+            return digest
+        }
+    }
+}
+```
+
+Error paths at the call site: `alreadyBuilt` is swallowed with a debug log (double session-end events are possible when wake and unlock race); any `DatabaseError` is logged and retried once after 5 s; a second failure surfaces as a Settings ▸ Status line ("Last digest failed to build — see log") rather than an alert, because the notifications themselves are safely in the archive and reachable through the timeline either way.
+
+**Reconstruction at launch.** If Backglance was not running during the away period (cold boot, app quit), `AppDelegate` asks `DigestEngine.reconstructIfNeeded()` at startup: it looks at the gap between `capture_state['last_import_at']`-adjacent activity and now, and if the capture backfill just imported records with `delivered_at` in that gap or `presented = 0`, it synthesizes an `AwaySession` with `isReconstructed = true` (reason `asleep` as the best guess, or `locked` when launch happened at the login screen). The resulting digest carries a "Reconstructed — Backglance wasn't running for part of this time" label in the UI, because honesty beats implied precision.
+
+## UI Components
+
+| Component | Module | Notes |
+|---|---|---|
+| `DigestView` | `BackglanceUI` | the digest card; hosted in the popover on first open after return |
+| `DigestAppSection` | `BackglanceUI` | app icon + name + that app's rows (reuses `NotificationRow`) |
+| `DigestHeader` | `BackglanceUI` | headline, reason glyphs (🔒 / 😴 / 🌙 / 📽 / ✋), duration, partial/reconstructed badges |
+| `DigestSettingsView` | `BackglanceUI` | thresholds, reasons, banner toggle |
+| Banner | app target | `UNUserNotificationCenter` local notification, optional |
+
+### DigestView
+
+Shown at the top of the popover the first time it opens after a digest is built; also reachable later via `backglance://digest` and the menu item "Last digest".
+
+```swift
+// Packages/BackglanceUI/Sources/BackglanceUI/Digest/DigestView.swift
+import SwiftUI
+import BackglanceCore
+
+public struct DigestView: View {
+    public let model: DigestViewModel
+
+    public init(model: DigestViewModel) { self.model = model }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            header
+            Divider()
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 6, pinnedViews: .sectionHeaders) {
+                    ForEach(model.appSections) { section in
+                        Section {
+                            ForEach(section.notifications) { n in
+                                NotificationRow(notification: n, style: .digest)
+                            }
+                        } header: {
+                            DigestAppSectionHeader(app: section.app, count: section.notifications.count)
+                        }
+                    }
+                    if model.mutedCount > 0 {
+                        DisclosureGroup("\(model.mutedCount) more from muted apps") {
+                            ForEach(model.mutedNotifications) { n in
+                                NotificationRow(notification: n, style: .digest)
+                            }
+                        }
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    }
+                    if model.overflowCount > 0 {
+                        Button("and \(model.overflowCount) more…") { model.openTimelineAtSession() }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .frame(maxHeight: 380)
+            footer
+        }
+        .padding(12)
+        .task { await model.markShown() }   // sets digests.shown_at once
+    }
+
+    private var header: some View {
+        HStack(spacing: 8) {
+            Image(systemName: model.primaryReasonSymbol)   // e.g. "lock.fill"
+            VStack(alignment: .leading, spacing: 2) {
+                Text(model.headline)                        // "You missed 12 notifications from 4 apps"
+                    .font(.headline)
+                Text(model.subheadline)                     // "while locked · 47 min · ended 09:12"
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if model.isReconstructed {
+                    Label("Reconstructed — Backglance wasn't running for part of this time",
+                          systemImage: "clock.arrow.circlepath")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            Button {
+                model.dismiss()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss digest")
+        }
+    }
+
+    private var footer: some View {
+        HStack {
+            Button("Open timeline at this point") { model.openTimelineAtSession() }
+            Spacer()
+            Button("Mark all read") { Task { await model.markAllRead() } }
+        }
+        .font(.callout)
+    }
+}
+```
+
+`DigestViewModel.dismiss()` writes `dismissed_at` and removes the card; the digest remains queryable (timeline filter "Missed", `is:missed` in [SEARCH.md](./SEARCH.md)) but is never presented again. "Open timeline at this point" opens `TimelineWindow` scrolled to `started_at` with the session's rows tinted ([TIMELINE.md](./TIMELINE.md)). "Mark all read" sets `is_read = 1` for the digest's notification ids through the shared `NotificationActionHandler` ([ACTIONS.md](./ACTIONS.md)).
+
+### The Local Notification Banner
+
+Optional (Settings ▸ Digest ▸ "Also show a notification banner", default **on** for lock/sleep, off for focus — a Focus usually means "do not ping me"). Posted only when the user has not already opened the popover within 30 s of return:
+
+```swift
+// Backglance/Scenes/Digest/DigestBannerPoster.swift
+import UserNotifications
+import os
+
+struct DigestBannerPoster {
+    private let log = Logger(subsystem: "app.backglance.Backglance", category: "digest")
+
+    func post(digest: Digest, appCount: Int, duration: TimeInterval, reason: AwayReason) async {
+        let center = UNUserNotificationCenter.current()
+        do {
+            // provisional: delivered quietly, no authorization prompt on first run.
+            let granted = try await center.requestAuthorization(options: [.alert, .provisional])
+            guard granted else {
+                log.notice("Digest banner skipped: notification authorization denied")
+                return
+            }
+            let content = UNMutableNotificationContent()
+            content.title = "What did I miss"
+            let minutes = Int(duration / 60)
+            content.body = "You missed \(digest.itemCount) notification\(digest.itemCount == 1 ? "" : "s") "
+                + "from \(appCount) app\(appCount == 1 ? "" : "s") while \(reasonLabel(reason)) (\(minutes) min)"
+            content.sound = nil                      // never a sound by default
+            content.userInfo = ["digestID": digest.id ?? 0]
+            let request = UNNotificationRequest(identifier: "digest-\(digest.id ?? 0)",
+                                                content: content, trigger: nil)   // deliver now
+            try await center.add(request)
+            log.info("Digest banner posted for digest \(digest.id ?? 0)")
+        } catch {
+            // Failure to post a banner must never surface as an error dialog:
+            // the digest still shows in the popover, which is the primary path.
+            log.error("Digest banner failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func reasonLabel(_ r: AwayReason) -> String {
+        switch r {
+        case .locked: return "locked"
+        case .asleep: return "asleep"
+        case .focus: return "in a Focus"
+        case .presenting: return "presenting"
+        case .manual: return "away"
+        }
+    }
+}
+```
+
+Yes, a notification-history app posting a notification is mildly ironic; that is exactly why it is one per session, silent, and one toggle from gone. Tapping it opens the popover on the digest (via `UNUserNotificationCenterDelegate` → `StatusItemController`).
+
+### Settings
+
+Settings ▸ Digest, stored in `UserDefaults` (suite `app.backglance.Backglance`) via `@AppStorage`:
+
+| Setting | Key | Default |
+|---|---|---|
+| Show digest | `digest.threshold` = `after5min` / `after15min` / `always` / `never` | `after5min` |
+| Don't show for these reasons | `digest.disabledReasons` (Set of `AwayReason` raw values) | empty |
+| Also show a notification banner | `digest.banner.enabled` | on |
+| Banner for Focus sessions | `digest.banner.focus` | off |
+| Banner sound | `digest.banner.sound` | off |
+
+Settings ▸ Status additionally shows the live detection lines: "Lock/unlock: active · Sleep/wake: active · Focus detection: active/unavailable · Presenting detection: active/limited".
+
+## Never Nagging Rules
+
+The explicit contract, testable line by line:
+
+1. **At most one banner per away session.** Enforced by the deterministic request identifier `digest-<id>` plus the one-digest-per-session constraint.
+2. **No banner if the user opened the popover within 30 s of return.** They're already looking; `StatusItemController` reports the last-open timestamp and the poster checks it.
+3. **No repeats.** A dismissed digest (`dismissed_at` set) is never shown again — not on relaunch, not on next popover open. An unshown digest appears in the popover only until it is shown once and dismissed.
+4. **No sound by default.** `content.sound = nil`; opt-in toggle exists for people who want it.
+5. **No badge.** The digest never contributes to the menu bar unread badge beyond the notifications it contains (which count via `is_read` as usual, [TIMELINE.md](./TIMELINE.md)).
+6. **Below-threshold and zero-item sessions are silent.** Recorded, never presented.
+7. **"never" means never.** With `digest.threshold = never`, nothing is built or posted; away sessions are still tracked for `is:missed`.
+
+> ✅ **Do:** treat these as invariants in code review. A change that can produce a second banner for one session is a bug, whatever the justification.
+
+## Edge Cases and Error Handling
+
+| Case | Behaviour |
+|---|---|
+| Overlapping reasons (Focus active, then lid closed) | one session; `reasons = {focus, asleep, locked}`; primary reason = first activated; ends when the last clears |
+| Unlock for 20 s, re-lock | merge gap (60 s) keeps it one session; the candidate end is discarded |
+| System clock jumps (NTP correction, timezone change mid-session) | timestamps are Unix epoch, so timezone changes are harmless; a backwards NTP jump can make `ended_at < started_at` — the tracker clamps duration to ≥ 0 and logs it; such a session never meets the threshold |
+| App launched mid-session (login while locked, relaunch during Focus) | `beginPartial` starts the session at app launch, `isPartial = true`; the header shows "since Backglance started"; capture backfill still pulls earlier records via `presented = 0` |
+| App not running during the away period at all | on launch, `reconstructIfNeeded()` builds a reconstructed session from store timestamps + `presented` flags after the capture backfill; digest is labeled "Reconstructed" |
+| A 3-day trip | one session; the digest caps at 50 shown and the header groups the summary per day ("Fri 34 · Sat 12 · Sun 41"); "and n more" opens the timeline at the session start |
+| Zero notifications | session recorded, no digest row, nothing shown |
+| Double session-end events (wake and unlock race) | second `build` throws `alreadyBuilt`; swallowed with a debug log |
+| Assertions.json format changes | `FocusAssertionWatcher` returns `.unavailable`; Focus events stop; sessions still form from lock/sleep; Settings ▸ Status shows "Focus detection: unavailable"; `presented = 0` still routes suppressed notifications into digests |
+| Zoom/Meet/Teams rename their indicator windows | presenting detection silently misses; `presented = 0` fallback still catches what macOS suppressed during sharing |
+| Notification arrives seconds before lock, banner suppressed | the ± 2 min skew window plus `presented = 0` pulls it in |
+| User dismisses the digest, then wants it back | menu item "Last digest" reopens it read-only (dismissed state unchanged); the timeline filter "Missed" always works |
+| Banner authorization denied | logged once; popover path unaffected; Settings ▸ Digest shows "Banners are off in System Settings ▸ Notifications" |
+| Digest build fails (disk full, `SQLITE_FULL`) | one retry after 5 s; then a Settings ▸ Status line; notifications remain in the archive and timeline |
+| Retention prunes notifications out of an old digest | `digest_items` rows cascade away; `item_count` preserves the historical headline; the digest view shows "some items have been removed by retention" |
+| Panic wipe | `away_sessions`, `digests`, `digest_items` all live in the archive and are wiped together ([PRIVACY_CONTROLS.md](./PRIVACY_CONTROLS.md)) |
+
+## Testing Approach
+
+Targets: `Tests/BackglanceCoreTests` (tracker, engine), `Tests/BackglanceUITests` (dismissal flow). Everything runs on `Archive(inMemory: true)` and synthetic fixtures; no test reads the real store or the real DND database.
+
+**Session tracker with injected clock and scripted events:**
+
+```swift
+import Testing
+@testable import BackglanceCore
+
+/// Manual clock: `now` only moves when the test advances it; sleeps complete instantly
+/// once the target time is reached.
+final class TestClock: AwayClock, @unchecked Sendable {
+    var now = Date(timeIntervalSince1970: 1_755_400_000)
+    func sleep(for seconds: TimeInterval) async throws { now += seconds }
+    func advance(_ seconds: TimeInterval) { now += seconds }
+}
+
+@Suite struct AwaySessionTrackerTests {
+    @Test func lockUnlockProducesEligibleSession() async throws {
+        let clock = TestClock()
+        var ended: [AwaySessionTracker.EndedSession] = []
+        let tracker = AwaySessionTracker(clock: clock) { ended.append($0) }
+
+        await tracker.handle(.screenLocked)
+        clock.advance(600)                               // 10 minutes locked
+        await tracker.handle(.screenUnlocked)            // schedules finalize after merge gap
+        try await Task.sleep(for: .milliseconds(50))     // let the finalize task run
+
+        #expect(ended.count == 1)
+        #expect(ended[0].meetsDigestThreshold)
+        #expect(ended[0].session.reasons == [.locked])
+    }
+
+    @Test func briefUnlockMergesIntoOneSession() async throws {
+        let clock = TestClock()
+        var ended: [AwaySessionTracker.EndedSession] = []
+        let tracker = AwaySessionTracker(clock: clock) { ended.append($0) }
+
+        await tracker.handle(.screenLocked)
+        clock.advance(400)
+        await tracker.handle(.screenUnlocked)
+        clock.advance(20)                                // re-lock within the 60 s gap
+        await tracker.handle(.screenLocked)
+        clock.advance(400)
+        await tracker.handle(.screenUnlocked)
+        try await Task.sleep(for: .milliseconds(50))
+
+        #expect(ended.count == 1)                        // merged, not two sessions
+    }
+
+    @Test func overlappingReasonsEndWhenLastClears() async throws {
+        let clock = TestClock()
+        var ended: [AwaySessionTracker.EndedSession] = []
+        let tracker = AwaySessionTracker(clock: clock) { ended.append($0) }
+
+        await tracker.handle(.focusChanged(active: true))
+        clock.advance(120)
+        await tracker.handle(.screenLocked)
+        clock.advance(600)
+        await tracker.handle(.screenUnlocked)            // focus still on → session continues
+        #expect(ended.isEmpty)
+        clock.advance(300)
+        await tracker.handle(.focusChanged(active: false))
+        try await Task.sleep(for: .milliseconds(50))
+
+        #expect(ended.count == 1)
+        #expect(ended[0].session.reasons.contains(.focus))
+    }
+}
+```
+
+**Digest builder table tests** on the seeded archive. The seed includes the important fixture: rows with `presented = 0` whose `delivered_at` is 90 s before the session start (inside the skew window) and others 10 min before (outside it).
+
+```swift
+import XCTest
+@testable import BackglanceCore
+
+final class DigestEngineTests: XCTestCase {
+    func testSelectionUnionOfWindowAndPresentedFlag() async throws {
+        let archive = try SeededArchive.makeDigestFixture(seed: 11)
+        // Fixture: session 10:00–10:47; 12 in-window rows; 2 rows presented=0 at 09:58:30;
+        // 1 row presented=0 at 09:50 (outside skew); 1 excluded-app row in window.
+        var session = SeededArchive.fixtureSession                // 10:00–10:47, reason .locked
+        session.id = try await archive.insert(session)
+
+        let digest = try await DigestEngine(archive: archive).build(for: session)
+
+        XCTAssertEqual(digest?.itemCount, 14)      // 12 + 2 skew-window presented=0; not 09:50, not excluded
+    }
+
+    func testVIPFirstMutedLastCapAt50() async throws {
+        let archive = try SeededArchive.makeDigestFixture(seed: 12, count: 80, vipEvery: 10, mutedApp: true)
+        var session = SeededArchive.fixtureSession
+        session.id = try await archive.insert(session)
+        let digest = try await DigestEngine(archive: archive).build(for: session)!
+
+        let items = try await archive.reader.read { db in
+            try Row.fetchAll(db, sql: """
+                SELECT di.rank, n.id, a.is_muted FROM digest_items di
+                JOIN notifications n ON n.id = di.notification_id
+                JOIN apps a ON a.id = n.app_id
+                WHERE di.digest_id = ? ORDER BY di.rank
+                """, arguments: [digest.id])
+        }
+        XCTAssertEqual(items.count, 50)                          // cap
+        XCTAssertEqual(digest.itemCount, 80)                     // headline keeps the truth
+        XCTAssertEqual(items.first?["is_muted"] as Bool?, false) // muted never first
+    }
+
+    func testSecondBuildThrowsAlreadyBuilt() async throws {
+        let archive = try SeededArchive.makeDigestFixture(seed: 13)
+        var session = SeededArchive.fixtureSession
+        session.id = try await archive.insert(session)
+        _ = try await DigestEngine(archive: archive).build(for: session)
+        do {
+            _ = try await DigestEngine(archive: archive).build(for: session)
+            XCTFail("expected alreadyBuilt")
+        } catch DigestEngine.DigestError.alreadyBuilt { /* expected */ }
+    }
+
+    func testZeroNotificationsBuildsNothing() async throws {
+        let archive = try Archive(inMemory: true)                // empty
+        var session = SeededArchive.fixtureSession
+        session.id = try await archive.insert(session)
+        let digest = try await DigestEngine(archive: archive).build(for: session)
+        XCTAssertNil(digest)
+        let count = try await archive.reader.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM digests") ?? 0
+        }
+        XCTAssertEqual(count, 0)
+    }
+}
+```
+
+**Focus watcher parse tests** feed `readStatus()` three fixture files: an active-assertion capture, an empty one, and a deliberately reshaped JSON — asserting `.active`, `.inactive`, `.unavailable` respectively. No test touches the real `~/Library/DoNotDisturb`.
+
+**UI test for dismissal** (XCUITest, `Tests/BackglanceUITests`): launch with `-BGSeedDigest 1` (seeds an unshown digest), open the popover, assert the digest card exists, click "Dismiss digest", relaunch, open the popover, assert the card is gone — the "no repeats" invariant end to end.
+
+**Never-nagging tests**: the banner poster is wrapped behind a protocol in tests; a scripted "popover opened 10 s after return" sequence asserts `post` is never called; a double session-end asserts exactly one `UNNotificationRequest` identifier.
+
+CI runs the Core tests on all three runners; the UI test runs on `macos-26` only ([CI_CD.md](../deployment/CI_CD.md)).
+
+## Next Steps
+
+- Read [TIMELINE.md](./TIMELINE.md) for "Open timeline at this point" and the Missed filter.
+- Read [SEARCH.md](./SEARCH.md) for `is:missed`, which rides `away_session_id` and `presented`.
+- v1.x follow-ups: `GetMissedDigestIntent` for Shortcuts ([EXPORT_AUTOMATION.md](./EXPORT_AUTOMATION.md)), a digest widget ([WIDGETS.md](./WIDGETS.md)), digest counts in analytics ([ANALYTICS.md](./ANALYTICS.md)).
+
+## Related Documentation
+
+- [CAPTURE.md](./CAPTURE.md) — where `presented` comes from and why late capture still fills digests
+- [PERMISSIONS_PRIVACY.md](./PERMISSIONS_PRIVACY.md) — FDA, and why Focus detection can use it
+- [TIMELINE.md](./TIMELINE.md) — session-anchored scrolling, Missed filter, read state
+- [SEARCH.md](./SEARCH.md) — `is:missed` and the away-session join
+- [RULES.md](./RULES.md) — VIP/highlight/mute triage used in digest ranking
+- [ACTIONS.md](./ACTIONS.md) — mark-all-read and per-row actions inside the digest
+- [PRIVACY_CONTROLS.md](./PRIVACY_CONTROLS.md) — retention pruning of digest items, panic wipe
+- [DATABASE_SCHEMA.md](../architecture/DATABASE_SCHEMA.md) — `away_sessions`, `digests`, `digest_items` DDL
+- [OS_COMPATIBILITY_PLAYBOOK.md](../architecture/OS_COMPATIBILITY_PLAYBOOK.md) — what breaks per macOS release, including the Assertions.json watch
+- [API_DOCUMENTATION.md](../api/API_DOCUMENTATION.md) — `AwaySessionTracker`, `DigestEngine`, `Digest` signatures
+- [TROUBLESHOOTING.md](../operations/TROUBLESHOOTING.md) — "Focus detection: unavailable" and other Status lines
+- [MONITORING_LOGGING.md](../operations/MONITORING_LOGGING.md) — the `away`/`digest`/`focus` log categories
+- [TESTING.md](../testing/TESTING.md) — seeded archive helpers, UI test launch arguments
+- [ANALYTICS.md](./ANALYTICS.md) — v1.x reports that count missed notifications per app
+- [WIDGETS.md](./WIDGETS.md) — v1.x digest widget

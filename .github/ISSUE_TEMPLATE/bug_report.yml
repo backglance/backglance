@@ -1,0 +1,114 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug!
+
+        **Please do not paste notification content.** Titles, message bodies, senders and verification codes are private. Backglance's diagnostics export (Settings ▸ Advanced ▸ Export Diagnostics…) contains counts, versions and status only — never content — and is the safest thing to attach.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug
+      placeholder: What happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Backglance Version
+      description: What version are you using? (Settings ▸ About)
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: macos
+    attributes:
+      label: macOS Version and Build
+      description: "Apple menu ▸ About This Mac, or run: sw_vers"
+      placeholder: "26.5 (25F84)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: capture_status
+    attributes:
+      label: Capture Status
+      description: What does Settings ▸ Status show?
+      options:
+        - Running
+        - Paused
+        - "Degraded — Full Disk Access not granted"
+        - "Degraded — unknown store schema"
+        - "Degraded — store not found"
+        - "Degraded — read error"
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: adapter
+    attributes:
+      label: Store Adapter and Fingerprint
+      description: From Settings ▸ Status. The fingerprint is a hash — it contains no personal data.
+      placeholder: "StoreAdapterV26 · a1b2c3d4e5f60718"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: "Output of: log show --predicate 'subsystem == \"app.backglance.Backglance\"' --last 10m. Backglance never logs notification content, but please review before pasting."
+      render: shell
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: If applicable, add screenshots to help explain the problem. Please blur or crop any real notification content.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues to ensure this bug hasn't been reported
+          required: true
+        - label: I am using the latest version of Backglance
+          required: false
+        - label: This report contains no private notification content
+          required: true
