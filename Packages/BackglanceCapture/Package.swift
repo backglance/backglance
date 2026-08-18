@@ -37,6 +37,10 @@ let package = Package(
             name: "BackglanceCaptureTests",
             dependencies: ["BackglanceCapture", "BackglanceTestSupport"],
             path: "Tests/BackglanceCaptureTests",
+            // Tests/Fixtures is symlinked into every bundle as SharedFixtures, so this
+            // target sees the archive fixtures too. They belong to BackglanceCoreTests;
+            // bundling them here would ship a copy nothing reads.
+            exclude: ["SharedFixtures/Archive"],
             resources: [
                 .copy("SharedFixtures/SystemStore"), // macOS14/, macOS15/, macOS26/ — synthetic only
             ]
