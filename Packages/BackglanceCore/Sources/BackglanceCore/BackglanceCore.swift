@@ -10,5 +10,5 @@ public enum BackglanceCore {
     ///
     /// Bumped by `ArchiveMigrations` when a migration is added; the archive refuses
     /// to open a file written by a newer build.
-    public static let archiveSchemaVersion = 0
+    public static let archiveSchemaVersion = ArchiveMigrations.currentArchiveVersion
 }
