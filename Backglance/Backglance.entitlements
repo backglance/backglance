@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      Deliberately empty.
+
+      No com.apple.security.app-sandbox: Backglance reads Apple's Notification Center
+      store (~/Library/Group Containers/group.com.apple.usernoted/db2/db), which is
+      only reachable with Full Disk Access. FDA is a TCC grant to the app's code
+      signature and is incompatible with App Sandbox. That is also why Backglance
+      is not on the Mac App Store.
+
+      No com.apple.security.cs.disable-library-validation: Sparkle.framework is
+      re-signed with the same Developer ID identity as the app, so library
+      validation (part of the hardened runtime) already accepts it.
+
+      No com.apple.security.get-task-allow: Xcode injects it for Debug builds via
+      CODE_SIGN_INJECT_BASE_ENTITLEMENTS; a Release archive must not carry it, or
+      notarization is refused.
+    -->
+</dict>
+</plist>
