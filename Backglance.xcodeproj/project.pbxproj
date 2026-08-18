@@ -11,16 +11,35 @@
 		BG000000000000000002021 /* BackglanceCapture in Frameworks */ = {isa = PBXBuildFile; productRef = BG000000000000000002022 /* BackglanceCapture */; };
 		BG000000000000000002031 /* BackglanceSearch in Frameworks */ = {isa = PBXBuildFile; productRef = BG000000000000000002032 /* BackglanceSearch */; };
 		BG000000000000000002041 /* BackglanceUI in Frameworks */ = {isa = PBXBuildFile; productRef = BG000000000000000002042 /* BackglanceUI */; };
+		BG0000000000000000003110 /* BackglanceCore in Frameworks */ = {isa = PBXBuildFile; productRef = BG0000000000000000003120 /* BackglanceCore */; };
+		BG0000000000000000003111 /* BackglanceTestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = BG0000000000000000003121 /* BackglanceTestSupport */; };
+		BG0000000000000000003210 /* BackglanceCore in Frameworks */ = {isa = PBXBuildFile; productRef = BG0000000000000000003220 /* BackglanceCore */; };
+		BG0000000000000000003211 /* BackglanceCapture in Frameworks */ = {isa = PBXBuildFile; productRef = BG0000000000000000003221 /* BackglanceCapture */; };
+		BG0000000000000000003212 /* BackglanceTestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = BG0000000000000000003222 /* BackglanceTestSupport */; };
+		BG0000000000000000003310 /* BackglanceCore in Frameworks */ = {isa = PBXBuildFile; productRef = BG0000000000000000003320 /* BackglanceCore */; };
+		BG0000000000000000003311 /* BackglanceSearch in Frameworks */ = {isa = PBXBuildFile; productRef = BG0000000000000000003321 /* BackglanceSearch */; };
+		BG0000000000000000003312 /* BackglanceTestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = BG0000000000000000003322 /* BackglanceTestSupport */; };
+		BG0000000000000000003410 /* BackglanceCore in Frameworks */ = {isa = PBXBuildFile; productRef = BG0000000000000000003420 /* BackglanceCore */; };
+		BG0000000000000000003411 /* BackglanceUI in Frameworks */ = {isa = PBXBuildFile; productRef = BG0000000000000000003421 /* BackglanceUI */; };
+		BG0000000000000000003412 /* BackglanceTestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = BG0000000000000000003422 /* BackglanceTestSupport */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		BG0000000000000000000001 /* Backglance.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Backglance.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BG0000000000000000000002 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		BG0000000000000000000003 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		BG0000000000000000003101 /* BackglanceCoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BackglanceCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BG0000000000000000003201 /* BackglanceCaptureTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BackglanceCaptureTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BG0000000000000000003301 /* BackglanceSearchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BackglanceSearchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BG0000000000000000003401 /* BackglanceUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BackglanceUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		BG0000000000000000000010 /* Backglance */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (BG0000000000000000000011 /* Exceptions for "Backglance" folder in "Backglance" target */,); path = Backglance; sourceTree = "<group>"; };
+		BG0000000000000000003108 /* BackglanceCoreTests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Tests/BackglanceCoreTests; sourceTree = "<group>"; };
+		BG0000000000000000003208 /* BackglanceCaptureTests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Tests/BackglanceCaptureTests; sourceTree = "<group>"; };
+		BG0000000000000000003308 /* BackglanceSearchTests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Tests/BackglanceSearchTests; sourceTree = "<group>"; };
+		BG0000000000000000003408 /* BackglanceUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Tests/BackglanceUITests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -43,6 +62,45 @@
 				BG000000000000000002021 /* BackglanceCapture in Frameworks */,
 				BG000000000000000002031 /* BackglanceSearch in Frameworks */,
 				BG000000000000000002041 /* BackglanceUI in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BG0000000000000000003103 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BG0000000000000000003110 /* BackglanceCore in Frameworks */,
+				BG0000000000000000003111 /* BackglanceTestSupport in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BG0000000000000000003203 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BG0000000000000000003210 /* BackglanceCore in Frameworks */,
+				BG0000000000000000003211 /* BackglanceCapture in Frameworks */,
+				BG0000000000000000003212 /* BackglanceTestSupport in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BG0000000000000000003303 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BG0000000000000000003310 /* BackglanceCore in Frameworks */,
+				BG0000000000000000003311 /* BackglanceSearch in Frameworks */,
+				BG0000000000000000003312 /* BackglanceTestSupport in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BG0000000000000000003403 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BG0000000000000000003410 /* BackglanceCore in Frameworks */,
+				BG0000000000000000003411 /* BackglanceUI in Frameworks */,
+				BG0000000000000000003412 /* BackglanceTestSupport in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -104,6 +162,105 @@
 			productReference = BG0000000000000000000001 /* Backglance.app */;
 			productType = "com.apple.product-type.application";
 		};
+		BG0000000000000000003100 /* BackglanceCoreTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BG0000000000000000003105 /* Build configuration list for PBXNativeTarget "BackglanceCoreTests" */;
+			buildPhases = (
+				BG0000000000000000003102 /* Sources */,
+				BG0000000000000000003103 /* Frameworks */,
+				BG0000000000000000003104 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				BG0000000000000000003108 /* BackglanceCoreTests */,
+			);
+			name = BackglanceCoreTests;
+			packageProductDependencies = (
+				BG0000000000000000003120 /* BackglanceCore */,
+				BG0000000000000000003121 /* BackglanceTestSupport */,
+			);
+			productName = BackglanceCoreTests;
+			productReference = BG0000000000000000003101 /* BackglanceCoreTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		BG0000000000000000003200 /* BackglanceCaptureTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BG0000000000000000003205 /* Build configuration list for PBXNativeTarget "BackglanceCaptureTests" */;
+			buildPhases = (
+				BG0000000000000000003202 /* Sources */,
+				BG0000000000000000003203 /* Frameworks */,
+				BG0000000000000000003204 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				BG0000000000000000003208 /* BackglanceCaptureTests */,
+			);
+			name = BackglanceCaptureTests;
+			packageProductDependencies = (
+				BG0000000000000000003220 /* BackglanceCore */,
+				BG0000000000000000003221 /* BackglanceCapture */,
+				BG0000000000000000003222 /* BackglanceTestSupport */,
+			);
+			productName = BackglanceCaptureTests;
+			productReference = BG0000000000000000003201 /* BackglanceCaptureTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		BG0000000000000000003300 /* BackglanceSearchTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BG0000000000000000003305 /* Build configuration list for PBXNativeTarget "BackglanceSearchTests" */;
+			buildPhases = (
+				BG0000000000000000003302 /* Sources */,
+				BG0000000000000000003303 /* Frameworks */,
+				BG0000000000000000003304 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				BG0000000000000000003308 /* BackglanceSearchTests */,
+			);
+			name = BackglanceSearchTests;
+			packageProductDependencies = (
+				BG0000000000000000003320 /* BackglanceCore */,
+				BG0000000000000000003321 /* BackglanceSearch */,
+				BG0000000000000000003322 /* BackglanceTestSupport */,
+			);
+			productName = BackglanceSearchTests;
+			productReference = BG0000000000000000003301 /* BackglanceSearchTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		BG0000000000000000003400 /* BackglanceUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BG0000000000000000003405 /* Build configuration list for PBXNativeTarget "BackglanceUITests" */;
+			buildPhases = (
+				BG0000000000000000003402 /* Sources */,
+				BG0000000000000000003403 /* Frameworks */,
+				BG0000000000000000003404 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				BG0000000000000000003408 /* BackglanceUITests */,
+			);
+			name = BackglanceUITests;
+			packageProductDependencies = (
+				BG0000000000000000003420 /* BackglanceCore */,
+				BG0000000000000000003421 /* BackglanceUI */,
+				BG0000000000000000003422 /* BackglanceTestSupport */,
+			);
+			productName = BackglanceUITests;
+			productReference = BG0000000000000000003401 /* BackglanceUITests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -134,12 +291,17 @@
 				BG000000000000000002023 /* XCLocalSwiftPackageReference "Packages/BackglanceCapture" */,
 				BG000000000000000002033 /* XCLocalSwiftPackageReference "Packages/BackglanceSearch" */,
 				BG000000000000000002043 /* XCLocalSwiftPackageReference "Packages/BackglanceUI" */,
+				BG0000000000000000002053 /* XCLocalSwiftPackageReference "Tests/BackglanceTestSupport" */,
 			);
 			productRefGroup = BG0000000000000000000060 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				BG0000000000000000000020 /* Backglance */,
+				BG0000000000000000003100 /* BackglanceCoreTests */,
+				BG0000000000000000003200 /* BackglanceCaptureTests */,
+				BG0000000000000000003300 /* BackglanceSearchTests */,
+				BG0000000000000000003400 /* BackglanceUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -152,10 +314,66 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BG0000000000000000003104 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BG0000000000000000003204 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BG0000000000000000003304 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BG0000000000000000003404 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		BG0000000000000000000080 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BG0000000000000000003102 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BG0000000000000000003202 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BG0000000000000000003302 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BG0000000000000000003402 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -306,6 +524,118 @@
 			};
 			name = Release;
 		};
+		BG0000000000000000003106 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.backglance.BackglanceCoreTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Debug;
+		};
+		BG0000000000000000003107 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.backglance.BackglanceCoreTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Release;
+		};
+		BG0000000000000000003206 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.backglance.BackglanceCaptureTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Debug;
+		};
+		BG0000000000000000003207 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.backglance.BackglanceCaptureTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Release;
+		};
+		BG0000000000000000003306 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.backglance.BackglanceSearchTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Debug;
+		};
+		BG0000000000000000003307 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.backglance.BackglanceSearchTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Release;
+		};
+		BG0000000000000000003406 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.backglance.BackglanceUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Debug;
+		};
+		BG0000000000000000003407 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.backglance.BackglanceUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -324,6 +654,10 @@
 		BG000000000000000002043 /* XCLocalSwiftPackageReference "Packages/BackglanceUI" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/BackglanceUI;
+		};
+		BG0000000000000000002053 /* XCLocalSwiftPackageReference "Tests/BackglanceTestSupport" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Tests/BackglanceTestSupport;
 		};
 /* End XCLocalSwiftPackageReference section */
 
@@ -346,6 +680,42 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		BG0000000000000000003105 /* Build configuration list for PBXNativeTarget "BackglanceCoreTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BG0000000000000000003106 /* Debug */,
+				BG0000000000000000003107 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BG0000000000000000003205 /* Build configuration list for PBXNativeTarget "BackglanceCaptureTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BG0000000000000000003206 /* Debug */,
+				BG0000000000000000003207 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BG0000000000000000003305 /* Build configuration list for PBXNativeTarget "BackglanceSearchTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BG0000000000000000003306 /* Debug */,
+				BG0000000000000000003307 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BG0000000000000000003405 /* Build configuration list for PBXNativeTarget "BackglanceUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BG0000000000000000003406 /* Debug */,
+				BG0000000000000000003407 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -364,6 +734,50 @@
 		BG000000000000000002042 /* BackglanceUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = BackglanceUI;
+		};
+		BG0000000000000000003120 /* BackglanceCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BackglanceCore;
+		};
+		BG0000000000000000003121 /* BackglanceTestSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BackglanceTestSupport;
+		};
+		BG0000000000000000003220 /* BackglanceCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BackglanceCore;
+		};
+		BG0000000000000000003221 /* BackglanceCapture */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BackglanceCapture;
+		};
+		BG0000000000000000003222 /* BackglanceTestSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BackglanceTestSupport;
+		};
+		BG0000000000000000003320 /* BackglanceCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BackglanceCore;
+		};
+		BG0000000000000000003321 /* BackglanceSearch */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BackglanceSearch;
+		};
+		BG0000000000000000003322 /* BackglanceTestSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BackglanceTestSupport;
+		};
+		BG0000000000000000003420 /* BackglanceCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BackglanceCore;
+		};
+		BG0000000000000000003421 /* BackglanceUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BackglanceUI;
+		};
+		BG0000000000000000003422 /* BackglanceTestSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BackglanceTestSupport;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

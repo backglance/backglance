@@ -1,0 +1,67 @@
+{
+  "configurations": [
+    {
+      "id": "6C582B62-E0E5-AA05-6473-88BD045F2E3E",
+      "name": "Fast",
+      "options": {
+        "environmentVariableEntries": [
+          {
+            "key": "BACKGLANCE_TEST_SCOPE",
+            "value": "fast"
+          }
+        ]
+      }
+    },
+    {
+      "id": "008DACB6-D1E8-5BD8-C0AE-9661C4472810",
+      "name": "Full",
+      "options": {
+        "environmentVariableEntries": [
+          {
+            "key": "BACKGLANCE_TEST_SCOPE",
+            "value": "full"
+          }
+        ]
+      }
+    }
+  ],
+  "defaultOptions": {
+    "codeCoverage": true,
+    "targetForVariableExpansion": {
+      "containerPath": "container:Backglance.xcodeproj",
+      "identifier": "BG0000000000000000000020",
+      "name": "Backglance"
+    }
+  },
+  "testTargets": [
+    {
+      "target": {
+        "containerPath": "container:Backglance.xcodeproj",
+        "identifier": "BG0000000000000000003100",
+        "name": "BackglanceCoreTests"
+      }
+    },
+    {
+      "target": {
+        "containerPath": "container:Backglance.xcodeproj",
+        "identifier": "BG0000000000000000003200",
+        "name": "BackglanceCaptureTests"
+      }
+    },
+    {
+      "target": {
+        "containerPath": "container:Backglance.xcodeproj",
+        "identifier": "BG0000000000000000003300",
+        "name": "BackglanceSearchTests"
+      }
+    },
+    {
+      "target": {
+        "containerPath": "container:Backglance.xcodeproj",
+        "identifier": "BG0000000000000000003400",
+        "name": "BackglanceUITests"
+      }
+    }
+  ],
+  "version": 1
+}

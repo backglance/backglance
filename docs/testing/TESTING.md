@@ -82,7 +82,25 @@ Tests/
 
 `Tests/Fixtures/` is a resource directory of the `BackglanceCaptureTests` and `BackglanceCoreTests` targets (`resources: [.copy("Fixtures/SystemStore")]` in each `Package.swift`, reaching the root `Tests/Fixtures/` through a `Fixtures` symlink inside the test target — see [TECH_STACK.md](../architecture/TECH_STACK.md#packageswift-excerpts) for why), so tests reach them through `Bundle.module.resourceURL`. `Support/` files are shared through a small internal `BackglanceTestSupport` target so the SplitMix64 generator, the test clock, and stubs are written once.
 
-`Backglance.xctestplan` runs all four bundles in Debug. The plan has two configurations: `Fast` (unit + fixtures, what a PR runs first) and `Full` (everything including UI).
+`Backglance.xctestplan` runs all four bundles in Debug. The plan has two configurations: `Fast`
+(unit + fixtures, what a PR runs first) and `Full` (everything including UI). An Xcode test-plan
+configuration varies *options*, not target membership, so the two are told apart by the
+`BACKGLANCE_TEST_SCOPE` environment variable (`fast` / `full`) that each configuration sets; a suite
+that only belongs in `Full` — the UI tests, the performance tests — skips itself when the variable
+reads `fast`.
+
+Each bundle is declared **twice**, over one set of source files:
+
+- as a native Xcode unit-test target in `Backglance.xcodeproj`, which is what the test plan and
+  `ci.yml` run (`xcodebuild test -scheme Backglance -testPlan Backglance`), and
+- as a `.testTarget` in the owning package's `Package.swift`, which is what `swift test` runs from a
+  package directory, without Xcode.
+
+The duplication is deliberate: Xcode does not surface a local package's test targets as testables of
+the containing project, so a project-level test plan cannot reach them. Both declarations compile
+`Tests/<Bundle>/`, so there is exactly one copy of every test. Adding a *file* needs no change to
+either declaration — the Xcode targets use synchronized folders and SwiftPM globs the directory —
+but adding a *bundle* means adding it in both places.
 
 ## Fixture databases
 

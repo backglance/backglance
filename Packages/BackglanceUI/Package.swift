@@ -13,6 +13,7 @@ let package = Package(
         .library(name: "BackglanceUI", targets: ["BackglanceUI"]),
     ],
     dependencies: [
+        .package(path: "../../Tests/BackglanceTestSupport"),
         .package(path: "../BackglanceCore"),
     ],
     targets: [
@@ -27,7 +28,7 @@ let package = Package(
         ),
         .testTarget(
             name: "BackglanceUITests",
-            dependencies: ["BackglanceUI"],
+            dependencies: ["BackglanceUI", "BackglanceTestSupport"],
             path: "Tests/BackglanceUITests"
         ),
     ]

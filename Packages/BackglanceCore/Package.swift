@@ -8,6 +8,7 @@ let package = Package(
         .library(name: "BackglanceCore", targets: ["BackglanceCore"]),
     ],
     dependencies: [
+        .package(path: "../../Tests/BackglanceTestSupport"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.0.0"),
     ],
     targets: [
@@ -22,8 +23,11 @@ let package = Package(
         ),
         .testTarget(
             name: "BackglanceCoreTests",
-            dependencies: ["BackglanceCore"],
-            path: "Tests/BackglanceCoreTests"
+            dependencies: ["BackglanceCore", "BackglanceTestSupport"],
+            path: "Tests/BackglanceCoreTests",
+            resources: [
+                .copy("SharedFixtures/SystemStore"), // macOS14/, macOS15/, macOS26/ — synthetic only
+            ]
         ),
     ]
 )
