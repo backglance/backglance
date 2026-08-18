@@ -46,14 +46,14 @@ public struct ArchivedNotification: Codable, FetchableRecord, MutablePersistable
     /// in the DDL, so GRDB infers the join without an explicit column list.
     public static let app = belongsTo(AppRecord.self)
 
-    // MARK: `awaySession` / `redactions` associations arrive with BACKGLANCE-35
+    /// The away session `deliveredAt` fell inside, if any. The foreign key
+    /// (`notifications.away_session_id`, `ON DELETE SET NULL`) is declared
+    /// in the DDL, so GRDB infers the join without an explicit column list.
+    public static let awaySession = belongsTo(AwaySession.self)
 
-    //
-    // `AwaySession` and `RedactionEvent` do not exist in this module yet
-    // (they are scoped to a separate task). `notifications.away_session_id`
-    // and the `redactions` table already exist in the DDL — only the Swift
-    // associations (`belongsTo(AwaySession.self)`, `hasMany(RedactionEvent.self)`)
-    // are deferred, and should be added here once those model types land.
+    /// Redaction events recorded for this notification's text.
+    /// `ON DELETE CASCADE` on `redactions.notification_id`.
+    public static let redactions = hasMany(RedactionEvent.self)
 
     /// `nil` until the row is inserted; ``didInsert(_:)`` fills it from the
     /// autoincrement rowID.
