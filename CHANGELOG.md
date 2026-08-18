@@ -18,6 +18,11 @@ Work in progress toward v1.0 — the nine MVP feature groups (see [docs/referenc
 Project scaffolding is complete: a fresh clone runs `Scripts/bootstrap.sh`, opens in Xcode, builds,
 tests and lints clean.
 
+Continuous integration is deliberately not running yet. The four workflow files are authored and
+their gates reproduce green locally, but they stay untracked until M4 so that nothing is verified by
+a pipeline that no one is watching; `docs/deployment/CI_CD.md` remains the canonical copy. Until
+then, the build, test and lint gates are local commands.
+
 ### Added
 
 - `Backglance.xcodeproj` with the `Backglance` app target — macOS 14.0 deployment target, Swift 5
@@ -51,10 +56,10 @@ tests and lints clean.
 
 Planned pre-release tags on the way to 1.0.0, one per milestone (targets, not promises):
 
-- `0.2.0` — M1: capture, archive, adapters, fixtures
-- `0.3.0` — M2: timeline and search
-- `0.4.0` — M3: digest, privacy controls, onboarding
-- `1.0.0` — M4: actions, rules, foundation, release pipeline
+- `v0.2.0` — M1: capture, archive, adapters, fixtures
+- `v0.3.0` — M2: timeline and search
+- `v0.4.0` — M3: digest, privacy controls, onboarding
+- `v1.0.0` — M4: actions, rules, foundation, release pipeline
 
 ## [0.1.0] - 2026-08-17
 
