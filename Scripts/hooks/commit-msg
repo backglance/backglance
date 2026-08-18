@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Scripts/hooks/commit-msg — git commit-msg hook for Backglance.
+#
+# Installed as a symlink into .git/hooks/commit-msg by Scripts/bootstrap.sh.
+# Git calls this with exactly one argument: the path to a file containing the
+# commit message (COMMIT_EDITMSG). A pre-commit hook cannot see the message,
+# so message-shaped validation (Conventional Commits, DCO sign-off) lives here
+# instead — kept consistent with .claude/hooks/validate-commit.sh.
+set -euo pipefail
+
+MSG_FILE="${1:?usage: commit-msg <path-to-commit-message-file>}"
+
+# Strip comment lines (git leaves the "# Please enter the commit message..."
+# scaffolding in the file) and trailing blank lines before validating.
+message="$(grep -v '^#' "$MSG_FILE" || true)"
+title="$(printf '%s\n' "$message" | sed '/^[[:space:]]*$/d' | head -n1)"
+
+# ============================================
+# CHECK 1: Conventional Commits format
+# ============================================
+# Pattern: type(scope): description
+# Valid types: feat, fix, docs, refactor, test, chore, perf, ci
+if [[ -z "$title" ]]; then
+  echo "ERROR: Commit message is empty" >&2
+  exit 1
+fi
+
+if ! echo "$title" | grep -qE '^(feat|fix|docs|refactor|test|chore|perf|ci)(\([^)]+\))?:[[:space:]].+'; then
+  echo "ERROR: Commit message must follow conventional commits format" >&2
+  echo "" >&2
+  echo "Format: type(scope): description" >&2
+  echo "Valid types: feat, fix, docs, refactor, test, chore, perf, ci" >&2
+  echo "" >&2
+  echo "Examples:" >&2
+  echo "  feat(capture): add StoreAdapterV26 with fingerprint match" >&2
+  echo "  fix(digest): merge away sessions separated by under 60s" >&2
+  echo "  docs(readme): update the macOS compatibility table" >&2
+  echo "" >&2
+  echo "Your title: $title" >&2
+  exit 1
+fi
+
+# ============================================
+# CHECK 2: Title length (10-72 chars)
+# ============================================
+title_length=${#title}
+if [[ $title_length -gt 72 ]]; then
+  echo "ERROR: Commit title too long ($title_length > 72 characters)" >&2
+  echo "" >&2
+  echo "Keep the first line under 72 characters." >&2
+  echo "Your title: $title" >&2
+  exit 1
+fi
+
+if [[ $title_length -lt 10 ]]; then
+  echo "ERROR: Commit message too short ($title_length < 10 characters)" >&2
+  echo "" >&2
+  echo "Provide a meaningful description of the change." >&2
+  exit 1
+fi
+
+# ============================================
+# CHECK 3: DCO sign-off
+# ============================================
+# docs/contributing/CONTRIBUTING.md requires every commit to carry a
+# "Signed-off-by:" trailer certifying the Developer Certificate of Origin.
+# `git commit -s` adds this automatically.
+if ! printf '%s\n' "$message" | grep -qE '^Signed-off-by: .+ <.+@.+>$'; then
+  echo "ERROR: Commit is missing a DCO sign-off" >&2
+  echo "" >&2
+  echo "Every commit must carry a 'Signed-off-by:' trailer (see" >&2
+  echo "docs/contributing/CONTRIBUTING.md#license-and-contribution-terms)." >&2
+  echo "" >&2
+  echo "Fix: git commit -s --amend --no-edit" >&2
+  echo "     (or: git rebase --signoff <base> for a whole branch)" >&2
+  exit 1
+fi
+
+exit 0

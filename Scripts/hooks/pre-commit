@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# Scripts/hooks/pre-commit — git pre-commit hook for Backglance.
+#
+# Installed as a symlink into .git/hooks/pre-commit by Scripts/bootstrap.sh.
+# Receives no arguments; inspects the staged index with `git diff --cached`.
+#
+# Checks (kept consistent with .claude/hooks/validate-commit.sh):
+#   1. No test/screenshot artifacts staged (page-*.png, screenshot*.png, ...).
+#   2. Nothing that looks like a copy of Apple's notification store staged.
+#   3. Staged fixture .db files pass the synthetic-data hygiene scan.
+#   4. Optional: swiftlint / swiftformat --lint on staged Swift files, if installed.
+#
+# Commit *message* validation (Conventional Commits, DCO sign-off) lives in
+# Scripts/hooks/commit-msg — a git pre-commit hook is never given the message.
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+staged_files="$(git diff --cached --name-only --diff-filter=ACM || true)"
+
+if [[ -z "$staged_files" ]]; then
+  exit 0
+fi
+
+fail=0
+
+# ============================================
+# CHECK 1: No test/screenshot artifacts
+# ============================================
+staged_artifacts="$(printf '%s\n' "$staged_files" \
+  | grep -iE '\.(png|jpg|jpeg)$' \
+  | grep -iE '(page-|screenshot|test-|temp-|tmp-)' || true)"
+
+if [[ -n "$staged_artifacts" ]]; then
+  echo "ERROR: Test/screenshot image files detected in commit" >&2
+  echo "" >&2
+  echo "The following files appear to be test artifacts:" >&2
+  echo "$staged_artifacts" | sed 's/^/  - /' >&2
+  echo "" >&2
+  echo "Remove them from staging:" >&2
+  echo "  git reset HEAD <file>" >&2
+  echo "" >&2
+  echo "Or delete them entirely:" >&2
+  echo "  git rm --cached <file> && rm <file>" >&2
+  fail=1
+fi
+
+# ============================================
+# CHECK 2: No real system store copies
+# ============================================
+# The Notification Center store must never be committed — fixtures are synthetic.
+# See docs/testing/TESTING.md and docs/contributing/CONTRIBUTING.md.
+suspect_store="$(printf '%s\n' "$staged_files" \
+  | grep -iE '(^|/)(db|db-wal|db-shm)$|usernoted|DoNotDisturb|Assertions\.json' || true)"
+
+if [[ -n "$suspect_store" ]]; then
+  echo "ERROR: A file that looks like a copy of Apple's notification store is staged" >&2
+  echo "" >&2
+  echo "$suspect_store" | sed 's/^/  - /' >&2
+  echo "" >&2
+  echo "Backglance never commits a real system store. Fixtures are generated" >&2
+  echo "synthetically by Scripts/make_fixture.sh — see docs/testing/TESTING.md." >&2
+  echo "" >&2
+  echo "  git reset HEAD <file>" >&2
+  fail=1
+fi
+
+# ============================================
+# CHECK 3: Fixtures must pass the synthetic-data hygiene scan
+# ============================================
+staged_fixtures="$(printf '%s\n' "$staged_files" \
+  | grep -E '^Tests/Fixtures/SystemStore/.*\.db$' || true)"
+
+if [[ -n "$staged_fixtures" && -x "Scripts/verify_fixture.sh" ]]; then
+  while IFS= read -r fixture; do
+    [[ -z "$fixture" ]] && continue
+    if ! Scripts/verify_fixture.sh "$fixture" >/dev/null 2>&1; then
+      echo "ERROR: Fixture failed the synthetic-data check: $fixture" >&2
+      echo "" >&2
+      echo "Run it directly to see what matched:" >&2
+      echo "  Scripts/verify_fixture.sh $fixture" >&2
+      fail=1
+    fi
+  done <<< "$staged_fixtures"
+fi
+
+# ============================================
+# CHECK 4: swiftlint / swiftformat on staged Swift files, if installed
+# ============================================
+# Per docs/getting-started/SETUP_GUIDE.md: "run by the pre-commit hook if present".
+staged_swift="$(printf '%s\n' "$staged_files" | grep -E '\.swift$' || true)"
+
+if [[ -n "$staged_swift" ]]; then
+  if command -v swiftlint >/dev/null 2>&1; then
+    while IFS= read -r swift_file; do
+      [[ -z "$swift_file" ]] && continue
+      [[ -f "$swift_file" ]] || continue
+      if ! swiftlint lint --quiet --strict --path "$swift_file"; then
+        echo "ERROR: swiftlint found violations in $swift_file" >&2
+        fail=1
+      fi
+    done <<< "$staged_swift"
+  fi
+
+  if command -v swiftformat >/dev/null 2>&1; then
+    # shellcheck disable=SC2086
+    if ! swiftformat --lint $staged_swift 2>&1; then
+      echo "ERROR: swiftformat --lint found unformatted files (run: swiftformat .)" >&2
+      fail=1
+    fi
+  fi
+fi
+
+if [[ "$fail" -ne 0 ]]; then
+  exit 1
+fi
+
+exit 0
