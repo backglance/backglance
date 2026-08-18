@@ -27,6 +27,7 @@ let package = Package(
             path: "Tests/BackglanceCoreTests",
             resources: [
                 .copy("SharedFixtures/SystemStore"), // macOS14/, macOS15/, macOS26/ — synthetic only
+                .copy("SharedFixtures/Archive"), // v*.sqlite — frozen archives, synthetic rows only
             ]
         ),
     ]
