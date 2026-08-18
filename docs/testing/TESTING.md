@@ -80,7 +80,7 @@ Tests/
     └── Archive/                                v1.sqlite, v2.sqlite, ...; archive-100k.sqlite (perf)
 ```
 
-`Tests/Fixtures/` is a resource directory of the `BackglanceCaptureTests` and `BackglanceCoreTests` targets (`resources: [.copy("../Fixtures")]` in each `Package.swift`), so tests reach them through `Bundle.module.resourceURL`. `Support/` files are shared through a small internal `BackglanceTestSupport` target so the SplitMix64 generator, the test clock, and stubs are written once.
+`Tests/Fixtures/` is a resource directory of the `BackglanceCaptureTests` and `BackglanceCoreTests` targets (`resources: [.copy("Fixtures/SystemStore")]` in each `Package.swift`, reaching the root `Tests/Fixtures/` through a `Fixtures` symlink inside the test target — see [TECH_STACK.md](../architecture/TECH_STACK.md#packageswift-excerpts) for why), so tests reach them through `Bundle.module.resourceURL`. `Support/` files are shared through a small internal `BackglanceTestSupport` target so the SplitMix64 generator, the test clock, and stubs are written once.
 
 `Backglance.xctestplan` runs all four bundles in Debug. The plan has two configurations: `Fast` (unit + fixtures, what a PR runs first) and `Full` (everything including UI).
 

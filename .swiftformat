@@ -1,7 +1,7 @@
 # SwiftFormat Configuration for Backglance
 
 # File options
---exclude DerivedData,.build,.swiftpm,Pods,Carthage,vendor,Tests/Fixtures
+--exclude DerivedData,build,.build,Packages/*/.build,Packages/*/.swiftpm,.swiftpm,Pods,Carthage,vendor,Tests/Fixtures
 
 # Format options
 --allman false

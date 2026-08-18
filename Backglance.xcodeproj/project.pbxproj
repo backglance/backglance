@@ -6,6 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		BG000000000000000002011 /* BackglanceCore in Frameworks */ = {isa = PBXBuildFile; productRef = BG000000000000000002012 /* BackglanceCore */; };
+		BG000000000000000002021 /* BackglanceCapture in Frameworks */ = {isa = PBXBuildFile; productRef = BG000000000000000002022 /* BackglanceCapture */; };
+		BG000000000000000002031 /* BackglanceSearch in Frameworks */ = {isa = PBXBuildFile; productRef = BG000000000000000002032 /* BackglanceSearch */; };
+		BG000000000000000002041 /* BackglanceUI in Frameworks */ = {isa = PBXBuildFile; productRef = BG000000000000000002042 /* BackglanceUI */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		BG0000000000000000000001 /* Backglance.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Backglance.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BG0000000000000000000002 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
@@ -32,6 +39,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BG000000000000000002011 /* BackglanceCore in Frameworks */,
+				BG000000000000000002021 /* BackglanceCapture in Frameworks */,
+				BG000000000000000002031 /* BackglanceSearch in Frameworks */,
+				BG000000000000000002041 /* BackglanceUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -84,6 +95,10 @@
 			);
 			name = Backglance;
 			packageProductDependencies = (
+				BG000000000000000002012 /* BackglanceCore */,
+				BG000000000000000002022 /* BackglanceCapture */,
+				BG000000000000000002032 /* BackglanceSearch */,
+				BG000000000000000002042 /* BackglanceUI */,
 			);
 			productName = Backglance;
 			productReference = BG0000000000000000000001 /* Backglance.app */;
@@ -114,6 +129,12 @@
 			mainGroup = BG0000000000000000000040;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
+			packageReferences = (
+				BG000000000000000002013 /* XCLocalSwiftPackageReference "Packages/BackglanceCore" */,
+				BG000000000000000002023 /* XCLocalSwiftPackageReference "Packages/BackglanceCapture" */,
+				BG000000000000000002033 /* XCLocalSwiftPackageReference "Packages/BackglanceSearch" */,
+				BG000000000000000002043 /* XCLocalSwiftPackageReference "Packages/BackglanceUI" */,
+			);
 			productRefGroup = BG0000000000000000000060 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -287,6 +308,25 @@
 		};
 /* End XCBuildConfiguration section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		BG000000000000000002013 /* XCLocalSwiftPackageReference "Packages/BackglanceCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/BackglanceCore;
+		};
+		BG000000000000000002023 /* XCLocalSwiftPackageReference "Packages/BackglanceCapture" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/BackglanceCapture;
+		};
+		BG000000000000000002033 /* XCLocalSwiftPackageReference "Packages/BackglanceSearch" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/BackglanceSearch;
+		};
+		BG000000000000000002043 /* XCLocalSwiftPackageReference "Packages/BackglanceUI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/BackglanceUI;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCConfigurationList section */
 		BG0000000000000000000110 /* Build configuration list for PBXProject "Backglance" */ = {
 			isa = XCConfigurationList;
@@ -307,6 +347,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		BG000000000000000002012 /* BackglanceCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BackglanceCore;
+		};
+		BG000000000000000002022 /* BackglanceCapture */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BackglanceCapture;
+		};
+		BG000000000000000002032 /* BackglanceSearch */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BackglanceSearch;
+		};
+		BG000000000000000002042 /* BackglanceUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BackglanceUI;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = BG0000000000000000000100 /* Project object */;
 }

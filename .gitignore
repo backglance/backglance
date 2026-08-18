@@ -20,13 +20,16 @@ xcuserdata/
 *.moved-aside
 *.xcuserstate
 *.xcscmblueprint
-*.xcworkspace
-!default.xcworkspace
+*.xcworkspace/xcuserdata/
+*.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+*.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
 
 # Swift Package Manager
 .build/
 .swiftpm/
-Package.resolved
+# Package.resolved is deliberately NOT ignored: TECH_STACK.md pins GRDB and Sparkle
+# with `from:` rather than `exact:`, so the committed resolution is what makes a build
+# reproducible, and ci.yml keys its SPM cache on the hash of these files.
 
 # CocoaPods
 Pods/

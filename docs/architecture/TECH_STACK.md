@@ -375,6 +375,17 @@ Apple frameworks used, per package:
 
 Each package under `Packages/` is a standalone SPM package so it can be built and tested with `swift build` / `swift test` without opening the Xcode project. Local dependencies use `.package(path:)`.
 
+> ⚠️ **Why the test targets are reached through symlinks.** SwiftPM refuses a target whose path
+> escapes the package root (`target 'X' in package 'y' is outside the package root`), and it silently
+> skips a resource whose real path does so too. The test sources still live at the repository root, in
+> `Tests/`, because `Backglance.xctestplan`, `ci.yml` and `Scripts/verify_fixture.sh` all address them
+> there. Each package therefore carries one symlink per test target —
+> `Packages/BackglanceCore/Tests/BackglanceCoreTests -> ../../../Tests/BackglanceCoreTests` — and the
+> capture fixtures are reached through a second one, `Tests/BackglanceCaptureTests/Fixtures ->
+> ../Fixtures`, so `.copy("Fixtures/SystemStore")` resolves inside the target directory and the
+> fixtures land in `Bundle.module` as [TESTING.md](../testing/TESTING.md) describes. Nothing is
+> duplicated: there is exactly one copy of every test file and every fixture, at the root.
+
 `Packages/BackglanceCore/Package.swift`:
 
 ```swift
@@ -403,7 +414,7 @@ let package = Package(
         .testTarget(
             name: "BackglanceCoreTests",
             dependencies: ["BackglanceCore"],
-            path: "../../Tests/BackglanceCoreTests"
+            path: "Tests/BackglanceCoreTests"
         ),
     ]
 )
@@ -442,9 +453,9 @@ let package = Package(
         .testTarget(
             name: "BackglanceCaptureTests",
             dependencies: ["BackglanceCapture"],
-            path: "../../Tests/BackglanceCaptureTests",
+            path: "Tests/BackglanceCaptureTests",
             resources: [
-                .copy("../Fixtures/SystemStore"),   // macOS14/, macOS15/, macOS26/ — synthetic only
+                .copy("Fixtures/SystemStore"),   // macOS14/, macOS15/, macOS26/ — synthetic only
             ]
         ),
     ]
@@ -485,7 +496,7 @@ let package = Package(
         .testTarget(
             name: "BackglanceSearchTests",
             dependencies: ["BackglanceSearch"],
-            path: "../../Tests/BackglanceSearchTests"
+            path: "Tests/BackglanceSearchTests"
         ),
     ]
 )
