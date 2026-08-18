@@ -15,8 +15,30 @@ Conventions used here:
 
 Work in progress toward v1.0 — the nine MVP feature groups (see [docs/reference/ROADMAP.md](docs/reference/ROADMAP.md) for milestones and status).
 
+Project scaffolding is complete: a fresh clone runs `Scripts/bootstrap.sh`, opens in Xcode, builds,
+tests and lints clean.
+
 ### Added
 
+- `Backglance.xcodeproj` with the `Backglance` app target — macOS 14.0 deployment target, Swift 5
+  language mode on the Swift 6 toolchain, complete strict concurrency, hardened runtime, and a
+  shared scheme. New sources need no project-file edit: the app and test targets use
+  filesystem-synchronized groups
+- `Config/Debug.xcconfig` and `Config/Release.xcconfig`, with the git-ignored `Local.xcconfig` pulled
+  in by `#include?` for personal-team signing; `agvtool` keeps the two version numbers in the project
+  file
+- `Backglance/Info.plist` (`LSUIElement`, the `backglance://` URL type, the Sparkle keys) and the
+  deliberately empty `Backglance/Backglance.entitlements` — no sandbox, no hardened-runtime
+  exceptions. `SUPublicEDKey` is a Release-only substitution, so a Debug build never starts the updater
+- Status item template imagesets (running, paused, degraded), an AppIcon placeholder, and an empty
+  `Localizable.xcstrings`
+- The four Swift packages — `BackglanceCore` (GRDB 7.x), `BackglanceCapture` (plus the
+  `FixtureGenerator` executable), `BackglanceSearch` (NaturalLanguage, Accelerate) and
+  `BackglanceUI` — wired into the app with the documented dependency direction
+- Four test bundles, the shared `BackglanceTestSupport` target (`SplitMix64`, `TestClock`, `Stubs`)
+  and `Backglance.xctestplan` with its `Fast` and `Full` configurations
+- `Scripts/bootstrap.sh`, `build.sh`, `grant_fda_hint.sh`, `ExportOptions.plist`, and the
+  `pre-commit` / `commit-msg` git hooks
 - Continuous capture: store watcher, fingerprinting, `StoreAdapterV14`/`V15`/`V26`, first-launch import, degraded mode (in progress)
 - Timeline: menu bar popover and full window, day/app grouping, compact and detailed rows, unread badge (in progress)
 - Instant search: FTS5 full-text search with filters, fuzzy matching, optional on-device semantic search (in progress)
