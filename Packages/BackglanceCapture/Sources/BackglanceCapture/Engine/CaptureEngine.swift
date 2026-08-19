@@ -76,13 +76,20 @@ public actor CaptureEngine {
     /// The adapter bootstrap chose, or `nil` while degraded. Diagnostics and tests.
     public private(set) var adapterID: String?
 
-    /// How many store records the engine has read since it was created. A capture metric,
-    /// and content-free by construction.
-    public private(set) var recordsRead = 0
+    /// What capture has done, as numbers. Content-free by construction, which is what
+    /// lets Settings show it and the diagnostics export carry it.
+    public private(set) var metrics = CaptureMetrics()
+
+    /// How many store records the engine has read since it was created.
+    public var recordsRead: Int {
+        metrics.totals.read
+    }
 
     /// How many of those became rows in the archive. The gap between this and
     /// ``recordsRead`` is exclusions, duplicates and records that would not parse.
-    public private(set) var recordsArchived = 0
+    public var recordsArchived: Int {
+        metrics.totals.archived
+    }
 
     /// How far capture has read. Settings shows its date; tests read it directly.
     public var currentCursor: StoreCursor {
@@ -221,26 +228,16 @@ public actor CaptureEngine {
                 return
             }
 
-            var archived = 0
+            var tally = CaptureMetrics.Tally()
             for raw in batch {
-                switch await archiveOne(raw, source: .live) {
-                case .archived,
-                     .updated:
-                    archived += 1
-
-                case .excluded,
-                     .duplicate,
-                     .failed:
-                    break
-                }
+                await tally.record(archiveOne(raw, source: .live))
                 cursor = adapter.cursor(for: raw)
             }
             try archive.saveCursor(cursor)
-            recordsRead += batch.count
-            recordsArchived += archived
+            metrics.add(tally)
 
             let reached = cursor.lastRecID
-            Log.capture.debug("tick \(reason.rawValue): \(archived)/\(batch.count) archived, through rec \(reached)")
+            Log.capture.debug("tick \(reason.rawValue): \(tally.summary), through rec \(reached)")
         } catch let error as CaptureError {
             transition(to: .degraded(error.degradedReason))
         } catch {
@@ -258,6 +255,15 @@ public actor CaptureEngine {
             return
         }
         status = newStatus
+
+        // Kept on the metrics too, because that is what the diagnostics export carries:
+        // "capture is degraded" is the first thing anyone reading one wants to know.
+        if case let .degraded(reason) = newStatus {
+            metrics.degradedReason = reason
+        } else {
+            metrics.degradedReason = nil
+        }
+
         statusContinuation.yield(newStatus)
         Log.capture.debug("status: \(newStatus.logDescription)")
     }

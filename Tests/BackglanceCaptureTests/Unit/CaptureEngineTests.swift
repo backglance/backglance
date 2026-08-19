@@ -256,6 +256,65 @@ final class CaptureEngineTests: XCTestCase {
         XCTAssertEqual(recordsRead, 0)
     }
 
+    // MARK: - Metrics
+
+    /// "Capture stopped working" is unanswerable without these. A tick that reads forty
+    /// records and archives three is correct if the rest were excluded and a bug if they
+    /// failed, and only the tally tells them apart.
+    func testATickTalliesEveryOutcome() async throws {
+        let engine = try XCTUnwrap(engine)
+        let storeURL = try XCTUnwrap(storeURL)
+        var corrupt = MiniatureStore.Row(recID: 2)
+        corrupt.payload = Data("not a property list".utf8)
+        try MiniatureStore.makeFile(at: storeURL, rows: [
+            MiniatureStore.notification(recID: 1),
+            corrupt,
+            MiniatureStore.notification(recID: 3),
+        ])
+
+        await engine.start()
+        await engine.tick(reason: .manual)
+
+        let metrics = await engine.metrics
+        XCTAssertEqual(metrics.ticks, 1)
+        XCTAssertEqual(metrics.totals.read, 3)
+        XCTAssertEqual(metrics.totals.archived, 2)
+        XCTAssertEqual(metrics.totals.failed, 1)
+        XCTAssertNotNil(metrics.lastTickAt)
+    }
+
+    /// 🔒 The summary goes into a log line and into a diagnostics export a user is about to
+    /// send to a stranger, so it is counts and nothing else.
+    func testTheMetricsSummaryIsCountsOnly() async throws {
+        let engine = try XCTUnwrap(engine)
+        try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: [
+            MiniatureStore.notification(recID: 1, bundleID: "com.example.chat", title: "Ada", body: "Landing at six"),
+        ])
+        await engine.start()
+        await engine.tick(reason: .manual)
+
+        let summary = await engine.metrics.summary
+
+        XCTAssertEqual(summary, "ticks 1 read 1 archived 1 updated 0 dup 0 excluded 0 failed 0 transient 0 resets 0")
+    }
+
+    /// Degrading is the thing a diagnostics report is usually about, so the reason is on
+    /// the metrics too — and it clears again when capture recovers.
+    func testTheDegradedReasonIsCarriedOnTheMetricsAndCleared() async throws {
+        let engine = try XCTUnwrap(engine)
+        let storeURL = try XCTUnwrap(storeURL)
+        await engine.start()
+
+        let degraded = await engine.metrics.degradedReason
+        XCTAssertEqual(degraded, .storeNotFound)
+
+        try MiniatureStore.makeFile(at: storeURL, rows: [MiniatureStore.notification(recID: 1)])
+        await engine.tick(reason: .screenUnlocked)
+
+        let recovered = await engine.metrics.degradedReason
+        XCTAssertNil(recovered)
+    }
+
     // MARK: - Status
 
     func testEveryTransitionReachesTheStatusStream() async throws {
