@@ -271,24 +271,28 @@ public enum Log {
 Usage at the parser boundary — success and error paths:
 
 ```swift
-// BackglanceCapture/Parsing/RecordParser+Logging.swift
-extension RecordParser {
-    func parseLogged(_ raw: RawStoreRecord) -> ParsedNotification? {
-        do {
-            let parsed = try parse(raw)
-            Log.parser.debug("parsed rec=\(raw.recID) bytes=\(raw.plistData.count) app=\(raw.appIdentifier)")
-            return parsed
-        } catch let error as RecordParser.ParseError {
-            // ParseError carries the *key name* that was missing, never its value.
-            Log.parser.error("parse failed rec=\(raw.recID) key=\(error.key) reason=\(error.reasonCode)")
-            return nil
-        } catch {
-            Log.parser.error("parse failed rec=\(raw.recID) reason=unknown")
-            return nil
-        }
-    }
+// BackglanceCapture/Parsing/RecordParser.swift — the parser has no error type of its
+// own: it throws CaptureError.parseFailed(recID:reason:), where `reason` is one of a
+// small fixed set of strings ("empty payload", "no delivered date", or a PlistGuard
+// shape such as "payload over 64 KB"). Never a fragment of the payload.
+throw CaptureError.parseFailed(recID: raw.recID, reason: "no delivered date")
+
+// BackglanceCapture/Engine/CaptureEngine.swift — where it is logged, once per record,
+// by rec_id and the fixed reason.
+do {
+    let parsed = try parser.parse(raw)
+    Log.parser.debug("parsed rec=\(raw.recID) bytes=\(raw.plistData.count) app=\(raw.appIdentifier)")
+    …
+} catch let error as CaptureError {
+    Log.capture.error("skip rec \(raw.recID): \(error.logDescription)")   // logDescription is content-free
+    return .failed
+} catch {
+    Log.capture.error("rec \(raw.recID): \(String(describing: type(of: error)))")
+    return .failed
 }
 ```
+
+A bad record is counted, not narrated: `ArchiveOutcome.failed` goes into the tick's tally, and the tally is what the summary line carries.
 
 > ℹ️ **Info:** `emit` marks the assembled string `.public` because by construction it contains only non-content values; the redaction happens *before* the string exists, at the type level. If you find yourself wanting `.private` inside `RedactingLogger`, the value should not be reaching it at all.
 
