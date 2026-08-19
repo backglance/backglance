@@ -19,20 +19,34 @@ import Foundation
 public actor EnrichmentService: NotificationEnricher {
     // MARK: Lifecycle
 
-    public init(icons: AppIconCache = AppIconCache()) {
+    public init(
+        icons: AppIconCache = AppIconCache(),
+        deepLinks: DeepLinkResolverRegistry = .default
+    ) {
         self.icons = icons
+        self.deepLinks = deepLinks
     }
 
     // MARK: Public
 
-    /// Caches the app's icon and returns the notification.
+    /// Caches the app's icon and resolves the notification's deep link.
     ///
     /// The icon is a side effect rather than a field: the archive has no icon column, and
     /// storing one per notification would keep thousands of copies of the same PNG. The
     /// timeline looks the icon up by bundle id when it draws.
+    ///
+    /// The deep link *is* a field, and this is the only chance to fill it: it is derived
+    /// from `userInfo`, which the archive does not keep. A notification that resolves to
+    /// nothing keeps a `nil` link and gets the app fallback when opened.
     public func enrich(_ notification: ParsedNotification) async -> ParsedNotification {
         icons.ensureIcon(forBundleID: notification.bundleID)
-        return notification
+
+        guard notification.deepLink == nil else {
+            return notification
+        }
+        var enriched = notification
+        enriched.deepLink = deepLinks.resolve(notification)
+        return enriched
     }
 
     /// Where the cached icon for `bundleID` is, if there is one.
@@ -43,4 +57,5 @@ public actor EnrichmentService: NotificationEnricher {
     // MARK: Private
 
     private let icons: AppIconCache
+    private let deepLinks: DeepLinkResolverRegistry
 }
