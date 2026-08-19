@@ -61,6 +61,55 @@ Planned pre-release tags on the way to 1.0.0, one per milestone (targets, not pr
 - `v0.4.0` — M3: digest, privacy controls, onboarding
 - `v1.0.0` — M4: actions, rules, foundation, release pipeline
 
+## [0.2.0] - unreleased
+
+M1 — capture core and archive. Backglance reads the system's notification store, recognises
+which macOS it is looking at, and keeps what it finds in its own database.
+
+> The tag is not cut yet: the milestone's exit criteria include live capture verified on
+> macOS 14, 15 and 26 from a fresh clone, which needs machines running those releases.
+> Everything else in the criteria is green — `Scripts/verify_fixture.sh` passes for all
+> three fixtures, and a 10 000-record import finishes well inside its ten-second budget.
+
+### Added
+
+- **The archive.** `Archive` over a GRDB `DatabasePool` in WAL mode, the `v1_initial` and
+  `v1_fts` migrations, `UnixDate`, `ArchiveHealth`, and the models for notifications, apps,
+  away sessions, digests, redactions and rules
+- **Store access.** `StoreLocation`, `StoreSnapshot` (copy first, open read-only, never
+  Apple's live file), `SnapshotDirectory` with its stale sweep, `StoreWatcher` (file events,
+  wake, unlock, poll, debounced into one stream) and `StoreCursor`, persisted in
+  `capture_state`
+- **Adapters.** `StoreAdapter` with `StoreAdapterV14`, `V15` and `V26` over a shared
+  `RecordQuery`, `StoreFingerprint`, and a registry that resolves by exact fingerprint, then
+  by OS major, then by newest adapter — with everything short of an exact match confirmed by
+  a probe before it is used
+- **Parsing.** `RecordParser` reading the store's abbreviated bplist keys with tolerant
+  fallbacks, `ParsedNotification`, and `PlistGuard`, which treats every payload as hostile
+  input: 64 KB per record, depth 8, 512 entries, 16 K characters, and never `NSKeyedUnarchiver`
+- **The capture engine.** An actor driven by the watcher: bootstrap into running or degraded,
+  a bounded batch per wake with the cursor persisted after it, the exclusion → redaction →
+  enrichment → insert pipeline, first-launch import, pause with a cursor fast-forward, and
+  in-place refresh for notifications the store rewrites
+- **Enrichment.** An on-disk app-icon cache and deep-link resolvers for Messages, Mail, Slack
+  and Discord, plus a generic scan that only accepts URLs this Mac can actually open
+- **Fixtures.** `FixtureGenerator`, `Scripts/make_fixture.sh`, `Scripts/verify_fixture.sh`, a
+  250-record synthetic fixture per supported macOS, and a harness that checks each one end to
+  end — fingerprint, adapter, probe, every parsed field, and the final cursor
+- **Observability.** The nine `Log` categories behind a `RedactingLogger` whose API cannot be
+  handed a notification, and `CaptureMetrics`, which counts what each tick did and nothing else
+
+### Security
+
+- Excluded apps are checked against the store row before the payload is decoded, so their
+  notifications never become objects in memory
+- Nothing that touches notification content can reach a log: `NotificationLogRef` carries an
+  id, a bundle id and a length, and the overloads that would take a notification are marked
+  unavailable
+- Every fixture is synthetic and machine-checked: `verify_fixture.sh` refuses an address
+  outside `example.*`, a phone number outside the fictional range, a `/Users/<name>/` path,
+  an iCloud address, or code-shaped text the generator did not produce
+
 ## [0.1.0] - 2026-08-17
 
 Initial pre-release. No binary is published for this tag; it marks the project skeleton and the documentation set. Everything described in the docs at this tag is design intent unless a later entry says it shipped.
