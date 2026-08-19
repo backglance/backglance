@@ -630,8 +630,7 @@ class FixtureHarness: XCTestCase {
     class var fixtureDirectory: String { "" }
 
     private var fixtureURL: URL {
-        Bundle.module.resourceURL!                                    // tests may force-unwrap
-            .appendingPathComponent("Fixtures/SystemStore/\(Self.fixtureDirectory)")
+        Fixtures.systemStore.appendingPathComponent(Self.fixtureDirectory, isDirectory: true)
     }
 
     func test_whenFixtureOpened_thenFingerprintMatchesManifest() throws {

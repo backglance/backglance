@@ -441,7 +441,7 @@ import GRDB
 
 final class StoreAdapterV27FixtureTests: XCTestCase {
     func testFixtureResolvesToV27AndParsesExpected() throws {
-        let dir = try XCTUnwrap(Bundle.module.url(forResource: "macOS27", withExtension: nil, subdirectory: "SystemStore"))
+        let dir = Fixtures.systemStore.appendingPathComponent("macOS27", isDirectory: true)
         let dbURL = dir.appendingPathComponent("store.db")
         var config = Configuration()
         config.readonly = true

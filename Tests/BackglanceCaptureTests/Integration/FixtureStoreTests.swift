@@ -1,4 +1,5 @@
 @testable import BackglanceCapture
+import BackglanceTestSupport
 import Foundation
 import GRDB
 import XCTest
@@ -249,7 +250,7 @@ class FixtureStoreTests: XCTestCase {
     }
 
     private static var root: URL? {
-        Bundle.module.resourceURL?.appendingPathComponent("SystemStore", isDirectory: true)
+        Fixtures.exists(Fixtures.systemStore) ? Fixtures.systemStore : nil
     }
 
     /// Runs `body` for every fixture the class covers, failing if there are none: a

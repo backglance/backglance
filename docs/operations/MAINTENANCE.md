@@ -323,7 +323,7 @@ import GRDB
 final class ArchiveUpgradeTests: XCTestCase {
     func testUpgradeFromEveryReleasedArchive() throws {
         let fixtures = try FileManager.default.contentsOfDirectory(
-            at: Bundle.module.resourceURL!.appendingPathComponent("Archive"),
+            at: Fixtures.archive,
             includingPropertiesForKeys: nil
         ).filter { $0.pathExtension == "sqlite" }
         XCTAssertFalse(fixtures.isEmpty, "no archive fixtures found")

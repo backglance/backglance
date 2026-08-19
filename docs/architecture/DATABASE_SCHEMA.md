@@ -1577,7 +1577,7 @@ final class AdapterFixtureTests: XCTestCase {
     }
 
     func testEachFixtureResolvesParsesAndMatchesExpected() throws {
-        let root = Bundle.module.resourceURL!.appendingPathComponent("Fixtures/SystemStore")
+        let root = Fixtures.systemStore
         for dirName in ["macOS14", "macOS15", "macOS26"] {
             let dir = root.appendingPathComponent(dirName)
             let manifest = try JSONDecoder().decode(Manifest.self, from: Data(contentsOf: dir.appendingPathComponent("manifest.json")))

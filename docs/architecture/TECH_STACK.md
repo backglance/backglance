@@ -376,15 +376,18 @@ Apple frameworks used, per package:
 Each package under `Packages/` is a standalone SPM package so it can be built and tested with `swift build` / `swift test` without opening the Xcode project. Local dependencies use `.package(path:)`.
 
 > ⚠️ **Why the test targets are reached through symlinks.** SwiftPM refuses a target whose path
-> escapes the package root (`target 'X' in package 'y' is outside the package root`), and it silently
-> skips a resource whose real path does so too. The test sources still live at the repository root, in
-> `Tests/`, because `Backglance.xctestplan`, `ci.yml` and `Scripts/verify_fixture.sh` all address them
-> there. Each package therefore carries one symlink per test target —
-> `Packages/BackglanceCore/Tests/BackglanceCoreTests -> ../../../Tests/BackglanceCoreTests` — and the
-> capture fixtures are reached through a second one, `Tests/BackglanceCaptureTests/Fixtures ->
-> ../Fixtures`, so `.copy("Fixtures/SystemStore")` resolves inside the target directory and the
-> fixtures land in `Bundle.module` as [TESTING.md](../testing/TESTING.md) describes. Nothing is
-> duplicated: there is exactly one copy of every test file and every fixture, at the root.
+> escapes the package root (`target 'X' in package 'y' is outside the package root`). The test sources
+> still live at the repository root, in `Tests/`, because `Backglance.xctestplan`, `ci.yml` and
+> `Scripts/verify_fixture.sh` all address them there. Each package therefore carries one symlink per
+> test target — `Packages/BackglanceCore/Tests/BackglanceCoreTests -> ../../../Tests/BackglanceCoreTests`.
+> Nothing is duplicated: there is exactly one copy of every test file, at the root.
+>
+> The fixtures are *not* bundled as resources. Every test bundle is built twice — once by SwiftPM and
+> once by the Xcode test target the test plan runs — and `Bundle.module` exists only in the SwiftPM
+> build, so a resource lookup would not compile in Xcode. Tests reach `Tests/Fixtures/` through
+> `BackglanceTestSupport.Fixtures`, which derives the path from its own `#filePath`; the
+> `SharedFixtures` symlink inside each test target is `exclude`d from the manifest so SwiftPM does not
+> warn about it. See [TESTING.md](../testing/TESTING.md).
 
 `Packages/BackglanceCore/Package.swift`:
 

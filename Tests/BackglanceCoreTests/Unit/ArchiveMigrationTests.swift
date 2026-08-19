@@ -1,4 +1,5 @@
 @testable import BackglanceCore
+import BackglanceTestSupport
 import CryptoKit
 import Foundation
 import GRDB
@@ -167,7 +168,8 @@ final class ArchiveMigrationTests: XCTestCase {
     }
 
     private func archivedFixtures() throws -> [URL] {
-        guard let root = Bundle.module.resourceURL?.appendingPathComponent("Archive", isDirectory: true) else {
+        let root = Fixtures.archive
+        guard Fixtures.exists(root) else {
             return []
         }
         let contents = try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)

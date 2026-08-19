@@ -80,7 +80,7 @@ Tests/
     └── Archive/                                v1.sqlite, v2.sqlite, ...; archive-100k.sqlite (perf)
 ```
 
-`Tests/Fixtures/` is a resource directory of the `BackglanceCaptureTests` and `BackglanceCoreTests` targets (`resources: [.copy("Fixtures/SystemStore")]` in each `Package.swift`, reaching the root `Tests/Fixtures/` through a `Fixtures` symlink inside the test target — see [TECH_STACK.md](../architecture/TECH_STACK.md#packageswift-excerpts) for why), so tests reach them through `Bundle.module.resourceURL`. `Support/` files are shared through a small internal `BackglanceTestSupport` target so the SplitMix64 generator, the test clock, and stubs are written once.
+`Tests/Fixtures/` is read from the working copy, not copied into a test bundle: `BackglanceTestSupport.Fixtures` derives the path from its own `#filePath`, and exposes `Fixtures.systemStore` and `Fixtures.archive`. The reason is that these sources are built twice — as SwiftPM test targets (`swift test`) and as the `Backglance.xcodeproj` test targets the test plan runs — and `Bundle.module` exists only in the first, so a bundle-based lookup does not compile in Xcode at all. The fixtures are read-only inputs; a test that needs to write copies one into a temporary directory first. `Support/` files are shared through a small internal `BackglanceTestSupport` target so the SplitMix64 generator, the test clock, and stubs are written once.
 
 `Backglance.xctestplan` runs all four bundles in Debug. The plan has two configurations: `Fast`
 (unit + fixtures, what a PR runs first) and `Full` (everything including UI). An Xcode test-plan
@@ -431,7 +431,7 @@ struct FixtureExpectation {
 class FixtureStoreTests: XCTestCase {
     class var only: String? { nil }
 
-    private static let root = Bundle.module.resourceURL!.appendingPathComponent("Fixtures/SystemStore")
+    private static let root = Fixtures.systemStore
 
     private func fixtureDirectories() throws -> [URL] {
         let all = try FileManager.default.contentsOfDirectory(at: Self.root, includingPropertiesForKeys: nil)
@@ -905,7 +905,7 @@ final class OTPRedactorRuleTests: XCTestCase {
 
     func test_whenFixtureOTPTemplatesRedacted_thenNoDigitRunRemains() throws {
         // The generator marks OTP-shaped records with userInfo["bg.fixture"] == "[synthetic-otp]".
-        let root = Bundle.module.resourceURL!.appendingPathComponent("Fixtures/SystemStore")
+        let root = Fixtures.systemStore
         struct Row: Decodable { var bundleID: String?; var body: String?; var userInfo: [String: String]? }
         for os in ["macOS14", "macOS15", "macOS26"] {
             let data = try Data(contentsOf: root.appendingPathComponent("\(os)/expected.json"))
@@ -1167,6 +1167,7 @@ The remaining cases follow the same injected-clock, injected-stream shape:
 ```swift
 import XCTest
 import GRDB
+import BackglanceTestSupport
 @testable import BackglanceCore
 
 final class ArchiveMigrationTests: XCTestCase {
@@ -1182,7 +1183,7 @@ final class ArchiveMigrationTests: XCTestCase {
     }
 
     private func archivedFixtures() throws -> [URL] {
-        let root = Bundle.module.resourceURL!.appendingPathComponent("Fixtures/Archive")
+        let root = Fixtures.archive
         return try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
             .filter { $0.lastPathComponent.hasPrefix("v") && $0.pathExtension == "sqlite" }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
@@ -1364,7 +1365,7 @@ A PR that lowers a gated package below its target fails `ci.yml`. A PR that lowe
 Go through this before pushing anything under `Tests/`:
 
 - [ ] No file named `db`, `db-wal`, `db-shm`, `archive.sqlite*` is staged (the pre-commit hook checks; you check first).
-- [ ] No test constructs a path under `~/Library/Group Containers/`, `~/Library/Application Support/Backglance/`, or `~/Library/DoNotDisturb/`. Tests use `Bundle.module`, `Archive(inMemory:)`, or `FileManager.default.temporaryDirectory`.
+- [ ] No test constructs a path under `~/Library/Group Containers/`, `~/Library/Application Support/Backglance/`, or `~/Library/DoNotDisturb/`. Tests use `Fixtures`, `Archive(inMemory:)`, or `FileManager.default.temporaryDirectory`.
 - [ ] Bundle IDs in stubs are `com.example.*` or the well-known Apple/third-party IDs the redactor and exclusion list need (`com.apple.MobileSMS`, `com.apple.mail`, `com.tinyspeck.slackmacgap`, `com.1password.1password`).
 - [ ] Email addresses end in `example.com` / `example.org`; phone numbers are `+1 555 01xx`; names are `<Word> Example`.
 - [ ] No literal 4–8 digit code in source next to a keyword like code/verification/PIN. Generate with `SplitMix64` at run time.

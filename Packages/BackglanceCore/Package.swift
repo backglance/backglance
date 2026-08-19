@@ -25,10 +25,11 @@ let package = Package(
             name: "BackglanceCoreTests",
             dependencies: ["BackglanceCore", "BackglanceTestSupport"],
             path: "Tests/BackglanceCoreTests",
-            resources: [
-                .copy("SharedFixtures/SystemStore"), // macOS14/, macOS15/, macOS26/ — synthetic only
-                .copy("SharedFixtures/Archive"), // v*.sqlite — frozen archives, synthetic rows only
-            ]
+            // The fixtures are read from the working copy through
+            // BackglanceTestSupport's `Fixtures`, not copied into the test bundle: the
+            // same sources are compiled by the Xcode test target, which gets no
+            // `Bundle.module`. The symlink is excluded so SwiftPM does not warn about it.
+            exclude: ["SharedFixtures"]
         ),
     ]
 )
