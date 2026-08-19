@@ -282,11 +282,13 @@ Backglance needs to notice new rows quickly without keeping a CPU-hungry loop al
 | Trigger | Mechanism | Why |
 |---|---|---|
 | File change | `DispatchSource.makeFileSystemObjectSource` on `db-wal` and `db` (`.write`, `.extend`, `.rename`, `.delete`) | Sub-second latency; near-zero idle cost |
-| Directory change | FSEvents on `db2/` (`kFSEventStreamCreateFlagFileEvents`) | Re-arms the file sources if usernoted recreates or checkpoints the files |
+| Directory change | `DispatchSource` on `db2/` (`.write`, `.rename`, `.delete`) | Re-arms the file sources if usernoted recreates or checkpoints the files, leaving the old descriptors on a dead inode |
 | Poll | `DispatchSource.makeTimerSource`, 15 s (60 s in Low Power Mode) | Belt and braces: catches missed events, checkpoints, and edits that do not touch the watched inode |
 | Wake / unlock | `NSWorkspace.didWakeNotification`, `com.apple.screenIsUnlocked` | Immediate catch-up when the user comes back |
 
-All triggers are debounced 500 ms before a tick, which keeps idle CPU under 0.1 % even when an app is spamming notifications.
+All triggers are debounced 500 ms before a tick, which keeps idle CPU under 0.1 % even when an app is spamming notifications. The debounce is capped at four intervals, so sustained activity delays a tick rather than cancelling it forever — see [CAPTURE.md](../features/CAPTURE.md#storewatcher).
+
+(The directory watch was originally specified as an `FSEventStream`. A `DispatchSource` on the directory's own descriptor delivers the same signal — an entry under `db2/` appeared, vanished or was renamed — with the primitive the file watches already use, and without the C callback and `Unmanaged` pointer an `FSEventStream` needs. The only thing either mechanism does here is re-arm and wake.)
 
 > ❌ **Don't:** open Apple's live `db` with a normal `DatabaseQueue`. Even a read-only handle participates in the WAL/shm locking protocol on a file we do not own, and a stray write path would be a data-loss risk for the user's Notification Center.
 

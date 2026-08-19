@@ -299,7 +299,11 @@ public final class StoreWatcher: @unchecked Sendable {
         pollTimer?.cancel()
         let timer = DispatchSource.makeTimerSource(queue: queue)
         let interval = pollInterval
-        timer.schedule(deadline: .now() + interval, repeating: interval, leeway: .seconds(2))
+        // Leeway proportional to the interval, not a flat 2 s: two seconds of slack on a
+        // two-second timer means the timer may never be the thing that fires.
+        let leeway = min(interval / 10, 2)
+        timer.schedule(deadline: .now() + interval, repeating: interval,
+                       leeway: .microseconds(Int(leeway * 1_000_000)))
         timer.setEventHandler { [weak self] in self?.scheduleWake(.poll) }
         timer.resume()
         pollTimer = timer
@@ -325,17 +329,29 @@ public final class StoreWatcher: @unchecked Sendable {
 
     // MARK: Debounce
 
-    /// Coalesces bursts (an app posting 50 notifications in a second) into one tick.
+    /// Coalesces bursts (an app posting 50 notifications in a second) into one tick —
+    /// but never postpones a wake indefinitely. See the warning below.
     private func scheduleWake(_ reason: WakeReason, immediate: Bool = false) {
         pending?.cancel()
+        let now = Date()
+        let waitingSince = pendingSince ?? now
+        pendingSince = waitingSince
+        let delay: TimeInterval = immediate ? 0 : max(0, min(
+            debounce,
+            waitingSince.addingTimeInterval(maxWait).timeIntervalSince(now)
+        ))
         let item = DispatchWorkItem { [weak self] in
-            self?.continuation.yield(reason)
+            guard let self else { return }
+            pendingSince = nil
+            continuation.yield(reason)
         }
         pending = item
-        queue.asyncAfter(deadline: .now() + (immediate ? 0 : 0.5), execute: item)
+        queue.asyncAfter(deadline: .now() + delay, execute: item)
     }
 }
 ```
+
+> ⚠️ **Warning:** A plain cancel-and-reschedule debounce is a *starvation* bug, not just a delay. Under sustained activity — an app posting steadily, or any trigger recurring faster than the debounce — every rescheduling cancels the wake that was about to fire, and the engine is never told anything at all, so nothing is ever archived. `scheduleWake` therefore also caps the wait: once a trigger has been held for `maxWait` (four debounces), it fires regardless of what keeps arriving. Coalescing a burst is the goal; swallowing one is not. `StoreWatcherTests.testSustainedWritesStillWakeTheEngine` pins this.
 
 > 💡 **Tip:** `bufferingPolicy: .bufferingNewest(1)` means the engine can never fall behind the watcher. If a tick is still running when the next wake arrives, exactly one wake is queued, and that one wake reads everything that accumulated.
 
