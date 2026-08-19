@@ -1,6 +1,5 @@
 import BackglanceCore
 import Foundation
-import OSLog
 
 // MARK: - CaptureEngine
 
@@ -128,7 +127,6 @@ public actor CaptureEngine {
     // MARK: Internal
 
     let archive: Archive
-    let logger = Logger(subsystem: "app.backglance.Backglance", category: "capture")
 
     /// The adapter reads go through, or `nil` while degraded.
     var currentAdapter: (any StoreAdapter)? {
@@ -241,17 +239,8 @@ public actor CaptureEngine {
             recordsRead += batch.count
             recordsArchived += archived
 
-            // Bound to a local: an os_log interpolation is an autoclosure, and reaching
-            // through `self` there is what the formatter and the compiler disagree about.
             let reached = cursor.lastRecID
-            logger.debug(
-                """
-                tick \(reason.rawValue, privacy: .public): \(
-                    batch.count,
-                    privacy: .public
-                ) records,                 through rec \(reached, privacy: .public)
-                """
-            )
+            Log.capture.debug("tick \(reason.rawValue): \(archived)/\(batch.count) archived, through rec \(reached)")
         } catch let error as CaptureError {
             transition(to: .degraded(error.degradedReason))
         } catch {
@@ -270,7 +259,7 @@ public actor CaptureEngine {
         }
         status = newStatus
         statusContinuation.yield(newStatus)
-        logger.debug("status: \(newStatus.logDescription, privacy: .public)")
+        Log.capture.debug("status: \(newStatus.logDescription)")
     }
 
     /// Parse, exclude, redact, enrich, insert — for one record.
@@ -306,7 +295,7 @@ public actor CaptureEngine {
             let now = Date()
             let app = try archive.upsertApp(bundleID: enriched.bundleID, now: now)
             guard let appID = app.id else {
-                logger.error("archive rec \(raw.recID, privacy: .public): app row has no id")
+                Log.capture.error("archive rec \(raw.recID): app row has no id")
                 return .failed
             }
 
@@ -335,13 +324,14 @@ public actor CaptureEngine {
             // The import and live capture overlapping. Expected, and not worth a line.
             return .duplicate
         } catch let error as CaptureError {
-            logger.error("skip rec \(raw.recID, privacy: .public): \(error.logDescription, privacy: .public)")
+            Log.capture.error("skip rec \(raw.recID): \(error.logDescription)")
             return .failed
         } catch let error as ArchiveError {
-            logger.error("archive rec \(raw.recID, privacy: .public): \(error.logDescription, privacy: .public)")
+            Log.capture.error("archive rec \(raw.recID): \(error.logDescription)")
             return .failed
         } catch {
-            logger.error("rec \(raw.recID, privacy: .public): \(String(describing: type(of: error)), privacy: .public)")
+            Log.capture
+                .error("rec \(raw.recID): \(String(describing: type(of: error)))")
             return .failed
         }
     }
@@ -407,7 +397,7 @@ public actor CaptureEngine {
             selected = adapter
             // Logged once per bootstrap, not per tick: it is a standing condition, and
             // the note is content-free by construction.
-            logger.notice("adapter fallback: \(note, privacy: .public)")
+            Log.capture.notice("adapter fallback: \(note)")
 
         case let .degraded(reason):
             adapter = nil

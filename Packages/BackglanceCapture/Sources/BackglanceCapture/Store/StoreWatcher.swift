@@ -1,6 +1,6 @@
 import AppKit
+import BackglanceCore
 import Foundation
-import OSLog
 
 // MARK: - WakeReason
 
@@ -164,7 +164,6 @@ public final class StoreWatcher: @unchecked Sendable {
 
     private let continuation: AsyncStream<WakeReason>.Continuation
     private let queue = DispatchQueue(label: "app.backglance.Backglance.store-watcher", qos: .utility)
-    private let logger = Logger(subsystem: "app.backglance.Backglance", category: "capture")
     // All of the following are touched only on `queue`, which is what makes the
     // `@unchecked Sendable` conformance honest.
     private var fileSources: [DispatchSourceFileSystemObject] = []
@@ -202,7 +201,7 @@ public final class StoreWatcher: @unchecked Sendable {
             let descriptor = open(path, O_EVTONLY)
             guard descriptor >= 0 else {
                 let name = URL(fileURLWithPath: path).lastPathComponent
-                logger.notice("watch \(name, privacy: .public) unavailable, errno \(errno, privacy: .public)")
+                Log.capture.notice("watch \(name) unavailable, errno \(errno)")
                 continue
             }
             let source = DispatchSource.makeFileSystemObjectSource(
@@ -244,7 +243,7 @@ public final class StoreWatcher: @unchecked Sendable {
         let directory = location.deletingLastPathComponent()
         let descriptor = open(directory.path, O_EVTONLY)
         guard descriptor >= 0 else {
-            logger.notice("watch store directory unavailable, errno \(errno, privacy: .public)")
+            Log.capture.notice("watch store directory unavailable, errno \(errno)")
             return
         }
         let source = DispatchSource.makeFileSystemObjectSource(

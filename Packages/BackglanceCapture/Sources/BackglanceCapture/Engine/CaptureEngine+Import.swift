@@ -160,9 +160,9 @@ public extension CaptureEngine {
         let duplicates = summary.duplicates
         let excluded = summary.excluded
         let failed = summary.failed
-        logger.notice("""
-        import: \(archived, privacy: .public) archived, \(duplicates, privacy: .public) duplicate, \
-        \(excluded, privacy: .public) excluded, \(failed, privacy: .public) failed
+        Log.capture.notice("""
+        import: \(archived) archived, \(duplicates) duplicate, \
+        \(excluded) excluded, \(failed) failed
         """)
         return summary
     }

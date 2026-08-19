@@ -305,7 +305,10 @@ class FixtureStoreTests: XCTestCase {
 
 /// One fixture at a time, so `-only-testing` and `Scripts/verify_fixture.sh --os 14` can
 /// target it. The assertions are the base class's.
-final class FixtureMacOS14Tests: FixtureStoreTests {
+///
+/// Not `final`: `only` is a `class var` because it is overridden, and that is the whole
+/// mechanism these three subclasses exist for.
+class FixtureMacOS14Tests: FixtureStoreTests {
     override class var only: String? {
         "macOS14"
     }
@@ -313,7 +316,7 @@ final class FixtureMacOS14Tests: FixtureStoreTests {
 
 // MARK: - FixtureMacOS15Tests
 
-final class FixtureMacOS15Tests: FixtureStoreTests {
+class FixtureMacOS15Tests: FixtureStoreTests {
     override class var only: String? {
         "macOS15"
     }
@@ -321,7 +324,7 @@ final class FixtureMacOS15Tests: FixtureStoreTests {
 
 // MARK: - FixtureMacOS26Tests
 
-final class FixtureMacOS26Tests: FixtureStoreTests {
+class FixtureMacOS26Tests: FixtureStoreTests {
     override class var only: String? {
         "macOS26"
     }
