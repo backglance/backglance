@@ -314,9 +314,11 @@ public struct StoreSnapshot: Sendable {
             if fm.fileExists(atPath: wal.path) {
                 try fm.copyItem(at: wal, to: URL(fileURLWithPath: target.path + "-wal"))
             }
-        } catch let error as NSError
-            where error.domain == NSCocoaErrorDomain && error.code == NSFileReadNoPermissionError {
-            // 257: the classic "no Full Disk Access" symptom.
+        } catch let error as NSError where isPermissionDenied(error) {
+            // The classic "no Full Disk Access" symptom. Matched on the errno underneath
+            // (EACCES/EPERM), not on a single Cocoa code: copyItem with an unreadable
+            // *source* reports NSFileWriteNoPermissionError (513), attributing the
+            // failure to the destination, so a 257-only check never fires here.
             try? fm.removeItem(at: dir)
             throw CaptureError.fullDiskAccessDenied
         } catch {

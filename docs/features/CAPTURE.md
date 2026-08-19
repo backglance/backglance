@@ -343,6 +343,8 @@ public final class StoreWatcher: @unchecked Sendable {
 
 The copy is cheap: `FileManager.copyItem` uses `copyfile(3)` with `COPYFILE_CLONE`, so on APFS a 150 MB store becomes a copy-on-write clone in a few milliseconds. The `-wal` is copied so uncheckpointed rows (the most recent ones — exactly the ones we want) are visible. The `-shm` is deliberately *not* copied: it is a live wal-index belonging to another process, and a stale one could point at WAL frames that our copy does not contain. SQLite rebuilds the wal-index from the copied `-wal` on open.
 
+> ⚠️ **Warning:** Do not match the Full Disk Access denial on `NSFileReadNoPermissionError` (257) alone. `FileManager.copyItem` with a *source* it cannot read reports `NSFileWriteNoPermissionError` (**513**), attributing the failure to the destination and wording the message that way ("you don't have permission to access &lt;destination&gt;"). A 257-only check never fires on this path, so every FDA-denied user would be shown a generic `readError` instead of the one fix that works. `StoreSnapshot.isPermissionDenied(_:)` accepts either Cocoa code and decides on the `EACCES`/`EPERM` at the bottom of the `NSUnderlyingError` chain. The destination is a directory Backglance created moments earlier at `0700`, so a denial on this copy has no plausible cause other than the source.
+
 ```swift
 // Packages/BackglanceCapture/Sources/BackglanceCapture/StoreSnapshot.swift
 import Foundation
@@ -363,12 +365,10 @@ public struct StoreSnapshot: Sendable {
             if fm.fileExists(atPath: wal.path) {
                 try fm.copyItem(at: wal, to: URL(fileURLWithPath: target.path + "-wal"))
             }
-        } catch let error as NSError
-            where error.domain == NSCocoaErrorDomain && error.code == NSFileReadNoPermissionError {
+        } catch let error as NSError where isPermissionDenied(error) {
             try? fm.removeItem(at: dir)
-            throw CaptureError.fullDiskAccessDenied              // errno EPERM behind Cocoa error 257
-        } catch let error as NSError
-            where error.domain == NSCocoaErrorDomain && error.code == NSFileReadNoSuchFileError {
+            throw CaptureError.fullDiskAccessDenied              // EACCES/EPERM under Cocoa 257 *or* 513
+        } catch let error as NSError where isNoSuchFile(error) {
             try? fm.removeItem(at: dir)
             throw CaptureError.storeNotFound(location)
         } catch {
