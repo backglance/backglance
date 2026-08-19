@@ -463,7 +463,7 @@ public struct StoreAdapterV26: StoreAdapter, StoreTailProviding {
     public init() {}
 
     public static func matches(_ fp: StoreFingerprint) -> Bool {
-        KnownFingerprints.shared.hashes(forAdapter: id).contains(fp.schemaHash)
+        StoreFingerprints.hashes(forAdapter: id).contains(fp.schemaHash)
     }
 
     public func probe(_ db: Database) throws -> ProbeResult {

@@ -415,7 +415,7 @@ jobs:
               permissionDenied|storeNotFound) echo "$runner: $status (expected)"; continue ;;
             esac
             # A readable store whose hash is already in KnownFingerprints.json is fine.
-            if [[ "$status" == "ok" ]] && jq -e --arg h "$hash" 'any(.[]?[]?; . == $h)' "$KNOWN" > /dev/null; then
+            if [[ "$status" == "ok" ]] && jq -e --arg h "$hash" 'any(.adapters[]?[]?; . == $h)' "$KNOWN" > /dev/null; then
               echo "$runner: ok, known fingerprint ${hash:0:12}"; continue
             fi
             title="Unknown store fingerprint on $runner (macOS $osver)"

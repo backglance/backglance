@@ -58,8 +58,10 @@ public struct StoreAdapterV26: StoreAdapter {
     /// is a fixture-refresh trigger, so this set is expected to grow.
     ///
     /// Empty until the macOS 26 fixture exists, for the reason given on
-    /// ``StoreAdapterV14/knownSchemaHashes``. Populated from the bundled
-    /// `KnownFingerprints.json`, which `Scripts/verify_fixture.sh` regenerates from the
-    /// fixtures.
-    static let knownSchemaHashes: Set<String> = []
+    /// ``StoreAdapterV14/knownSchemaHashes``. Read from the bundled
+    /// `KnownFingerprints.json` through ``StoreFingerprints``, which
+    /// `Scripts/verify_fixture.sh` regenerates from the fixtures.
+    static var knownSchemaHashes: Set<String> {
+        StoreFingerprints.v26
+    }
 }

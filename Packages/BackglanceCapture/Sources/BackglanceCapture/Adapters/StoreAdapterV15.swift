@@ -58,7 +58,9 @@ public struct StoreAdapterV15: StoreAdapter {
     /// ``StoreAdapterV14/knownSchemaHashes``: an unverified hash is a silent mis-parse
     /// waiting to happen, while no hash merely costs a probe.
     ///
-    /// Populated from the bundled `KnownFingerprints.json`, which
-    /// `Scripts/verify_fixture.sh` regenerates from the fixtures.
-    static let knownSchemaHashes: Set<String> = []
+    /// Read from the bundled `KnownFingerprints.json` through ``StoreFingerprints``,
+    /// which `Scripts/verify_fixture.sh` regenerates from the fixtures.
+    static var knownSchemaHashes: Set<String> {
+        StoreFingerprints.v15
+    }
 }

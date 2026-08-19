@@ -55,7 +55,9 @@ public struct StoreAdapterV14: StoreAdapter {
     /// nothing has verified is the failure mode that ships a silent mis-parse; declining
     /// to claim one merely costs a probe.
     ///
-    /// Populated from the bundled `KnownFingerprints.json`, which
-    /// `Scripts/verify_fixture.sh` regenerates from the fixtures.
-    static let knownSchemaHashes: Set<String> = []
+    /// Read from the bundled `KnownFingerprints.json` through ``StoreFingerprints``,
+    /// which `Scripts/verify_fixture.sh` regenerates from the fixtures.
+    static var knownSchemaHashes: Set<String> {
+        StoreFingerprints.v14
+    }
 }

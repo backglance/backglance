@@ -1,4 +1,8 @@
 {
   "version": 1,
-  "fingerprints": []
+  "adapters": {
+    "v14": [],
+    "v15": [],
+    "v26": []
+  }
 }
