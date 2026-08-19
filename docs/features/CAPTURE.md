@@ -689,7 +689,13 @@ private func archiveOne(_ raw: RawStoreRecord, source: ArchivedNotification.Sour
         let (clean, redaction) = redactor.redact(parsed)
         // 4. Enrich (icon, deep link) and write.
         let enriched = await enrichment.enrich(clean)
-        switch try archive.insertOrUpdate(enriched, redaction: redaction, storeRecID: raw.recID, source: source) {
+        //    The app row first — an excluded app must never reach insertOrUpdate — then
+        //    the Core model built from the parsed record on this side of the boundary.
+        let now = Date()
+        let app = try archive.upsertApp(bundleID: enriched.bundleID, now: now)
+        let row = ArchivedNotification(parsed: enriched, appID: app.id!, storeRecID: raw.recID,
+                                       source: source, capturedAt: now)
+        switch try archive.insertOrUpdate(row, redaction: redaction) {
         case .inserted: return .archived
         case .updated:  return .updated
         case .duplicate: return .duplicate
@@ -723,146 +729,135 @@ Two keys, checked in order inside one write transaction:
 2. **`uuid`** — a *different* store row carrying a uuid we already have. This is what a thread update looks like: Messages replaces the banner for a conversation, Mail re-delivers an updated summary. Outcome: `.updated` — text and `store_rec_id` are refreshed on the existing archive row; the row keeps its id (and its place in digests); it becomes unread again only if the text actually changed.
 
 ```swift
-// Packages/BackglanceCore/Sources/BackglanceCore/Archive+Capture.swift
+// Packages/BackglanceCore/Sources/BackglanceCore/Archive/Archive+Upsert.swift
 import Foundation
 import GRDB
 
-extension Archive {
-    public enum InsertOutcome: Sendable, Equatable {
+public extension Archive {
+    enum InsertOutcome: Sendable, Equatable {
         case inserted(id: Int64)
         case updated(id: Int64)
         case duplicate
     }
 
-    public func insertOrUpdate(_ n: ParsedNotification,
-                               redaction: RedactionEvent?,
-                               storeRecID: Int64?,
-                               source: ArchivedNotification.Source) throws -> InsertOutcome {
+    /// Core's half: it takes an `ArchivedNotification`, which is a Core model, and knows
+    /// nothing about the store or the parser.
+    @discardableResult
+    func insertOrUpdate(_ notification: ArchivedNotification,
+                        redaction: RedactionEvent? = nil) throws -> InsertOutcome {
         try pool.write { db in
-            if let recID = storeRecID,
-               try ArchivedNotification.filter(Column("store_rec_id") == recID).fetchCount(db) > 0 {
-                return .duplicate
-            }
-            var app = try AppRecord.findOrCreate(db, bundleID: n.bundleID, seenAt: UnixDate(n.deliveredAt))
-
-            if var existing = try ArchivedNotification.filter(Column("uuid") == n.uuid.uuidString).fetchOne(db),
-               let existingID = existing.id {
-                let textChanged = existing.title != n.title
-                    || existing.subtitle != n.subtitle
-                    || existing.body != n.body
-                existing.title = n.title
-                existing.subtitle = n.subtitle
-                existing.body = n.body
-                existing.sender = n.sender
-                existing.threadId = n.threadID
-                existing.deliveredAt = UnixDate(n.deliveredAt)
-                existing.presented = n.presented
-                existing.deepLink = n.deepLink?.absoluteString
-                existing.attachmentsJson = try Self.encodeAttachments(n.attachments)
-                existing.storeRecId = storeRecID
-                if textChanged { existing.isRead = false }
-                try existing.update(db)                        // notifications_au keeps FTS in sync
-                return .updated(id: existingID)
+            if let storeRecID = notification.storeRecId,
+               try ArchivedNotification.filter(Column("store_rec_id") == storeRecID).fetchCount(db) > 0 {
+                return .duplicate                              // key 1: same store row
             }
 
-            var row = ArchivedNotification(
-                id: nil,
-                uuid: n.uuid.uuidString,
-                appId: app.id!,
-                title: n.title,
-                subtitle: n.subtitle,
-                body: n.body,
-                sender: n.sender,
-                threadId: n.threadID,
-                category: n.category,
-                deliveredAt: UnixDate(n.deliveredAt),
-                capturedAt: .now,
-                source: source,
-                presented: n.presented,
-                awaySessionId: nil,                            // AwaySessionTracker links later
-                deepLink: n.deepLink?.absoluteString,
-                attachmentsJson: try Self.encodeAttachments(n.attachments),
-                redaction: redaction == nil ? .none : .otp,
-                isRead: false,
-                isPinned: false,
-                isDeleted: false,
-                storeRecId: storeRecID)
+            if let existing = try ArchivedNotification.filter(Column("uuid") == notification.uuid).fetchOne(db) {
+                return try Self.refresh(db, existing: existing, with: notification)   // key 2: thread update
+            }
+
+            var stored = notification
             do {
-                try row.insert(db)
-            } catch let error as DatabaseError where error.resultCode == .SQLITE_CONSTRAINT {
-                // Two engines racing on the same uuid (tests) or a unique-index hit we did
-                // not predict. Treat as duplicate rather than failing the batch.
+                try stored.insert(db)
+            } catch let error as DatabaseError where Self.isUniquenessViolation(error) {
+                // Two writers racing on the same uuid (tests, or an import overlapping a
+                // tick). Whoever lost has nothing to add — a duplicate, not a failure.
                 return .duplicate
             }
-            if var event = redaction {
-                event.notificationId = row.id!
-                try event.insert(db)
+            guard let id = stored.id else { throw ArchiveError.insertFailed(/* … */) }
+
+            if var redaction {
+                redaction.notificationId = id
+                try redaction.insert(db)
             }
-            app.notificationCount += 1
-            app.lastSeenAt = max(app.lastSeenAt, UnixDate(n.deliveredAt))
-            try app.update(db)
-            return .inserted(id: row.id!)
+            try Self.recordNotification(db, appID: stored.appId, deliveredAt: stored.deliveredAt)
+            return .inserted(id: id)
         }
-    }
-
-    /// Store was reset (rec_ids restarted from 1). Old rows must stop shadowing new rec_ids;
-    /// uuid remains the dedupe key for them.
-    public func forgetStoreRecIDs() throws {
-        try pool.write { db in
-            try db.execute(sql: "UPDATE notifications SET store_rec_id = NULL WHERE store_rec_id IS NOT NULL")
-        }
-    }
-
-    private static func encodeAttachments(_ items: [AttachmentMeta]) throws -> String? {
-        guard !items.isEmpty else { return nil }
-        return String(decoding: try JSONEncoder().encode(items), as: UTF8.self)
     }
 }
 ```
+
+`Self.refresh` copies the new text, sender, thread, delivery date, deep link, attachments and `store_rec_id` onto the existing row and updates it — `notifications_au` keeps FTS in sync — clearing `is_read` only when the text actually changed, and returns `.updated(id:)`.
+
+The conversion from a parsed store record to that Core model lives on the capture side, because `ParsedNotification` is a `BackglanceCapture` type and Core must not know about it ([ARCHITECTURE.md](../architecture/ARCHITECTURE.md#dependency-graph)):
+
+```swift
+// Packages/BackglanceCapture/Sources/BackglanceCapture/Engine/CapturePipeline.swift
+import BackglanceCore
+
+extension ArchivedNotification {
+    init(parsed: ParsedNotification, appID: Int64, storeRecID: Int64,
+         source: Source, capturedAt: Date) { /* field-by-field */ }
+}
+```
+
+so `archiveOne` reads:
+
+```swift
+let app = try archive.upsertApp(bundleID: enriched.bundleID, now: now)
+let outcome = try archive.insertOrUpdate(
+    ArchivedNotification(parsed: enriched, appID: appID, storeRecID: raw.recID,
+                         source: source, capturedAt: now),
+    redaction: redaction)
+```
+
+> ℹ️ **Info:** The app row is upserted by the engine before the insert, not inside it. An
+> excluded app must never reach `insertOrUpdate` at all, and the exclusion check runs
+> against the app row.
+
+After a store reset, `Archive.forgetStoreRecordIDs()` NULLs every `store_rec_id` — the new store numbers its rows from the start, and the old values would make its first notifications look like duplicates. Nothing is deleted; dedupe falls back to `uuid`.
 
 ### Cursor persistence
 
 `StoreCursor` is JSON in `capture_state.cursor`. It is written once per batch, *after* the batch's inserts committed. `lastRecID` is the primary key of progress; `lastDeliveredDate` is informational (shown in Settings as "last notification seen at") and used by the store-reset heuristic.
 
 ```swift
-// Packages/BackglanceCore/Sources/BackglanceCore/Archive+CaptureState.swift
+// Packages/BackglanceCore/Sources/BackglanceCore/Archive/Archive+CaptureState.swift
 import Foundation
 import GRDB
 
-extension Archive {
-    public enum CaptureStateKey: String { case cursor, fingerprint, adapterID = "adapter_id", lastImportAt = "last_import_at" }
-
-    public func loadCursor() throws -> StoreCursor? {
-        try pool.read { db in
-            guard let json = try String.fetchOne(db, sql: "SELECT value FROM capture_state WHERE key = ?",
-                                                 arguments: [CaptureStateKey.cursor.rawValue]) else { return nil }
-            do {
-                return try JSONDecoder().decode(StoreCursor.self, from: Data(json.utf8))
-            } catch {
-                // A corrupt cursor is not worth a degraded state: start from the tail on next bootstrap.
-                return nil
-            }
-        }
+public extension Archive {
+    enum CaptureStateKey: String, CaseIterable, Sendable {
+        case cursor, fingerprint, adapterID = "adapter_id", lastImportAt = "last_import_at"
     }
 
-    public func saveCursor(_ cursor: StoreCursor) throws {
-        let json = String(decoding: try JSONEncoder().encode(cursor), as: UTF8.self)
-        try pool.write { db in
-            try db.execute(sql: "INSERT INTO capture_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-                           arguments: [CaptureStateKey.cursor.rawValue, json])
-        }
-    }
+    // Raw string access, then a generic JSON layer over it. Core deliberately does not
+    // name StoreCursor or StoreFingerprint: both live in BackglanceCapture, which
+    // depends on Core and not the other way round.
+    func captureState(_ key: CaptureStateKey) throws -> String?
+    func setCaptureState(_ value: String?, for key: CaptureStateKey) throws
+    func captureStateJSON<Value: Decodable>(_ key: CaptureStateKey, as type: Value.Type) throws -> Value?
+    func setCaptureStateJSON(_ value: some Encodable, for key: CaptureStateKey) throws
 
-    public func saveLastImport(_ date: Date) throws {
-        try pool.write { db in
-            try db.execute(sql: "INSERT INTO capture_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-                           arguments: [CaptureStateKey.lastImportAt.rawValue, String(date.timeIntervalSince1970)])
-        }
-    }
+    // The two non-JSON values are typed in Core, because their types are.
+    func adapterID() throws -> String?
+    func saveAdapterID(_ adapterID: String) throws
+    func lastImportDate() throws -> Date?
+    func saveLastImport(_ date: Date) throws
 }
 ```
 
-`StoreCursor` lives in `BackglanceCapture`; the JSON shape is what `Archive` persists, which is why `StoreCursor` is `Codable` and why `Archive` treats it as an opaque blob when it cannot decode it.
+`captureStateJSON` returns `nil` for a value that will not decode rather than throwing: the cursor and the fingerprint are both *resumable* state, so a row written by another build costs a re-read or a re-probe on the next bootstrap instead of a failed launch.
+
+The typed accessors sit on the capture side, as extensions on `Archive`:
+
+```swift
+// Packages/BackglanceCapture/Sources/BackglanceCapture/Store/StoreCursor.swift
+import BackglanceCore
+
+public extension Archive {
+    func loadCursor() throws -> StoreCursor? { try captureStateJSON(.cursor, as: StoreCursor.self) }
+    func saveCursor(_ cursor: StoreCursor) throws { try setCaptureStateJSON(cursor, for: .cursor) }
+
+    /// Removes the row rather than writing `StoreCursor.start`: "never read anything" and
+    /// "read up to rec_id 0" are different states, and only the row's absence says the first.
+    func clearCursor() throws { try setCaptureState(nil, for: .cursor) }
+
+    func loadFingerprint() throws -> StoreFingerprint? { try captureStateJSON(.fingerprint, as: StoreFingerprint.self) }
+    func saveFingerprint(_ fingerprint: StoreFingerprint) throws { try setCaptureStateJSON(fingerprint, for: .fingerprint) }
+}
+```
+
+`StoreCursor` and `StoreFingerprint` are `Codable` precisely so that this works: to the archive they are opaque JSON blobs, and `BackglanceCapture` puts the names on top.
 
 ### CaptureEngine
 
@@ -1045,7 +1040,7 @@ public actor CaptureEngine {
                let tail = try snapshot.read({ try tailProvider.tail(in: $0) }),
                tail.lastRecID < cursor.lastRecID {
                 logger.notice("store reset: tail \(tail.lastRecID, privacy: .public) < cursor \(self.cursor.lastRecID, privacy: .public)")
-                try archive.forgetStoreRecIDs()
+                try archive.forgetStoreRecordIDs()
                 cursor = .start
                 try archive.saveCursor(cursor)
                 metrics.storeResets += 1
@@ -1220,7 +1215,7 @@ UX rules for the import screen:
 | Notification with empty title *and* body | Parser | Archived if a subtitle or attachment exists; otherwise skipped as `parseFailed("empty payload")` and counted, not logged as an error |
 | iOS app via iPhone Mirroring | `app.identifier` has no local `.app` bundle | ⚠️ Uncertain: observed to arrive with the iOS bundle ID; archived normally; icon falls back to a generic glyph; `display_name` from the plist `app` key or the bundle ID; deep links not resolved. Marked "unverified" in the fixtures manifest until we have a real capture. |
 | Same `uuid` re-delivered (thread update, edited banner) | `Archive.insertOrUpdate` uuid check | Update in place; unread again only if the text changed |
-| Store reset (rec_id goes backwards) | `tail.lastRecID < cursor.lastRecID` | `forgetStoreRecIDs()`, cursor → `.start`, everything in the store is archived as new; uuid dedupe still protects against true duplicates |
+| Store reset (rec_id goes backwards) | `tail.lastRecID < cursor.lastRecID` | `forgetStoreRecordIDs()`, cursor → `.start`, everything in the store is archived as new; uuid dedupe still protects against true duplicates |
 | FDA revoked mid-run | Next copy fails with Cocoa 257 (`EPERM`) | `.degraded(.noFullDiskAccess)`; icon changes; retried on every wake; browsing/search of the archive keeps working |
 | Unknown schema (new macOS, changed columns) | `StoreAdapterRegistry` → `.degraded(.unknownSchema(fp))` | Degraded with the fingerprint shown in Settings ▸ Capture and a "Copy diagnostics" button (fingerprint only, no content). See [../architecture/OS_COMPATIBILITY_PLAYBOOK.md](../architecture/OS_COMPATIBILITY_PLAYBOOK.md). |
 | Store file missing (never delivered a notification, unusual setup) | `StoreLocation.current()` / copy → no such file | `.degraded(.storeNotFound)`; retried on wake |
@@ -1375,7 +1370,7 @@ final class CursorTests: XCTestCase {
         let shadowed = try archive.pool.read { db in
             try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM notifications WHERE store_rec_id IS NOT NULL AND source = 'import'") ?? 0
         }
-        XCTAssertEqual(shadowed, 0, "forgetStoreRecIDs() must null out old store_rec_ids")
+        XCTAssertEqual(shadowed, 0, "forgetStoreRecordIDs() must null out old store_rec_ids")
     }
 
     func testCorruptCursorFallsBackToTail() throws {

@@ -447,13 +447,15 @@ public final class Archive: Sendable {
     public func write<T: Sendable>(_ body: @Sendable (Database) throws -> T) async throws -> T
     public func writeInTransaction<T>(_ body: (Database) throws -> T) throws -> T   // long imports
 
-    // Typed helpers used by capture, intents and UI
+    // Typed helpers used by capture, intents and UI. Every parameter is a Core type:
+    // ParsedNotification, StoreCursor and StoreFingerprint belong to BackglanceCapture,
+    // which depends on Core, so they cannot appear here.
     @discardableResult
-    public func upsertApp(bundleID: String, now: Date, retention: RetentionPolicy? = nil) throws -> AppRecord
+    public func upsertApp(bundleID: String, now: Date, retention: AppRetention? = nil) throws -> AppRecord
     @discardableResult
-    public func insert(_ n: ParsedNotification, redaction: RedactionEvent?, storeRecID: Int64?, source: NotificationSource) throws -> ArchivedNotification
+    public func insert(_ n: ArchivedNotification, redaction: RedactionEvent? = nil) throws -> ArchivedNotification
     @discardableResult
-    public func insert(_ n: ArchivedNotification) throws -> ArchivedNotification
+    public func insertOrUpdate(_ n: ArchivedNotification, redaction: RedactionEvent? = nil) throws -> InsertOutcome
     public func notification(id: Int64) throws -> ArchivedNotification
     public func notifications(ids: [Int64]) async throws -> [(notification: ArchivedNotification, appName: String)]
     public func notifications(uuids: [UUID]) async throws -> [(notification: ArchivedNotification, appName: String)]
@@ -461,9 +463,20 @@ public final class Archive: Sendable {
     public func countNotifications(includingDeleted: Bool) throws -> Int
     public func latestDigest() async throws -> Digest?
     public func digestItems(digestID: Int64) async throws -> [(notification: ArchivedNotification, appName: String)]
+
+    // capture_state, as opaque values. BackglanceCapture puts the typed accessors on top.
+    public func captureState(_ key: CaptureStateKey) throws -> String?
+    public func setCaptureState(_ value: String?, for key: CaptureStateKey) throws
+    public func captureStateJSON<Value: Decodable>(_ key: CaptureStateKey, as type: Value.Type) throws -> Value?
+    public func setCaptureStateJSON(_ value: some Encodable, for key: CaptureStateKey) throws
+    public func adapterID() throws -> String?
+    public func saveAdapterID(_ adapterID: String) throws
+    public func lastImportDate() throws -> Date?
     public func saveLastImport(_ date: Date) throws
 }
 ```
+
+> ℹ️ **Info:** The capture-shaped API is split across the module boundary, because the dependency direction is one-way ([ARCHITECTURE.md](../architecture/ARCHITECTURE.md#dependency-graph)). `BackglanceCore` takes `ArchivedNotification` and stores capture bookkeeping as opaque JSON; `BackglanceCapture` adds `extension Archive` with `loadCursor()` / `saveCursor(_:)` / `clearCursor()` / `loadFingerprint()` / `saveFingerprint(_:)` and the `ArchivedNotification(parsed:appID:storeRecID:source:capturedAt:)` conversion from a `ParsedNotification`. See [CAPTURE.md](../features/CAPTURE.md#cursor-persistence).
 
 **Isolation.** `Sendable`; call from any actor. Async `read`/`write` are non-blocking; the synchronous variants (`insert`, `upsertApp`, `notification(id:)`) are meant for the capture actor and tests. On disk, where `pool` is a `DatabasePool`, `pool.read` snapshots are consistent even while capture inserts; in-memory it is a `DatabaseQueue`, which serialises reads against writes instead — same code path, no WAL.
 
@@ -479,12 +492,13 @@ let app = try archive.upsertApp(bundleID: "com.example.demo", now: now)
 _ = try archive.insert(ArchivedNotification.stub(appID: app.id, deliveredAt: now))
 XCTAssertEqual(try archive.countNotifications(includingDeleted: false), 1)
 
-// Error path: duplicate store_rec_id is an expected outcome during import + live overlap
-do {
-    _ = try archive.insert(parsed, redaction: nil, storeRecID: 4_242, source: .live)
-    _ = try archive.insert(parsed, redaction: nil, storeRecID: 4_242, source: .import)
-} catch ArchiveError.duplicate {
-    // advance the cursor silently
+// Error path: duplicate store_rec_id is an expected outcome during import + live overlap.
+// In BackglanceCapture, where ParsedNotification lives:
+let row = ArchivedNotification(parsed: parsed, appID: app.id!, storeRecID: 4_242,
+                               source: .live, capturedAt: now)
+_ = try archive.insertOrUpdate(row)                       // .inserted(id:)
+if case .duplicate = try archive.insertOrUpdate(row) {
+    // advance the cursor silently — not an error
 }
 ```
 
