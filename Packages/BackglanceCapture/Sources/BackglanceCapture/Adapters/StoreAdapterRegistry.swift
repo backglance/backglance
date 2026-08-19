@@ -52,6 +52,25 @@ public enum StoreAdapterRegistry {
         resolve(fingerprint: fingerprint, in: adapters)
     }
 
+    /// Step two: resolution, confirmed against the store itself.
+    ///
+    /// The rule the whole capture layer rests on is here: **an exact fingerprint match is
+    /// trusted, everything else has to pass a probe first**. A fallback adapter is a
+    /// hypothesis — "this macOS is new but the store still looks like the old one" — and
+    /// ``StoreAdapter/probe(_:)`` is what turns it into an observation before a single
+    /// record is read.
+    ///
+    /// Note what this method does *not* do: it never throws, and it never returns an
+    /// adapter it is unsure about. Every way of failing comes back as
+    /// ``Resolution/degraded(reason:)``, because none of them is an error the user should
+    /// see as an alert — they are states the engine sits in and retries out of, with the
+    /// archive untouched.
+    ///
+    /// - Parameter db: a read-only snapshot of the store, never the live file.
+    public static func resolve(fingerprint: StoreFingerprint, probing db: Database) -> Resolution {
+        resolve(fingerprint: fingerprint, probing: db, in: adapters)
+    }
+
     // MARK: Internal
 
     /// The lookup, over an explicit adapter list.
@@ -77,5 +96,111 @@ public enum StoreAdapterRegistry {
         }
 
         return nil
+    }
+
+    /// Resolution over an explicit adapter list. See ``resolve(fingerprint:in:)`` for why
+    /// the list is injectable.
+    static func resolve(
+        fingerprint: StoreFingerprint,
+        probing db: Database,
+        in adapters: [any StoreAdapter]
+    ) -> Resolution {
+        guard let candidate = resolve(fingerprint: fingerprint, in: adapters) else {
+            return .degraded(reason: .unknownSchema(fingerprint))
+        }
+
+        let isExact = candidate.isExactMatch(for: fingerprint)
+        do {
+            switch try candidate.probe(db) {
+            case .ok:
+                guard !isExact else {
+                    return .matched(candidate)
+                }
+                return .fallback(
+                    candidate,
+                    note: "fingerprint \(fingerprint.schemaHash.prefix(12)) unknown; \(candidate.adapterID) probe ok"
+                )
+
+            case .permissionDenied:
+                return .degraded(reason: .noFullDiskAccess)
+
+            case .missingTables,
+                 .unknownSchema:
+                // The store is not the shape any adapter reads. This is the expected
+                // outcome of Apple reshaping it, and it is the whole reason capture stops
+                // rather than guessing.
+                return .degraded(reason: .unknownSchema(fingerprint))
+            }
+        } catch {
+            return .degraded(reason: .readError(Self.failureDescription(error)))
+        }
+    }
+
+    // MARK: Private
+
+    /// A content-free rendering of a probe failure.
+    ///
+    /// > 🔒 Deliberately *not* `String(describing:)`: a `DatabaseError`'s description
+    /// > carries the failing statement and its arguments, and this string ends up in the
+    /// > file log and the diagnostics export. The result code says what went wrong;
+    /// > nothing from the store needs to come with it. `StoreSnapshot` narrows its SQLite
+    /// > errors the same way.
+    private static func failureDescription(_ error: Error) -> String {
+        guard let databaseError = error as? DatabaseError else {
+            return "\(type(of: error))"
+        }
+        return "sqlite \(databaseError.resultCode.rawValue)"
+    }
+}
+
+// MARK: StoreAdapterRegistry.Resolution
+
+public extension StoreAdapterRegistry {
+    /// The outcome of resolving an adapter against a store.
+    ///
+    /// Three outcomes rather than an optional, because the middle one carries real
+    /// information: ``fallback(_:note:)`` is capture running normally on an adapter that
+    /// was chosen by OS rather than by fingerprint, which Settings shows as a best-effort
+    /// note and which is the maintainer's cue to refresh a fixture. Collapsing it into
+    /// ``matched(_:)`` would hide a macOS change; collapsing it into
+    /// ``degraded(reason:)`` would stop capture on a store that reads perfectly well.
+    enum Resolution: Sendable {
+        /// The fingerprint was recognised and the probe passed. Ordinary running.
+        case matched(any StoreAdapter)
+
+        /// The fingerprint was not recognised, but the adapter chosen by OS probed clean.
+        /// `note` is content-free — a hash prefix and an adapter id — and safe to log.
+        case fallback(any StoreAdapter, note: String)
+
+        /// Capture cannot run against this store. A state, not an error.
+        case degraded(reason: DegradedReason)
+
+        // MARK: Internal
+
+        /// The adapter to read with, or `nil` when there is none.
+        var adapter: (any StoreAdapter)? {
+            switch self {
+            case let .matched(adapter),
+                 let .fallback(adapter, _):
+                adapter
+
+            case .degraded:
+                nil
+            }
+        }
+
+        /// Safe for the file log and `os_log` with `privacy: .public`.
+        var logDescription: String {
+            switch self {
+            case let .matched(adapter):
+                "matched \(adapter.adapterID)"
+
+            case let .fallback(adapter, note):
+                "fallback \(adapter.adapterID): \(note)"
+
+            case let .degraded(reason):
+                "degraded: \(reason.logDescription)"
+            }
+        }
     }
 }

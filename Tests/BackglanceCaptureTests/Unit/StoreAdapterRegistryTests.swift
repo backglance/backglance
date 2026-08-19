@@ -84,7 +84,117 @@ final class StoreAdapterRegistryTests: XCTestCase {
         XCTAssertEqual(first, second)
     }
 
+    // MARK: - Resolution with a probe
+
+    /// A verified fingerprint plus a clean probe is the only path to ordinary running.
+    func testAnExactMatchThatProbesCleanIsMatched() throws {
+        let queue = try MiniatureStore.make(rows: MiniatureStore.rows(2))
+
+        let resolution = try queue.read { db in
+            StoreAdapterRegistry.resolve(
+                fingerprint: Self.fingerprint(os: 26, schemaHash: StubAdapter.knownHash),
+                probing: db,
+                in: [StubAdapter(), StoreAdapterV26()]
+            )
+        }
+
+        guard case let .matched(adapter) = resolution else {
+            return XCTFail("expected .matched, got \(resolution.logDescription)")
+        }
+        XCTAssertEqual(adapter.adapterID, "stub-v99")
+    }
+
+    /// The macOS-just-updated case: the hash is unfamiliar, the store still reads. Capture
+    /// keeps running, and the note is what tells the maintainer to refresh a fixture.
+    func testAnUnknownFingerprintOnAReadableStoreIsAProbedFallback() throws {
+        let queue = try MiniatureStore.make(rows: MiniatureStore.rows(1))
+
+        let resolution = try queue.read { db in
+            StoreAdapterRegistry.resolve(fingerprint: Self.fingerprint(os: 27), probing: db)
+        }
+
+        guard case let .fallback(adapter, note) = resolution else {
+            return XCTFail("expected .fallback, got \(resolution.logDescription)")
+        }
+        XCTAssertEqual(adapter.adapterID, "v26")
+        XCTAssertTrue(note.contains("ffffffffffff"), note)
+        XCTAssertTrue(note.contains("v26"), note)
+    }
+
+    /// The case the whole design exists for: a store that is not the shape any adapter
+    /// reads stops capture instead of being parsed anyway.
+    func testAStoreMissingTheTablesAnAdapterReadsIsDegraded() throws {
+        let queue = try MiniatureStore.make(droppingTables: ["record"])
+        let fingerprint = Self.fingerprint(os: 26)
+
+        let resolution = try queue.read { db in
+            StoreAdapterRegistry.resolve(fingerprint: fingerprint, probing: db)
+        }
+
+        XCTAssertEqual(Self.degradedReason(of: resolution), .unknownSchema(fingerprint))
+        XCTAssertNil(resolution.adapter)
+    }
+
+    func testARenamedColumnIsDegradedRatherThanFallenBackOn() throws {
+        let queue = try MiniatureStore.make(renamingDeliveredDateTo: "delivered_at")
+        let fingerprint = Self.fingerprint(os: 26)
+
+        let resolution = try queue.read { db in
+            StoreAdapterRegistry.resolve(fingerprint: fingerprint, probing: db)
+        }
+
+        XCTAssertEqual(Self.degradedReason(of: resolution), .unknownSchema(fingerprint))
+    }
+
+    /// Full Disk Access revoked between the snapshot and the read. The user gets the one
+    /// message they can act on, not "unrecognised store".
+    func testAProbeThatIsDeniedBecomesTheFullDiskAccessState() throws {
+        let queue = try MiniatureStore.make()
+
+        let resolution = try queue.read { db in
+            StoreAdapterRegistry.resolve(fingerprint: Self.fingerprint(os: 99), probing: db, in: [DeniedAdapter()])
+        }
+
+        XCTAssertEqual(Self.degradedReason(of: resolution), .noFullDiskAccess)
+    }
+
+    /// An unexpected SQLite failure must not escape: resolution never throws, and the
+    /// detail it records is a result code rather than the failing statement.
+    func testAProbeThatThrowsBecomesAContentFreeReadError() throws {
+        let queue = try MiniatureStore.make()
+
+        let resolution = try queue.read { db in
+            StoreAdapterRegistry.resolve(fingerprint: Self.fingerprint(os: 99), probing: db, in: [ThrowingAdapter()])
+        }
+
+        guard case let .readError(detail)? = Self.degradedReason(of: resolution) else {
+            return XCTFail("expected .readError, got \(resolution.logDescription)")
+        }
+        XCTAssertEqual(detail, "sqlite 11")
+        XCTAssertFalse(detail.contains("SELECT"), detail)
+    }
+
+    /// No candidate at all: the probe is never reached, and nothing is read.
+    func testAMacOSWithNoCandidateIsDegradedWithoutProbing() throws {
+        let queue = try MiniatureStore.make(rows: MiniatureStore.rows(1))
+        let fingerprint = Self.fingerprint(os: 13)
+
+        let resolution = try queue.read { db in
+            StoreAdapterRegistry.resolve(fingerprint: fingerprint, probing: db)
+        }
+
+        XCTAssertEqual(Self.degradedReason(of: resolution), .unknownSchema(fingerprint))
+    }
+
     // MARK: Private
+
+    /// The reason a resolution degraded for, or `nil` if it did not.
+    private static func degradedReason(of resolution: StoreAdapterRegistry.Resolution) -> DegradedReason? {
+        guard case let .degraded(reason) = resolution else {
+            return nil
+        }
+        return reason
+    }
 
     private static func fingerprint(os major: Int,
                                     schemaHash: String = String(repeating: "f", count: 64)) -> StoreFingerprint
@@ -116,6 +226,60 @@ private struct StubAdapter: StoreAdapter {
 
     func records(after cursor: StoreCursor, in db: Database) throws -> [RawStoreRecord] {
         try RecordQuery.records(after: cursor, in: db)
+    }
+
+    func cursor(for record: RawStoreRecord) -> StoreCursor {
+        StoreCursor(lastRecID: record.recID, lastDeliveredDate: record.deliveredDate)
+    }
+}
+
+// MARK: - DeniedAdapter
+
+/// An adapter whose probe reports that the snapshot cannot be read — Full Disk Access
+/// revoked after the copy was taken.
+private struct DeniedAdapter: StoreAdapter {
+    static let id = "denied"
+    static let supportedOS: ClosedRange<Int> = 99 ... 99
+
+    static func matches(_: StoreFingerprint) -> Bool {
+        false
+    }
+
+    func probe(_: Database) throws -> ProbeResult {
+        .permissionDenied
+    }
+
+    func records(after _: StoreCursor, in _: Database) throws -> [RawStoreRecord] {
+        []
+    }
+
+    func cursor(for record: RawStoreRecord) -> StoreCursor {
+        StoreCursor(lastRecID: record.recID, lastDeliveredDate: record.deliveredDate)
+    }
+}
+
+// MARK: - ThrowingAdapter
+
+/// An adapter whose probe fails the way a corrupt snapshot would. The SQL in the error is
+/// there so the test can assert it does not reach the degraded reason.
+private struct ThrowingAdapter: StoreAdapter {
+    static let id = "throwing"
+    static let supportedOS: ClosedRange<Int> = 99 ... 99
+
+    static func matches(_: StoreFingerprint) -> Bool {
+        false
+    }
+
+    func probe(_: Database) throws -> ProbeResult {
+        throw DatabaseError(
+            resultCode: .SQLITE_CORRUPT,
+            message: "database disk image is malformed",
+            sql: "SELECT name FROM sqlite_master"
+        )
+    }
+
+    func records(after _: StoreCursor, in _: Database) throws -> [RawStoreRecord] {
+        []
     }
 
     func cursor(for record: RawStoreRecord) -> StoreCursor {
