@@ -186,6 +186,69 @@ final class StoreAdapterRegistryTests: XCTestCase {
         XCTAssertEqual(Self.degradedReason(of: resolution), .unknownSchema(fingerprint))
     }
 
+    /// Recognising the fingerprint is not a licence to skip the probe. A store whose hash
+    /// was verified once but whose tables are gone now — a store replaced under us, or a
+    /// truncated snapshot — still has to degrade.
+    func testAnExactMatchWhoseProbeFailsStillDegrades() throws {
+        let queue = try MiniatureStore.make(droppingTables: ["record"])
+        let fingerprint = Self.fingerprint(os: 26, schemaHash: StubAdapter.knownHash)
+
+        let resolution = try queue.read { db in
+            StoreAdapterRegistry.resolve(fingerprint: fingerprint, probing: db, in: [StubAdapter()])
+        }
+
+        XCTAssertEqual(Self.degradedReason(of: resolution), .unknownSchema(fingerprint))
+    }
+
+    /// An empty adapter list is what a build with every adapter removed would look like.
+    /// It resolves to nothing rather than reaching for something.
+    func testNoRegisteredAdaptersDegradesWithoutReading() throws {
+        let queue = try MiniatureStore.make(rows: MiniatureStore.rows(1))
+        let fingerprint = Self.fingerprint(os: 26)
+
+        let resolution = try queue.read { db in
+            StoreAdapterRegistry.resolve(fingerprint: fingerprint, probing: db, in: [])
+        }
+
+        XCTAssertEqual(Self.degradedReason(of: resolution), .unknownSchema(fingerprint))
+    }
+
+    func testTheAdapterToReadWithIsCarriedByMatchedAndFallbackAlike() throws {
+        let queue = try MiniatureStore.make(rows: MiniatureStore.rows(1))
+
+        let (matched, fallback) = try queue.read { db in
+            (
+                StoreAdapterRegistry.resolve(
+                    fingerprint: Self.fingerprint(os: 26, schemaHash: StubAdapter.knownHash),
+                    probing: db,
+                    in: [StubAdapter()]
+                ),
+                StoreAdapterRegistry.resolve(fingerprint: Self.fingerprint(os: 26), probing: db)
+            )
+        }
+
+        XCTAssertEqual(matched.adapter?.adapterID, "stub-v99")
+        XCTAssertEqual(fallback.adapter?.adapterID, "v26")
+    }
+
+    /// 🔒 Resolution is logged on every bootstrap, so its rendering carries adapter ids,
+    /// a hash prefix and a fixed reason — never a path, and never anything from a record.
+    func testLogDescriptionsNameTheAdapterAndTheReason() throws {
+        let queue = try MiniatureStore.make(rows: MiniatureStore.rows(1))
+        let degradedFingerprint = Self.fingerprint(os: 13)
+
+        let (fallback, degraded) = try queue.read { db in
+            (
+                StoreAdapterRegistry.resolve(fingerprint: Self.fingerprint(os: 26), probing: db),
+                StoreAdapterRegistry.resolve(fingerprint: degradedFingerprint, probing: db)
+            )
+        }
+
+        XCTAssertTrue(fallback.logDescription.hasPrefix("fallback v26:"), fallback.logDescription)
+        XCTAssertTrue(degraded.logDescription.hasPrefix("degraded: unknown schema"), degraded.logDescription)
+        XCTAssertTrue(degraded.logDescription.contains("os=13.0"), degraded.logDescription)
+    }
+
     // MARK: Private
 
     /// The reason a resolution degraded for, or `nil` if it did not.
