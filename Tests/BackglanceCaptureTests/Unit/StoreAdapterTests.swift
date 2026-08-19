@@ -239,12 +239,3 @@ private struct StubStoreAdapter: StoreAdapter {
         StoreCursor(lastRecID: record.recID, lastDeliveredDate: record.deliveredDate)
     }
 }
-
-// MARK: - UUID + raw bytes
-
-private extension UUID {
-    /// The 16 raw bytes, as the store keeps them.
-    var rawBytes: [UInt8] {
-        withUnsafeBytes(of: uuid) { Array($0) }
-    }
-}

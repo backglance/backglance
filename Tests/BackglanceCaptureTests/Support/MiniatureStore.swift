@@ -1,0 +1,140 @@
+import Foundation
+import GRDB
+
+// MARK: - MiniatureStore
+
+/// An in-memory database shaped like Apple's notification store, small enough to assert
+/// on exactly.
+///
+/// 🔒 Synthetic by construction: every value here is written by the test that asks for it.
+/// Nothing reads `~/Library`, and no bytes from a real store are involved. The checked-in
+/// fixtures under `Tests/Fixtures/SystemStore/` are the full-size counterpart — this is
+/// for tests that want three rows and one deliberate deformity.
+///
+/// The schema mirrors the macOS 14 layout recorded in
+/// docs/architecture/OS_COMPATIBILITY_PLAYBOOK.md, including the columns Backglance
+/// ignores, so that "the adapter ignores what it does not need" is actually exercised.
+enum MiniatureStore {
+    // MARK: Internal
+
+    // MARK: - Rows
+
+    struct Row {
+        // MARK: Lifecycle
+
+        init(recID: Int64) {
+            self.recID = recID
+        }
+
+        // MARK: Internal
+
+        var recID: Int64
+        var bundleID = "app.backglance.Fixture"
+        var payload: Data? = Data("payload".utf8)
+        var uuidBlob: Data? = Data(UUID().rawBytes)
+        var deliveredDate: Date? = MiniatureStore.delivered
+        var requestDate: Date?
+        var presented: Bool? = true
+        var style: Int? = 0
+    }
+
+    /// A fixed instant, so date assertions do not depend on when the test runs.
+    static let delivered = Date(timeIntervalSinceReferenceDate: 774_000_000)
+
+    /// `count` rows numbered from 1, each with a distinct payload.
+    static func rows(_ count: Int) -> [Row] {
+        (1 ... count).map { recID in
+            var row = Row(recID: Int64(recID))
+            row.payload = Data("payload-\(recID)".utf8)
+            return row
+        }
+    }
+
+    /// A store containing `rows`.
+    ///
+    /// - Parameters:
+    ///   - droppingTables: tables to leave out entirely, for probe tests.
+    ///   - renamingDeliveredDateTo: renames `record.delivered_date`, which is the shape a
+    ///     future macOS taking a column away would have.
+    static func make(
+        rows: [Row] = [],
+        droppingTables: Set<String> = [],
+        renamingDeliveredDateTo deliveredColumn: String = "delivered_date"
+    ) throws -> DatabaseQueue {
+        let queue = try DatabaseQueue()
+        try queue.write { db in
+            if !droppingTables.contains("dbinfo") {
+                try db.execute(sql: "CREATE TABLE dbinfo (key TEXT PRIMARY KEY, value)")
+                try db.execute(sql: "INSERT INTO dbinfo (key, value) VALUES ('compatibleVersion', '14')")
+            }
+            if !droppingTables.contains("app") {
+                try db.execute(sql: "CREATE TABLE app (app_id INTEGER PRIMARY KEY, identifier TEXT, badge INTEGER)")
+            }
+            if !droppingTables.contains("record") {
+                try db.execute(sql: """
+                CREATE TABLE record (
+                    rec_id INTEGER PRIMARY KEY,
+                    app_id INTEGER,
+                    uuid BLOB,
+                    data BLOB,
+                    request_date REAL,
+                    request_last_date REAL,
+                    \(deliveredColumn) REAL,
+                    presented INTEGER,
+                    style INTEGER,
+                    snooze_fire_date REAL
+                )
+                """)
+            }
+            guard !droppingTables.contains("record"), !droppingTables.contains("app") else {
+                return
+            }
+            try insert(rows, deliveredColumn: deliveredColumn, into: db)
+        }
+        return queue
+    }
+
+    // MARK: Private
+
+    private static func insert(_ rows: [Row], deliveredColumn: String, into db: Database) throws {
+        var appIDs: [String: Int64] = [:]
+        for row in rows {
+            let appID: Int64
+            if let existing = appIDs[row.bundleID] {
+                appID = existing
+            } else {
+                appID = Int64(appIDs.count + 1)
+                appIDs[row.bundleID] = appID
+                try db.execute(
+                    sql: "INSERT INTO app (app_id, identifier, badge) VALUES (?, ?, 0)",
+                    arguments: [appID, row.bundleID]
+                )
+            }
+            try db.execute(
+                sql: """
+                INSERT INTO record (rec_id, app_id, uuid, data, request_date, \(deliveredColumn), presented, style)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                arguments: [
+                    row.recID,
+                    appID,
+                    row.uuidBlob,
+                    row.payload,
+                    row.requestDate?.timeIntervalSinceReferenceDate,
+                    row.deliveredDate?.timeIntervalSinceReferenceDate,
+                    row.presented.map { $0 ? 1 : 0 },
+                    row.style,
+                ]
+            )
+        }
+    }
+}
+
+// MARK: - UUID + raw bytes
+
+extension UUID {
+    /// The 16 raw bytes, as the store keeps them.
+    var rawBytes: [UInt8] {
+        withUnsafeBytes(of: uuid) { Array($0) }
+    }
+}
