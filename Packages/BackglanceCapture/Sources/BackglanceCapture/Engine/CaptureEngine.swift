@@ -54,6 +54,7 @@ public actor CaptureEngine {
 
     deinit {
         loopTask?.cancel()
+        autoResumeTask?.cancel()
         statusContinuation.finish()
     }
 
@@ -119,6 +120,7 @@ public actor CaptureEngine {
     public func stop() {
         loopTask?.cancel()
         loopTask = nil
+        cancelAutoResume()
         watcher.stop()
         transition(to: .stopped)
     }
@@ -131,6 +133,31 @@ public actor CaptureEngine {
     /// The adapter reads go through, or `nil` while degraded.
     var currentAdapter: (any StoreAdapter)? {
         adapter
+    }
+
+    /// Moves the cursor. Only the pause fast-forward and the tick loop do this.
+    func setCursor(_ newCursor: StoreCursor) {
+        cursor = newCursor
+    }
+
+    /// Schedules an automatic resume, replacing any already pending.
+    func scheduleAutoResume(at date: Date) {
+        autoResumeTask = Task { [weak self] in
+            let seconds = max(0, date.timeIntervalSinceNow)
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled else {
+                return
+            }
+            await self?.resume()
+        }
+    }
+
+    /// Cancels a pending automatic resume. Called by every path that changes the status
+    /// deliberately, so a stale timer cannot resume capture minutes after the user
+    /// stopped it.
+    func cancelAutoResume() {
+        autoResumeTask?.cancel()
+        autoResumeTask = nil
     }
 
     /// The store's path, as this engine resolves it.
@@ -314,6 +341,9 @@ public actor CaptureEngine {
 
     /// The task consuming ``StoreWatcher/wakes``. Its presence is what "started" means.
     private var loopTask: Task<Void, Never>?
+
+    /// The pending automatic resume, if the user paused with an end time.
+    private var autoResumeTask: Task<Void, Never>?
 
     /// The adapter reads go through, set by ``bootstrap()``.
     private var adapter: (any StoreAdapter)?
