@@ -134,28 +134,60 @@ Capture has almost no UI of its own; it publishes a `CaptureStatus` and the shel
 ### StoreLocation
 
 ```swift
-// Packages/BackglanceCapture/Sources/BackglanceCapture/StoreLocation.swift
+// Packages/BackglanceCapture/Sources/BackglanceCapture/Store/StoreLocation.swift
 import Foundation
 
-public struct StoreLocation: Sendable {
+public enum StoreLocation {
     /// Apple's Notification Center database. Requires Full Disk Access to read.
     /// ⚠️ Undocumented path; observed on macOS 11–26.
     public static func current() throws -> URL {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let url = home
-            .appendingPathComponent("Library/Group Containers/group.com.apple.usernoted/db2/db")
+        try resolve(environment: ProcessInfo.processInfo.environment,
+                    homeDirectory: FileManager.default.homeDirectoryForCurrentUser)
+    }
+
+    static let relativePath = "Library/Group Containers/group.com.apple.usernoted/db2/db"
+
+    /// `BACKGLANCE_STORE_PATH` is consulted in DEBUG builds only.
+    static let honoursStorePathOverride: Bool = {
+        #if DEBUG
+            true
+        #else
+            false
+        #endif
+    }()
+
+    static func resolve(environment: [String: String],
+                        homeDirectory: URL,
+                        honoursOverride: Bool = honoursStorePathOverride,
+                        fileManager: FileManager = .default) throws -> URL {
+        if honoursOverride,
+           let override = environment["BACKGLANCE_STORE_PATH"],
+           !override.isEmpty, (override as NSString).isAbsolutePath {
+            // A fixture is our own file, so its existence *can* be checked directly: no
+            // FDA stands between us and it, and a typo should say so here.
+            let url = URL(fileURLWithPath: override)
+            guard fileManager.fileExists(atPath: url.path) else {
+                throw CaptureError.storeNotFound(url)
+            }
+            return url
+        }
+
+        let url = homeDirectory.appendingPathComponent(relativePath)
         // Only the *directory* is checked here. `fileExists` on the db file itself is
         // unreliable without FDA (it can report false), and the snapshot copy gives a
-        // precise errno anyway.
+        // precise errno anyway — which is what distinguishes `noFullDiskAccess` from
+        // `storeNotFound`.
         var isDir: ObjCBool = false
         let dir = url.deletingLastPathComponent()
-        guard FileManager.default.fileExists(atPath: dir.path, isDirectory: &isDir), isDir.boolValue else {
+        guard fileManager.fileExists(atPath: dir.path, isDirectory: &isDir), isDir.boolValue else {
             throw CaptureError.storeNotFound(url)
         }
         return url
     }
 }
 ```
+
+A namespace enum rather than a `struct`, matching `ArchivePaths`; `resolve(...)` is an internal seam so tests can exercise the override, the default branch and both build configurations without mutating the process environment or depending on what exists under the test runner's `~`. An empty or relative `BACKGLANCE_STORE_PATH` is ignored rather than trapped, so a misconfigured environment degrades to the real store — the same rule `ArchivePaths` applies to `BACKGLANCE_ARCHIVE_PATH`.
 
 ### StoreWatcher
 
