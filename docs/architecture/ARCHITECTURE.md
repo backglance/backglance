@@ -487,8 +487,19 @@ public enum StoreAdapterRegistry {
                 return .degraded(reason: .unknownSchema(fp))
             }
         } catch {
-            return .degraded(reason: .readError(String(describing: error)))
+            return .degraded(reason: .readError(failureDescription(error)))
         }
+    }
+
+    /// A content-free rendering of a probe failure.
+    ///
+    /// 🔒 Deliberately *not* `String(describing:)`: a `DatabaseError`'s description
+    /// carries the failing statement and its arguments, and this string reaches the
+    /// file log and the diagnostics export. `StoreSnapshot` narrows its SQLite errors
+    /// the same way.
+    private static func failureDescription(_ error: Error) -> String {
+        guard let dbError = error as? DatabaseError else { return "\(type(of: error))" }
+        return "sqlite \(dbError.resultCode.rawValue)"
     }
 }
 ```
@@ -606,7 +617,7 @@ public actor CaptureEngine {
         } catch let error as CaptureError {
             status = .degraded(error.degradedReason)
         } catch {
-            status = .degraded(.readError(String(describing: error)))
+            status = .degraded(.readError("\(type(of: error))"))   // never the description
         }
     }
 
@@ -618,7 +629,7 @@ public actor CaptureEngine {
         } catch let error as CaptureError {
             status = .degraded(error.degradedReason)   // engine stays alive, retries on wake
         } catch {
-            status = .degraded(.readError(String(describing: error)))
+            status = .degraded(.readError("\(type(of: error))"))   // never the description
         }
     }
 
@@ -677,7 +688,7 @@ public actor CaptureEngine {
         } catch let error as CaptureError {
             status = .degraded(error.degradedReason)
         } catch {
-            status = .degraded(.readError(String(describing: error)))
+            status = .degraded(.readError("\(type(of: error))"))   // never the description
         }
     }
 
@@ -698,7 +709,7 @@ public actor CaptureEngine {
         } catch let error as ArchiveError {
             logger.error("archive rec \(raw.recID, privacy: .public): \(error.logDescription, privacy: .public)")
         } catch {
-            logger.error("rec \(raw.recID, privacy: .public): \(String(describing: error), privacy: .public)")
+            logger.error("rec \(raw.recID, privacy: .public): \(String(describing: type(of: error)), privacy: .public)")
         }
     }
 

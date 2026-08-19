@@ -707,7 +707,7 @@ private func archiveOne(_ raw: RawStoreRecord, source: ArchivedNotification.Sour
         logger.error("archive rec \(raw.recID, privacy: .public): \(error.logDescription, privacy: .public)")
         return .failed
     } catch {
-        logger.error("rec \(raw.recID, privacy: .public): \(String(describing: error), privacy: .public)")
+        logger.error("rec \(raw.recID, privacy: .public): \(String(describing: type(of: error)), privacy: .public)")
         return .failed
     }
 }
@@ -973,7 +973,7 @@ public actor CaptureEngine {
         } catch let error as CaptureError {
             status = .degraded(error.degradedReason)
         } catch {
-            status = .degraded(.readError(String(describing: error)))
+            status = .degraded(.readError("\(type(of: error))"))   // the type, never the description
         }
     }
 
@@ -985,7 +985,7 @@ public actor CaptureEngine {
         } catch let error as CaptureError {
             status = .degraded(error.degradedReason)     // stays alive; retried on every wake
         } catch {
-            status = .degraded(.readError(String(describing: error)))
+            status = .degraded(.readError("\(type(of: error))"))   // the type, never the description
         }
     }
 
@@ -1062,7 +1062,7 @@ public actor CaptureEngine {
         } catch let error as CaptureError {
             handleTickFailure(error)
         } catch {
-            handleTickFailure(.readFailed(String(describing: error)))
+            handleTickFailure(.readFailed("\(type(of: error))"))
         }
     }
 
