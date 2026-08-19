@@ -35,10 +35,35 @@ struct Arguments {
     var records: Int?
     var build: String
 
+    /// The `dbinfo` version value the fixture should carry.
+    ///
+    /// Apple's store keeps a version-like value in its own `dbinfo` table, and
+    /// ``StoreFingerprint`` reads it — so a fixture without one leaves that part of the
+    /// fingerprint untested. Synthetic like everything else here; the manifest records
+    /// what was written so the harness can check it came back.
+    var dbinfoVersion: String?
+
     /// Overrides the manifest's `notes`. The default claims the schema was captured with
     /// `sqlite3 .schema` on that macOS, which is only true when it was — a fixture built
     /// from a reconstructed schema has to say so.
     var notes: String?
+
+    /// The `--print-fingerprint` form, which needs a database and nothing else.
+    static func fingerprintOnly(databaseURL: URL) -> Arguments {
+        Arguments(
+            printFingerprintOnly: true,
+            osMajor: 0,
+            databaseURL: databaseURL,
+            expectedURL: URL(fileURLWithPath: "/dev/null"),
+            manifestURL: URL(fileURLWithPath: "/dev/null"),
+            sourceManifestURL: nil,
+            seed: nil,
+            records: nil,
+            build: "unknown",
+            dbinfoVersion: nil,
+            notes: nil
+        )
+    }
 
     static func parse(_ arguments: [String]) throws -> Arguments {
         var values: [String: String] = [:]
@@ -72,18 +97,7 @@ struct Arguments {
         }
 
         if flags.contains("print-fingerprint") {
-            return try Arguments(
-                printFingerprintOnly: true,
-                osMajor: 0,
-                databaseURL: URL(fileURLWithPath: required("db")),
-                expectedURL: URL(fileURLWithPath: "/dev/null"),
-                manifestURL: URL(fileURLWithPath: "/dev/null"),
-                sourceManifestURL: nil,
-                seed: nil,
-                records: nil,
-                build: "unknown",
-                notes: nil
-            )
+            return try fingerprintOnly(databaseURL: URL(fileURLWithPath: required("db")))
         }
 
         return try Arguments(
@@ -95,6 +109,7 @@ struct Arguments {
             seed: values["seed"].flatMap { UInt64($0) },
             records: values["records"].flatMap { Int($0) },
             build: values["build"] ?? "unknown",
+            dbinfoVersion: values["dbinfo-version"],
             notes: values["notes"]
         )
     }
@@ -116,7 +131,7 @@ enum GeneratorError: Error, CustomStringConvertible {
 
             usage: FixtureGenerator --os <major> --db <store.db> --expected <expected.json> \
             --manifest <manifest.json> [--source-manifest <manifest.json>] [--seed <int>] \
-            [--records <n>] [--build <build>] [--notes <text>]
+            [--records <n>] [--build <build>] [--dbinfo-version <value>] [--notes <text>]
                    FixtureGenerator --print-fingerprint --db <store.db>
             """
 
@@ -133,9 +148,20 @@ enum GeneratorError: Error, CustomStringConvertible {
 /// The `app` table is filled from the bundle ids the content generator actually used, so
 /// the fixture has no rows nothing points at — the join the adapter runs would not notice,
 /// but a person reading the fixture would wonder.
-func writeStore(_ notifications: [GeneratedNotification], to url: URL) throws {
+func writeStore(
+    _ notifications: [GeneratedNotification],
+    dbinfoVersion: String,
+    to url: URL
+) throws {
     let queue = try DatabaseQueue(path: url.path)
     try queue.write { db in
+        // The store keeps its own version marker, and the fingerprint reads it. A fixture
+        // without one would leave that part of the fingerprint untested.
+        try db.execute(
+            sql: "INSERT OR REPLACE INTO dbinfo (key, value) VALUES ('compatibleVersion', ?)",
+            arguments: [dbinfoVersion]
+        )
+
         var appIDs: [String: Int64] = [:]
         for bundleID in notifications.map(\.bundleID).uniqued() {
             let appID = Int64(appIDs.count + 1)
@@ -208,7 +234,11 @@ do {
     let endingAt = Date(timeIntervalSince1970: 1_755_421_200)
     let notifications = SeededContent.notifications(count: records, seed: seed, endingAt: endingAt)
 
-    try writeStore(notifications, to: arguments.databaseURL)
+    try writeStore(
+        notifications,
+        dbinfoVersion: arguments.dbinfoVersion ?? "\(arguments.osMajor)",
+        to: arguments.databaseURL
+    )
     let computed = try fingerprint(of: arguments.databaseURL)
 
     let expected = ExpectedFile(

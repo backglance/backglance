@@ -14,11 +14,15 @@ final class StoreAdapterV15Tests: XCTestCase {
         XCTAssertEqual(StoreAdapterV15.supportedOS, 15 ... 15)
     }
 
-    /// Sequoia's fingerprint differs from Sonoma's, so the two adapters must not answer
-    /// for each other's hashes — that separation is the whole point of keeping distinct
-    /// identities over a shared reader.
-    func testClaimsNoExactMatchWithoutAVerifiedHash() {
-        XCTAssertTrue(StoreAdapterV15.knownSchemaHashes.isEmpty)
+    /// Every hash here got in by way of a fixture whose records the suite parses and
+    /// checks, so an exact match is something that was verified rather than assumed. An
+    /// unfamiliar hash still resolves to nothing, which is what sends the registry down
+    /// the probe-guarded fallback instead.
+    func testClaimsOnlyFixtureVerifiedHashes() {
+        XCTAssertFalse(
+            StoreAdapterV15.knownSchemaHashes.isEmpty,
+            "the macOS 15 fixture's hash should be registered in KnownFingerprints.json"
+        )
         XCTAssertFalse(StoreAdapterV15.matches(Self.sequoiaFingerprint))
     }
 

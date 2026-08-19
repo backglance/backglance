@@ -1,8 +1,14 @@
 {
   "version": 1,
   "adapters": {
-    "v14": [],
-    "v15": [],
-    "v26": []
+    "v14": [
+      "6a0a7239c02a5300f3edcae60d3777d811aa211bc8aedb9a9c6601a662ab7100"
+    ],
+    "v15": [
+      "1da122208beaa3dab6fee3dc0e07a8526eff08b4f86c47b1834db60fcbe8ec5f"
+    ],
+    "v26": [
+      "4c785e1a6d3c8bca33c08936d446c576bbcec7e9d362589b3171d468d1c0d053"
+    ]
   }
 }

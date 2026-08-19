@@ -12,13 +12,14 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OS_MAJOR=""; HYGIENE_ONLY=0; LIVE=0
+OS_MAJOR=""; HYGIENE_ONLY=0; LIVE=0; UPDATE_KNOWN=0
 
 usage() {
   cat <<'EOF'
 usage: verify_fixture.sh --os <major> [--hygiene-only]
        verify_fixture.sh <path/to/store.db>          # hygiene only, for the pre-commit hook
        verify_fixture.sh --live                      # report this Mac's own store fingerprint
+       verify_fixture.sh --update-known-fingerprints # rebuild KnownFingerprints.json from the manifests
 EOF
 }
 
@@ -27,6 +28,7 @@ while [[ $# -gt 0 ]]; do
     --os) OS_MAJOR="$2"; shift 2 ;;
     --hygiene-only) HYGIENE_ONLY=1; shift ;;
     --live) LIVE=1; shift ;;
+    --update-known-fingerprints) UPDATE_KNOWN=1; shift ;;
     -h|--help) usage; exit 0 ;;
     # A bare path is how Scripts/hooks/pre-commit calls this: it is about to commit a
     # fixture and wants the synthetic-data check, not the whole verification.
@@ -71,6 +73,25 @@ if [[ "$LIVE" -eq 1 ]]; then
   else
     echo "live      UNKNOWN fingerprint — regenerate the fixture for this macOS (Scripts/make_fixture.sh)"
   fi
+  exit 0
+fi
+
+# ---- --update-known-fingerprints: the bundled hash list, rebuilt from the manifests. ----
+#
+# ⚠️ This is the only way a hash gets into KnownFingerprints.json. Every entry therefore
+# corresponds to a fixture whose records the test suite parses and checks — which is what
+# "an exact fingerprint match is trusted" is allowed to rest on.
+if [[ "$UPDATE_KNOWN" -eq 1 ]]; then
+  command -v jq > /dev/null 2>&1 || { echo "error: --update-known-fingerprints needs jq" >&2; exit 1; }
+  KNOWN="$REPO_ROOT/Packages/BackglanceCapture/Sources/BackglanceCapture/Resources/KnownFingerprints.json"
+  jq -s '
+      { version: 1,
+        adapters: (group_by(.adapter_id)
+          | map({ key: .[0].adapter_id, value: (map(.schema_sha256) | unique) })
+          | from_entries) }
+    ' "$REPO_ROOT"/Tests/Fixtures/SystemStore/macOS*/manifest.json > "$KNOWN.tmp"
+  mv "$KNOWN.tmp" "$KNOWN"
+  echo "known     $(jq -r '.adapters | to_entries | map("\(.key)=\(.value | length)") | join(" ")' "$KNOWN")"
   exit 0
 fi
 

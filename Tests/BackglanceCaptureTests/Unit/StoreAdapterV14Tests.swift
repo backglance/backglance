@@ -17,11 +17,15 @@ final class StoreAdapterV14Tests: XCTestCase {
         XCTAssertEqual(StoreAdapterV14.supportedOS, 14 ... 14)
     }
 
-    /// Until the macOS 14 fixture exists there is no verified hash to claim, and claiming
-    /// one anyway is how a mis-parse ships. The registry still reaches this adapter by OS
-    /// major, behind a probe.
-    func testClaimsNoExactMatchWithoutAVerifiedHash() {
-        XCTAssertTrue(StoreAdapterV14.knownSchemaHashes.isEmpty)
+    /// Every hash here got in by way of a fixture whose records the suite parses and
+    /// checks, so an exact match is something that was verified rather than assumed. An
+    /// unfamiliar hash still resolves to nothing, which is what sends the registry down
+    /// the probe-guarded fallback instead.
+    func testClaimsOnlyFixtureVerifiedHashes() {
+        XCTAssertFalse(
+            StoreAdapterV14.knownSchemaHashes.isEmpty,
+            "the macOS 14 fixture's hash should be registered in KnownFingerprints.json"
+        )
         XCTAssertFalse(StoreAdapterV14.matches(Self.fingerprint(schemaHash: String(repeating: "a", count: 64))))
     }
 

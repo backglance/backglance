@@ -14,8 +14,15 @@ final class StoreAdapterV26Tests: XCTestCase {
         XCTAssertEqual(StoreAdapterV26.supportedOS, 26 ... 26)
     }
 
-    func testClaimsNoExactMatchWithoutAVerifiedHash() {
-        XCTAssertTrue(StoreAdapterV26.knownSchemaHashes.isEmpty)
+    /// Every hash here got in by way of a fixture whose records the suite parses and
+    /// checks, so an exact match is something that was verified rather than assumed. An
+    /// unfamiliar hash still resolves to nothing, which is what sends the registry down
+    /// the probe-guarded fallback instead.
+    func testClaimsOnlyFixtureVerifiedHashes() {
+        XCTAssertFalse(
+            StoreAdapterV26.knownSchemaHashes.isEmpty,
+            "the macOS 26 fixture's hash should be registered in KnownFingerprints.json"
+        )
         XCTAssertFalse(StoreAdapterV26.matches(Self.tahoeFingerprint))
     }
 

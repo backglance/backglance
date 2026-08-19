@@ -1,0 +1,4419 @@
+{
+  "cursor" : {
+    "lastDeliveredDate" : 1756627422,
+    "lastRecID" : 250
+  },
+  "notifications" : [
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup finished",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755274611,
+      "presented" : true,
+      "sender" : "Linus Lovelace",
+      "threadID" : "chat-9",
+      "title" : "Linus Lovelace",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0195"
+      },
+      "uuid" : "EC28D218-040A-53C7-4DF5-BF07E98C11AA"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch needs a look",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755277033,
+      "presented" : true,
+      "sender" : "Radia Lovelace",
+      "subtitle" : "Radia Lovelace",
+      "threadID" : "#design",
+      "title" : "#design",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Radia Lovelace"
+      },
+      "uuid" : "89BD6C15-74A4-2B79-12BF-301306581694"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 612 moved to Thursday.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755278500,
+      "presented" : true,
+      "threadID" : "build-49",
+      "title" : "Lunch is ready",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/440"
+      },
+      "uuid" : "0AF584B3-CC2A-CE76-1A3C-53302CB06A05"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup is blocked",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755288054,
+      "presented" : true,
+      "sender" : "Alan Dijkstra",
+      "threadID" : "chat-0",
+      "title" : "Alan Dijkstra",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0146"
+      },
+      "uuid" : "06CB36D9-45C1-D7FB-4661-9611EA9A119D"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 402 finished.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755298045,
+      "presented" : true,
+      "threadID" : "build-33",
+      "title" : "The Design Review finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/38"
+      },
+      "uuid" : "8AE3BEE8-8E40-170E-F43C-67629940B83F"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch finished.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755303465,
+      "presented" : true,
+      "sender" : "alan@example.com",
+      "subtitle" : "Re: lunch",
+      "title" : "Alan Dijkstra",
+      "userInfo" : {
+        "from" : "alan@example.com",
+        "messageID" : "<b717a460-ec15-0f78-aa40-ead15eee3c36@example.com>"
+      },
+      "uuid" : "F36FE5D0-B78C-185D-9A65-4EDBE535D2D8"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch is ready.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755310869,
+      "presented" : false,
+      "sender" : "grace@example.com",
+      "subtitle" : "Re: lunch",
+      "title" : "Grace Turing",
+      "userInfo" : {
+        "from" : "grace@example.com",
+        "messageID" : "<43e90657-cfd6-9881-da0f-79bab8d0a14a@example.com>"
+      },
+      "uuid" : "79B040F2-6CEF-1EC4-F612-E6262FCCA4BB"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 550 is blocked.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755312574,
+      "presented" : true,
+      "threadID" : "build-2",
+      "title" : "Tomorrow's Standup moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/12"
+      },
+      "uuid" : "DB9B0C7A-6F3C-0D02-C5C6-5C2C9034BC79"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch is blocked",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755314170,
+      "presented" : true,
+      "sender" : "Barbara Torvalds",
+      "subtitle" : "Barbara Torvalds",
+      "threadID" : "#backglance",
+      "title" : "#backglance",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Barbara Torvalds"
+      },
+      "uuid" : "8E3B8CC1-DD3F-6E47-8FB9-7CB52704C35A"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-295.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "tomorrow's standup is ready.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755315041,
+      "presented" : true,
+      "sender" : "grace@example.com",
+      "subtitle" : "Re: the design review",
+      "title" : "Grace Hopper",
+      "userInfo" : {
+        "from" : "grace@example.com",
+        "messageID" : "<1b024b58-2879-c318-4390-4e49eba5cc3f@example.com>"
+      },
+      "uuid" : "161523A5-DA60-0EA3-D88A-EE6FB127673E"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy is ready.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755324585,
+      "presented" : true,
+      "sender" : "ada@example.com",
+      "subtitle" : "Re: the design review",
+      "title" : "Ada Torvalds",
+      "userInfo" : {
+        "from" : "ada@example.com",
+        "messageID" : "<0fc6deae-8e1a-96c9-d1cd-5fd0ff146972@example.com>"
+      },
+      "uuid" : "71E4F358-8A5A-8963-3212-257E64F4F2EB"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 228 finished.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755331219,
+      "presented" : false,
+      "threadID" : "build-6",
+      "title" : "The Design Review moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/249"
+      },
+      "uuid" : "511A4636-5AC9-5C59-1CC8-1815EA18FA5D"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup is ready.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755339641,
+      "presented" : true,
+      "sender" : "alan@example.com",
+      "subtitle" : "Re: the migration",
+      "title" : "Alan Johnson",
+      "userInfo" : {
+        "from" : "alan@example.com",
+        "messageID" : "<7cbf2ad2-247d-511a-9ee5-93e3d9275014@example.com>"
+      },
+      "uuid" : "616026DD-5D7B-27DB-6844-3B88CB6F742E"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-449.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "Build 4 moved to Thursday.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755348535,
+      "presented" : true,
+      "threadID" : "build-48",
+      "title" : "Lunch finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/39"
+      },
+      "uuid" : "83AAE38F-A9DD-F760-095A-3D75DB73A871"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 72 is blocked.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755352294,
+      "presented" : true,
+      "threadID" : "build-42",
+      "title" : "Tomorrow's Standup moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/895"
+      },
+      "uuid" : "A24CB314-20C6-5B46-E341-4DEB77CFEE0B"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Your verification code is 631935",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755362539,
+      "presented" : true,
+      "sender" : "Radia Liskov",
+      "threadID" : "chat-1",
+      "title" : "Radia Liskov",
+      "userInfo" : {
+        "bg.fixture" : "[synthetic-otp]",
+        "senderHandle" : "+1 555 0187"
+      },
+      "uuid" : "5BA87789-3603-24C2-652F-589AE158F640"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch needs a look",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755363269,
+      "presented" : true,
+      "sender" : "Alan Liskov",
+      "subtitle" : "Alan Liskov",
+      "threadID" : "#design",
+      "title" : "#design",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Alan Liskov"
+      },
+      "uuid" : "E11D07AF-5237-D6D7-F8F0-18BCFF6CF3AB"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup needs a look.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755369096,
+      "presented" : false,
+      "sender" : "barbara@example.com",
+      "subtitle" : "Re: the design review",
+      "title" : "Barbara Johnson",
+      "userInfo" : {
+        "from" : "barbara@example.com",
+        "messageID" : "<72b3dab7-071d-2cdd-0b24-1e24b1895472@example.com>"
+      },
+      "uuid" : "5DD41E30-967D-D20B-B5AD-3B2CD918864A"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 254 moved to Thursday.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755369499,
+      "presented" : true,
+      "threadID" : "build-16",
+      "title" : "Lunch finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/620"
+      },
+      "uuid" : "F6C2B2C5-D00A-32B4-09B4-2371C095F52B"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup finished",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755374118,
+      "presented" : false,
+      "sender" : "Radia Lovelace",
+      "threadID" : "chat-13",
+      "title" : "Radia Lovelace",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0175"
+      },
+      "uuid" : "79A434B1-B8E3-93C6-9C40-3D35D8E3E4B3"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 990 is blocked.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755377368,
+      "presented" : true,
+      "threadID" : "build-4",
+      "title" : "The Design Review moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/324"
+      },
+      "uuid" : "36964068-69E8-AE34-639E-3CFF85FAF535"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-994.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "Build 844 needs a look.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755383982,
+      "presented" : true,
+      "threadID" : "build-42",
+      "title" : "The Deploy moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/963"
+      },
+      "uuid" : "AF158179-FAD2-5B8E-E157-339CE6D246B7"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-725.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "Build 600 is blocked.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755385923,
+      "presented" : false,
+      "threadID" : "build-44",
+      "title" : "Tomorrow's Standup is blocked",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/914"
+      },
+      "uuid" : "AA284FA8-C9C5-34D8-3481-8589AAC815D1"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 8 finished.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755390351,
+      "presented" : true,
+      "threadID" : "build-38",
+      "title" : "Tomorrow's Standup is ready",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/697"
+      },
+      "uuid" : "4CCD2FF5-0E32-807D-27A4-19FFF9BE544D"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-538.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "Build 217 finished.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755393608,
+      "presented" : true,
+      "threadID" : "build-1",
+      "title" : "Tomorrow's Standup moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/150"
+      },
+      "uuid" : "F6F80D89-5FFB-31B3-E45E-E722018BFDF1"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 722 is ready.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755395401,
+      "presented" : true,
+      "threadID" : "build-4",
+      "title" : "The Design Review moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/392"
+      },
+      "uuid" : "98FB82E9-B0FF-F293-D653-598FA494496A"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-311.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "lunch needs a look",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755398076,
+      "presented" : false,
+      "sender" : "Grace Turing",
+      "threadID" : "chat-1",
+      "title" : "Grace Turing",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0189"
+      },
+      "uuid" : "3D801B78-D5A9-DE8E-7C91-C9B1CA5FEE9B"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 869 is ready.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755401381,
+      "presented" : true,
+      "threadID" : "build-34",
+      "title" : "Tomorrow's Standup finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/703"
+      },
+      "uuid" : "849C75A8-BC37-28F6-FD59-65AAD64D81C7"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 410 is blocked.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755405051,
+      "presented" : true,
+      "threadID" : "build-25",
+      "title" : "The Deploy needs a look",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/237"
+      },
+      "uuid" : "963495B1-CEF3-1BD1-7D9D-1B9C65CE3405"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch needs a look",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755410751,
+      "presented" : true,
+      "sender" : "Alan Turing",
+      "threadID" : "chat-8",
+      "title" : "Alan Turing",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0142"
+      },
+      "uuid" : "1C61D77F-EC65-EB40-1E81-B747566B01F7"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy needs a look",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755417020,
+      "presented" : false,
+      "sender" : "Radia Hopper",
+      "threadID" : "chat-9",
+      "title" : "Radia Hopper",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0183"
+      },
+      "uuid" : "1D687513-D1C1-47A9-1CD7-BFD17D46A588"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration is ready",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755423942,
+      "presented" : true,
+      "sender" : "Ada Lovelace",
+      "subtitle" : "Ada Lovelace",
+      "threadID" : "#general",
+      "title" : "#general",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Ada Lovelace"
+      },
+      "uuid" : "E222E65D-8638-36A8-61F0-471F01D97D60"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-129.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "tomorrow's standup is ready",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755434559,
+      "presented" : false,
+      "sender" : "Radia Lovelace",
+      "subtitle" : "Radia Lovelace",
+      "threadID" : "#incidents",
+      "title" : "#incidents",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Radia Lovelace"
+      },
+      "uuid" : "D40C5B68-24D4-4718-DD6B-9642987D67EF"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Your one-time code is 814085",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755437029,
+      "presented" : true,
+      "sender" : "grace@example.com",
+      "subtitle" : "Re: the design review",
+      "title" : "Grace Liskov",
+      "userInfo" : {
+        "bg.fixture" : "[synthetic-otp]",
+        "from" : "grace@example.com",
+        "messageID" : "<15c84948-21e1-6e89-a1f2-09d82090f3c9@example.com>"
+      },
+      "uuid" : "3B4C850E-808C-A52D-C7B5-B298FBF49B6F"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-87.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "tomorrow's standup is blocked",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755444431,
+      "presented" : false,
+      "sender" : "Linus Hopper",
+      "threadID" : "chat-16",
+      "title" : "Linus Hopper",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0179"
+      },
+      "uuid" : "D1901A35-55C9-2659-2FA6-040A5ED8CEB5"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 289 moved to Thursday.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755453534,
+      "presented" : true,
+      "threadID" : "build-30",
+      "title" : "The Migration finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/669"
+      },
+      "uuid" : "3FEBF242-35D9-F770-426A-F2E62F8A4987"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup is ready",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755454498,
+      "presented" : true,
+      "sender" : "Grace Lovelace",
+      "subtitle" : "Grace Lovelace",
+      "threadID" : "#incidents",
+      "title" : "#incidents",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Grace Lovelace"
+      },
+      "uuid" : "9AEF7D0D-FBB9-48D3-F446-BF74368C6810"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 687 is ready.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755460343,
+      "presented" : true,
+      "threadID" : "build-12",
+      "title" : "The Migration finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/460"
+      },
+      "uuid" : "0DA293C9-7BEE-B0C8-4ADF-D61195652799"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 943 moved to Thursday.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755460543,
+      "presented" : true,
+      "threadID" : "build-43",
+      "title" : "The Migration is ready",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/900"
+      },
+      "uuid" : "6A036CBC-CFEF-100D-88DC-872C9978D4E0"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 220 is ready.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755468505,
+      "presented" : false,
+      "threadID" : "build-18",
+      "title" : "The Migration finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/453"
+      },
+      "uuid" : "CB67766B-7D64-7FD7-3050-26FBF69AA809"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-879.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "the deploy moved to Thursday",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755472348,
+      "presented" : true,
+      "sender" : "Linus Johnson",
+      "threadID" : "chat-19",
+      "title" : "Linus Johnson",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0167"
+      },
+      "uuid" : "9F2CBD22-8441-335F-90DA-FCE86D73D862"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 196 finished.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755482009,
+      "presented" : true,
+      "threadID" : "build-31",
+      "title" : "The Migration moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/868"
+      },
+      "uuid" : "9CDFDDB0-F7EB-831F-4F0E-24956E9CA5A9"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 448 finished.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755484884,
+      "presented" : true,
+      "threadID" : "build-2",
+      "title" : "The Migration moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/616"
+      },
+      "uuid" : "05FCC0B9-AC2B-4F1A-1B22-016C5DE3D63E"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the design review finished.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755487616,
+      "presented" : true,
+      "sender" : "alan@example.com",
+      "subtitle" : "Re: tomorrow's standup",
+      "title" : "Alan Hopper",
+      "userInfo" : {
+        "from" : "alan@example.com",
+        "messageID" : "<22c24fca-5a25-522f-d803-56234974eed8@example.com>"
+      },
+      "uuid" : "4DDD6877-775C-EF17-1D27-F0707CABEBDC"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy moved to Thursday.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755493363,
+      "presented" : false,
+      "sender" : "ada@example.com",
+      "subtitle" : "Re: the migration",
+      "title" : "Ada Liskov",
+      "userInfo" : {
+        "from" : "ada@example.com",
+        "messageID" : "<9d5123fe-41de-08a0-6200-29423039a2e8@example.com>"
+      },
+      "uuid" : "64C3E5B7-0529-5CB7-F745-640590F3264A"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch is blocked.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755500007,
+      "presented" : false,
+      "sender" : "linus@example.com",
+      "subtitle" : "Re: the deploy",
+      "title" : "Linus Lovelace",
+      "userInfo" : {
+        "from" : "linus@example.com",
+        "messageID" : "<f5a80c10-095c-fbc3-6a6e-7fe343e941f8@example.com>"
+      },
+      "uuid" : "912A121E-DA0B-19E9-B923-F1A9FB4364A8"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup is blocked",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755503120,
+      "presented" : true,
+      "sender" : "Alan Turing",
+      "threadID" : "chat-15",
+      "title" : "Alan Turing",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0109"
+      },
+      "uuid" : "53A329A7-ED84-95BE-2050-984EEEF0F73D"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy is blocked.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755506059,
+      "presented" : true,
+      "sender" : "grace@example.com",
+      "subtitle" : "Re: lunch",
+      "title" : "Grace Torvalds",
+      "userInfo" : {
+        "from" : "grace@example.com",
+        "messageID" : "<6b6f884b-e72e-bc28-90d8-24228d2fce46@example.com>"
+      },
+      "uuid" : "F85F56A5-2F6E-49D3-7897-27EFFE9E9FB1"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch moved to Thursday",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755513323,
+      "presented" : false,
+      "sender" : "Alan Hopper",
+      "threadID" : "chat-3",
+      "title" : "Alan Hopper",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0154"
+      },
+      "uuid" : "28693F9D-EAD8-903A-740E-32E8572405B3"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 786 is ready.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755522618,
+      "presented" : true,
+      "threadID" : "build-29",
+      "title" : "Tomorrow's Standup moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/433"
+      },
+      "uuid" : "092ADBDC-17EA-9AE6-79A6-C7CC4E7E3D06"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 778 finished.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755524360,
+      "presented" : true,
+      "threadID" : "build-3",
+      "title" : "Lunch is blocked",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/182"
+      },
+      "uuid" : "47F8C80F-C69F-E943-B125-3203A5B82DF4"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration needs a look",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755531216,
+      "presented" : true,
+      "sender" : "Edsger Lovelace",
+      "threadID" : "chat-11",
+      "title" : "Edsger Lovelace",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0136"
+      },
+      "uuid" : "24D4A739-AE1B-FC9C-7F4E-9F142B835743"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 530 moved to Thursday.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755540044,
+      "presented" : true,
+      "threadID" : "build-40",
+      "title" : "The Deploy moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/486"
+      },
+      "uuid" : "63C34054-06E8-0301-496B-11F95BD02CA0"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch finished.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755544335,
+      "presented" : true,
+      "sender" : "ada@example.com",
+      "subtitle" : "Re: the design review",
+      "title" : "Ada Dijkstra",
+      "userInfo" : {
+        "from" : "ada@example.com",
+        "messageID" : "<f8ce2542-03d1-5320-c578-0f212b3f96ec@example.com>"
+      },
+      "uuid" : "6594CE12-3D91-E5D7-9A91-96D98E9177BA"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-659.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "Build 536 needs a look.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755549486,
+      "presented" : true,
+      "threadID" : "build-41",
+      "title" : "Tomorrow's Standup finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/577"
+      },
+      "uuid" : "B7572F26-7193-9981-5880-7F6B2E9C573C"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 47 finished.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755557710,
+      "presented" : false,
+      "threadID" : "build-42",
+      "title" : "Lunch is blocked",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/529"
+      },
+      "uuid" : "0C658CB6-9848-7F29-89E6-38F251469C0B"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch finished.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755559012,
+      "presented" : false,
+      "sender" : "barbara@example.com",
+      "subtitle" : "Re: tomorrow's standup",
+      "title" : "Barbara Johnson",
+      "userInfo" : {
+        "from" : "barbara@example.com",
+        "messageID" : "<dbfb6f32-5210-b605-c887-313e8569725d@example.com>"
+      },
+      "uuid" : "739B0E83-8085-B2AC-F990-172405E16BC2"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 820 is blocked.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755563224,
+      "presented" : true,
+      "threadID" : "build-33",
+      "title" : "Tomorrow's Standup moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/288"
+      },
+      "uuid" : "15017E55-A98A-949D-BAB7-AE60602D02AC"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup is blocked",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755570850,
+      "presented" : false,
+      "sender" : "Edsger Torvalds",
+      "threadID" : "chat-0",
+      "title" : "Edsger Torvalds",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0128"
+      },
+      "uuid" : "EF9A1E97-C378-11FF-76BB-58847D382B25"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup moved to Thursday",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755577397,
+      "presented" : false,
+      "sender" : "Radia Liskov",
+      "subtitle" : "Radia Liskov",
+      "threadID" : "#backglance",
+      "title" : "#backglance",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Radia Liskov"
+      },
+      "uuid" : "D9D7CB26-38B8-8A6E-3B1D-7E31CCB638F0"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy is ready",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755581986,
+      "presented" : false,
+      "sender" : "Edsger Dijkstra",
+      "subtitle" : "Edsger Dijkstra",
+      "threadID" : "#design",
+      "title" : "#design",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Edsger Dijkstra"
+      },
+      "uuid" : "19E54E4B-36B8-1E8E-D7B9-62E9E6C47EB1"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy needs a look",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755588907,
+      "presented" : false,
+      "sender" : "Edsger Torvalds",
+      "subtitle" : "Edsger Torvalds",
+      "threadID" : "#general",
+      "title" : "#general",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Edsger Torvalds"
+      },
+      "uuid" : "2C5909F8-7298-B6FF-58CF-9B443446F03C"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy is ready",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755597862,
+      "presented" : true,
+      "sender" : "Linus Liskov",
+      "threadID" : "chat-7",
+      "title" : "Linus Liskov",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0180"
+      },
+      "uuid" : "D020B2BE-A91A-AE68-D9D4-C22FDC45B302"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 499 is ready.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755601183,
+      "presented" : false,
+      "threadID" : "build-6",
+      "title" : "Tomorrow's Standup finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/801"
+      },
+      "uuid" : "0DE217A0-E413-F760-720F-495125E19CF4"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 644 finished.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755606054,
+      "presented" : true,
+      "threadID" : "build-23",
+      "title" : "The Migration moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/210"
+      },
+      "uuid" : "90FA5F55-42CB-E13F-5DEB-6A6F113A1E01"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch is ready.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755615102,
+      "presented" : true,
+      "sender" : "linus@example.com",
+      "subtitle" : "Re: the design review",
+      "title" : "Linus Liskov",
+      "userInfo" : {
+        "from" : "linus@example.com",
+        "messageID" : "<13a52f47-2111-f552-ac10-01178bff3097@example.com>"
+      },
+      "uuid" : "E386286A-5E1C-2D90-B1E7-4D4A6A983568"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the design review finished",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755615442,
+      "presented" : true,
+      "sender" : "Alan Torvalds",
+      "threadID" : "chat-3",
+      "title" : "Alan Torvalds",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0127"
+      },
+      "uuid" : "B92FF413-E7FE-9143-12D7-7497A6189199"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 617 is ready.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755618101,
+      "presented" : true,
+      "threadID" : "build-4",
+      "title" : "Lunch is ready",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/893"
+      },
+      "uuid" : "FAC628B3-039A-5C5A-A5FE-1B0B382ECCD9"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch needs a look.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755624710,
+      "presented" : true,
+      "sender" : "edsger@example.com",
+      "subtitle" : "Re: the deploy",
+      "title" : "Edsger Hopper",
+      "userInfo" : {
+        "from" : "edsger@example.com",
+        "messageID" : "<ee475045-c2f4-396d-63cb-b7addc1acff1@example.com>"
+      },
+      "uuid" : "0FDE0029-6C71-CE89-3022-EC8AC8C57C69"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 505 needs a look.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755624773,
+      "presented" : false,
+      "threadID" : "build-48",
+      "title" : "Tomorrow's Standup needs a look",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/205"
+      },
+      "uuid" : "DEC8B0F9-4F3B-A23D-D74C-747887C4DE3D"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch is ready",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755630043,
+      "presented" : false,
+      "sender" : "Katherine Turing",
+      "subtitle" : "Katherine Turing",
+      "threadID" : "#incidents",
+      "title" : "#incidents",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Katherine Turing"
+      },
+      "uuid" : "0A58F64D-2B1A-B45C-A145-8BAA0661D2F5"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-997.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "the deploy needs a look.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755639619,
+      "presented" : true,
+      "sender" : "alan@example.com",
+      "subtitle" : "Re: the design review",
+      "title" : "Alan Johnson",
+      "userInfo" : {
+        "from" : "alan@example.com",
+        "messageID" : "<a8532454-a9be-31d0-048c-2493a4680edd@example.com>"
+      },
+      "uuid" : "4700DEE6-7591-D862-0DB9-36C5798D694D"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup needs a look.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755645665,
+      "presented" : false,
+      "sender" : "barbara@example.com",
+      "subtitle" : "Re: the migration",
+      "title" : "Barbara Lovelace",
+      "userInfo" : {
+        "from" : "barbara@example.com",
+        "messageID" : "<a49d74a1-9c44-3538-db85-b86a05f4e0b7@example.com>"
+      },
+      "uuid" : "1F598C06-9711-AFD2-7CF4-4B4D71017B68"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 226 is blocked.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755650023,
+      "presented" : true,
+      "threadID" : "build-39",
+      "title" : "The Migration is ready",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/578"
+      },
+      "uuid" : "3F925388-803F-929D-5AED-F863CF316411"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 508 needs a look.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755656434,
+      "presented" : true,
+      "threadID" : "build-10",
+      "title" : "The Deploy is blocked",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/139"
+      },
+      "uuid" : "4F9F7BEC-EB78-CD53-AB61-DE14B63C44A6"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Your one-time code is 881844",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755665695,
+      "presented" : false,
+      "sender" : "alan@example.com",
+      "subtitle" : "Re: lunch",
+      "title" : "Alan Dijkstra",
+      "userInfo" : {
+        "bg.fixture" : "[synthetic-otp]",
+        "from" : "alan@example.com",
+        "messageID" : "<ed63bb71-c03a-a0f1-4d64-55a386e44705@example.com>"
+      },
+      "uuid" : "B8F66751-327D-E49B-3B1A-A1088D6CE2DB"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-475.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "tomorrow's standup is blocked.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755676314,
+      "presented" : true,
+      "sender" : "edsger@example.com",
+      "subtitle" : "Re: tomorrow's standup",
+      "title" : "Edsger Torvalds",
+      "userInfo" : {
+        "from" : "edsger@example.com",
+        "messageID" : "<edeb138a-ca77-bf8c-167b-cd699be72c55@example.com>"
+      },
+      "uuid" : "C56AF2B2-C3BB-0644-B127-46396C9F2DD2"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 896 finished.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755683312,
+      "presented" : false,
+      "threadID" : "build-14",
+      "title" : "The Design Review needs a look",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/534"
+      },
+      "uuid" : "5DD9AAF9-CAAE-4038-2A30-C2012CD31458"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch is blocked",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755688254,
+      "presented" : false,
+      "sender" : "Radia Lovelace",
+      "subtitle" : "Radia Lovelace",
+      "threadID" : "#design",
+      "title" : "#design",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Radia Lovelace"
+      },
+      "uuid" : "44A5AF59-A2B1-BA08-A005-A055D0C05B91"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the design review finished.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755688580,
+      "presented" : true,
+      "sender" : "ada@example.com",
+      "subtitle" : "Re: tomorrow's standup",
+      "title" : "Ada Liskov",
+      "userInfo" : {
+        "from" : "ada@example.com",
+        "messageID" : "<8131cd00-c718-50ea-873a-ca4a6b6b5632@example.com>"
+      },
+      "uuid" : "11CBAF7D-2D8D-B68E-096B-06FE7023710E"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-570.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "tomorrow's standup is ready.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755689756,
+      "presented" : true,
+      "sender" : "alan@example.com",
+      "subtitle" : "Re: the migration",
+      "title" : "Alan Johnson",
+      "userInfo" : {
+        "from" : "alan@example.com",
+        "messageID" : "<a2c38e8c-49d9-cbc6-fc67-4ffe023cac27@example.com>"
+      },
+      "uuid" : "D6D6EB64-BB14-FAB7-498F-6A6041BAE1D2"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 586 moved to Thursday.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755696557,
+      "presented" : true,
+      "threadID" : "build-14",
+      "title" : "The Deploy is blocked",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/570"
+      },
+      "uuid" : "6CDA8CE9-085A-B399-B3B5-15728AEC8C1C"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 988 needs a look.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755706934,
+      "presented" : true,
+      "threadID" : "build-11",
+      "title" : "The Deploy finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/462"
+      },
+      "uuid" : "445E3169-6EE5-4A1D-8CDF-79B1214B7B08"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration finished",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755713459,
+      "presented" : false,
+      "sender" : "Ada Torvalds",
+      "threadID" : "chat-19",
+      "title" : "Ada Torvalds",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0138"
+      },
+      "uuid" : "7F487805-DB0E-D471-A2D3-972B6334B497"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-408.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "Build 495 is blocked.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755715183,
+      "presented" : true,
+      "threadID" : "build-39",
+      "title" : "Tomorrow's Standup moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/645"
+      },
+      "uuid" : "8011848D-7B83-1894-2360-467655A954C0"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-698.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "Build 795 finished.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755715341,
+      "presented" : true,
+      "threadID" : "build-14",
+      "title" : "The Migration is ready",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/593"
+      },
+      "uuid" : "5487A7D9-2AD4-F51C-CAF8-7AA20B0F616B"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the design review needs a look.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755715882,
+      "presented" : true,
+      "sender" : "katherine@example.com",
+      "subtitle" : "Re: lunch",
+      "title" : "Katherine Liskov",
+      "userInfo" : {
+        "from" : "katherine@example.com",
+        "messageID" : "<905c6578-341a-b209-b133-c46ad750f858@example.com>"
+      },
+      "uuid" : "60B0B95C-DB5F-356E-B795-646854AA1A17"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup is ready",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755723817,
+      "presented" : true,
+      "sender" : "Ada Liskov",
+      "threadID" : "chat-6",
+      "title" : "Ada Liskov",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0121"
+      },
+      "uuid" : "F827CC13-8309-5191-3AB5-6AF3A4755E15"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy finished.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755730061,
+      "presented" : false,
+      "sender" : "linus@example.com",
+      "subtitle" : "Re: the migration",
+      "title" : "Linus Hopper",
+      "userInfo" : {
+        "from" : "linus@example.com",
+        "messageID" : "<c9a38401-11f6-3916-ce12-c614b27ad785@example.com>"
+      },
+      "uuid" : "48206D01-2685-F562-EADC-92D5903DF3EB"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy is blocked",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755740467,
+      "presented" : true,
+      "sender" : "Edsger Hopper",
+      "subtitle" : "Edsger Hopper",
+      "threadID" : "#general",
+      "title" : "#general",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Edsger Hopper"
+      },
+      "uuid" : "DC92CCD9-9343-82BC-12AA-59C64F2D222F"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 117 needs a look.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755745444,
+      "presented" : true,
+      "threadID" : "build-19",
+      "title" : "The Migration finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/274"
+      },
+      "uuid" : "7092DC30-2EAB-362D-EFE6-2E0D7E342911"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch is ready",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755748634,
+      "presented" : true,
+      "sender" : "Radia Turing",
+      "subtitle" : "Radia Turing",
+      "threadID" : "#incidents",
+      "title" : "#incidents",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Radia Turing"
+      },
+      "uuid" : "4C3764C3-47F2-8037-FD03-4AE469465808"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 996 is ready.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755750246,
+      "presented" : true,
+      "threadID" : "build-40",
+      "title" : "Tomorrow's Standup finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/86"
+      },
+      "uuid" : "9C96B18D-D614-4B96-FEB4-19BBA42D8CD5"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy is ready",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755757535,
+      "presented" : true,
+      "sender" : "Alan Lovelace",
+      "threadID" : "chat-15",
+      "title" : "Alan Lovelace",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0102"
+      },
+      "uuid" : "C3550E27-E5D3-2CB7-F469-DE9A98C26C6F"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 841 is blocked.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755759740,
+      "presented" : true,
+      "threadID" : "build-22",
+      "title" : "Tomorrow's Standup is ready",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/515"
+      },
+      "uuid" : "64DD40B5-151D-3020-E60F-0D0262FD3BFC"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 324 is blocked.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755766279,
+      "presented" : true,
+      "threadID" : "build-31",
+      "title" : "The Migration finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/905"
+      },
+      "uuid" : "88EE375E-C673-4485-50C9-5F1EE5917427"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration is blocked",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755768592,
+      "presented" : false,
+      "sender" : "Katherine Torvalds",
+      "subtitle" : "Katherine Torvalds",
+      "threadID" : "#incidents",
+      "title" : "#incidents",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Katherine Torvalds"
+      },
+      "uuid" : "38F454F6-A670-CAE8-5024-CB5910CE26EB"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup is ready",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755778658,
+      "presented" : true,
+      "sender" : "Radia Dijkstra",
+      "subtitle" : "Radia Dijkstra",
+      "threadID" : "#incidents",
+      "title" : "#incidents",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Radia Dijkstra"
+      },
+      "uuid" : "574328EB-1472-EC96-91C3-E789602DBF8F"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the design review is ready",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755787184,
+      "presented" : true,
+      "sender" : "Edsger Lovelace",
+      "subtitle" : "Edsger Lovelace",
+      "threadID" : "#incidents",
+      "title" : "#incidents",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Edsger Lovelace"
+      },
+      "uuid" : "2085A416-890D-F7FC-0DF8-8CCFF93C9198"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration is ready.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755791054,
+      "presented" : true,
+      "sender" : "ada@example.com",
+      "subtitle" : "Re: the deploy",
+      "title" : "Ada Torvalds",
+      "userInfo" : {
+        "from" : "ada@example.com",
+        "messageID" : "<c6170aad-08f3-6aa6-bedb-e2ce6776af5b@example.com>"
+      },
+      "uuid" : "71D4ABFF-3556-21F1-16B5-DC822BDD63E5"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration is ready",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755794626,
+      "presented" : true,
+      "sender" : "Edsger Liskov",
+      "threadID" : "chat-19",
+      "title" : "Edsger Liskov",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0108"
+      },
+      "uuid" : "2F6B969F-AF4C-503E-CCDF-D1A75052180D"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 573 moved to Thursday.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755804566,
+      "presented" : true,
+      "threadID" : "build-11",
+      "title" : "The Deploy moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/823"
+      },
+      "uuid" : "E57C2C33-0687-581C-F693-CE53E7C65FA2"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 687 is ready.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755808124,
+      "presented" : true,
+      "threadID" : "build-2",
+      "title" : "Tomorrow's Standup is blocked",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/751"
+      },
+      "uuid" : "96B9CA14-5F89-E87A-9709-548EFD47C807"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration is ready.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755817918,
+      "presented" : true,
+      "sender" : "ada@example.com",
+      "subtitle" : "Re: the deploy",
+      "title" : "Ada Turing",
+      "userInfo" : {
+        "from" : "ada@example.com",
+        "messageID" : "<1870215b-c1c5-5fad-1f4d-c54f571b7f89@example.com>"
+      },
+      "uuid" : "A753F052-7844-69EE-532D-C3890361385F"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup is ready",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755827472,
+      "presented" : false,
+      "sender" : "Katherine Lovelace",
+      "subtitle" : "Katherine Lovelace",
+      "threadID" : "#backglance",
+      "title" : "#backglance",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Katherine Lovelace"
+      },
+      "uuid" : "21E9F995-84F4-1456-F251-89CEE544986A"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup moved to Thursday",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755832492,
+      "presented" : false,
+      "sender" : "Alan Hopper",
+      "threadID" : "chat-12",
+      "title" : "Alan Hopper",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0109"
+      },
+      "uuid" : "16CF64CD-0371-5732-858F-B35AE2B23197"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 897 moved to Thursday.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755840309,
+      "presented" : false,
+      "threadID" : "build-8",
+      "title" : "The Migration is ready",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/601"
+      },
+      "uuid" : "C48F9CD5-A067-ADB2-FE27-57797F91160C"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the design review needs a look.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755846722,
+      "presented" : true,
+      "sender" : "radia@example.com",
+      "subtitle" : "Re: the migration",
+      "title" : "Radia Liskov",
+      "userInfo" : {
+        "from" : "radia@example.com",
+        "messageID" : "<acc6ec38-8a01-15ed-5ec0-83cf80273213@example.com>"
+      },
+      "uuid" : "0C5BE37A-598A-8383-2DC7-FC3F17010348"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup is ready",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755849157,
+      "presented" : false,
+      "sender" : "Edsger Turing",
+      "subtitle" : "Edsger Turing",
+      "threadID" : "#design",
+      "title" : "#design",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Edsger Turing"
+      },
+      "uuid" : "C96C2567-07EC-3CC3-852A-6F1E3964AB67"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup finished",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755856809,
+      "presented" : false,
+      "sender" : "Katherine Johnson",
+      "subtitle" : "Katherine Johnson",
+      "threadID" : "#incidents",
+      "title" : "#incidents",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Katherine Johnson"
+      },
+      "uuid" : "470F1A18-E6B4-34CA-9F1A-F7986ED16742"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup moved to Thursday",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755865998,
+      "presented" : true,
+      "sender" : "Ada Turing",
+      "subtitle" : "Ada Turing",
+      "threadID" : "#design",
+      "title" : "#design",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Ada Turing"
+      },
+      "uuid" : "59BD147E-CC71-AD60-769A-158B38CCC8E5"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration is ready.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755871974,
+      "presented" : true,
+      "sender" : "linus@example.com",
+      "subtitle" : "Re: the migration",
+      "title" : "Linus Liskov",
+      "userInfo" : {
+        "from" : "linus@example.com",
+        "messageID" : "<859703ae-fcc0-9879-4909-aa65004e05c0@example.com>"
+      },
+      "uuid" : "221D9296-005F-0D76-3673-ECDC6A04CA09"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the design review is ready",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755882239,
+      "presented" : true,
+      "sender" : "Edsger Hopper",
+      "subtitle" : "Edsger Hopper",
+      "threadID" : "#backglance",
+      "title" : "#backglance",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Edsger Hopper"
+      },
+      "uuid" : "52DF262D-5646-2BDF-3D54-1D2822B0013B"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy needs a look",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755887706,
+      "presented" : true,
+      "sender" : "Grace Johnson",
+      "subtitle" : "Grace Johnson",
+      "threadID" : "#design",
+      "title" : "#design",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Grace Johnson"
+      },
+      "uuid" : "29D58953-0519-A673-4D12-5809C22D8F9D"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 968 finished.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755895963,
+      "presented" : false,
+      "threadID" : "build-4",
+      "title" : "The Deploy moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/599"
+      },
+      "uuid" : "D7DDBDA9-AAE8-512E-FBDA-12F653AB72EA"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 480 moved to Thursday.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755904271,
+      "presented" : true,
+      "threadID" : "build-41",
+      "title" : "The Deploy is ready",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/832"
+      },
+      "uuid" : "FAAF9F8C-E657-9206-8F18-E4716D2EB884"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy finished.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755905419,
+      "presented" : false,
+      "sender" : "katherine@example.com",
+      "subtitle" : "Re: the design review",
+      "title" : "Katherine Torvalds",
+      "userInfo" : {
+        "from" : "katherine@example.com",
+        "messageID" : "<3dee66ff-47d1-07b7-e71c-2eeee1600e03@example.com>"
+      },
+      "uuid" : "2C619066-677E-3716-9892-878A2FE6698B"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration needs a look",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755914125,
+      "presented" : false,
+      "sender" : "Radia Lovelace",
+      "subtitle" : "Radia Lovelace",
+      "threadID" : "#design",
+      "title" : "#design",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Radia Lovelace"
+      },
+      "uuid" : "E7000EE6-AAF0-896A-22FA-BDBC257B9D67"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup moved to Thursday",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1755915407,
+      "presented" : false,
+      "sender" : "Alan Johnson",
+      "subtitle" : "Alan Johnson",
+      "threadID" : "#general",
+      "title" : "#general",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Alan Johnson"
+      },
+      "uuid" : "F133DAF4-F9A8-3E2B-55A0-52A762D0537E"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-901.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "Build 994 is ready.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755915626,
+      "presented" : false,
+      "threadID" : "build-48",
+      "title" : "Lunch needs a look",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/721"
+      },
+      "uuid" : "3609347F-E401-3E7C-C6A2-857AAC1307EB"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Your verification code is 378398",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755918146,
+      "presented" : true,
+      "sender" : "Alan Johnson",
+      "threadID" : "chat-16",
+      "title" : "Alan Johnson",
+      "userInfo" : {
+        "bg.fixture" : "[synthetic-otp]",
+        "senderHandle" : "+1 555 0138"
+      },
+      "uuid" : "8199CDFE-DAED-7D43-A379-833DCD9F3169"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 937 needs a look.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755927983,
+      "presented" : true,
+      "threadID" : "build-12",
+      "title" : "The Migration is blocked",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/124"
+      },
+      "uuid" : "7050DDD5-3221-B432-DD49-32CF82A17840"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch is blocked",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755931699,
+      "presented" : true,
+      "sender" : "Barbara Torvalds",
+      "threadID" : "chat-1",
+      "title" : "Barbara Torvalds",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0175"
+      },
+      "uuid" : "0572145B-DC3B-72E3-5991-34DFA2E7F640"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 919 needs a look.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755933875,
+      "presented" : true,
+      "threadID" : "build-9",
+      "title" : "Tomorrow's Standup needs a look",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/778"
+      },
+      "uuid" : "001836FA-034A-8705-C6FC-85D65F4088E4"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 891 is ready.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755943390,
+      "presented" : true,
+      "threadID" : "build-24",
+      "title" : "Lunch needs a look",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/184"
+      },
+      "uuid" : "05F6F558-C235-8C91-F494-D6FBA0642335"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy finished",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755944925,
+      "presented" : true,
+      "sender" : "Barbara Liskov",
+      "threadID" : "chat-16",
+      "title" : "Barbara Liskov",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0192"
+      },
+      "uuid" : "68029D43-55D5-7822-65D4-6E0EA09C81E2"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 737 needs a look.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755949738,
+      "presented" : true,
+      "threadID" : "build-9",
+      "title" : "Tomorrow's Standup is blocked",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/500"
+      },
+      "uuid" : "D8D0E534-81A4-5351-B597-722C5C8FD6D5"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy finished",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755953971,
+      "presented" : true,
+      "sender" : "Katherine Turing",
+      "threadID" : "chat-16",
+      "title" : "Katherine Turing",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0192"
+      },
+      "uuid" : "7D406822-A3E1-0F97-5FE8-41998F9B5B1C"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the design review is blocked.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755961652,
+      "presented" : false,
+      "sender" : "ada@example.com",
+      "subtitle" : "Re: tomorrow's standup",
+      "title" : "Ada Lovelace",
+      "userInfo" : {
+        "from" : "ada@example.com",
+        "messageID" : "<89f3fe92-e237-fa94-b363-abb1725077f2@example.com>"
+      },
+      "uuid" : "4FC0ED64-7C91-EE7B-E26C-F800E195353A"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 779 is blocked.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755962470,
+      "presented" : true,
+      "threadID" : "build-19",
+      "title" : "Tomorrow's Standup is ready",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/948"
+      },
+      "uuid" : "FE23F48A-8CAE-7678-0B07-BFAB12E2CE43"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup is ready.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755971379,
+      "presented" : true,
+      "sender" : "barbara@example.com",
+      "subtitle" : "Re: the deploy",
+      "title" : "Barbara Liskov",
+      "userInfo" : {
+        "from" : "barbara@example.com",
+        "messageID" : "<278a63e6-4d46-79b7-493d-7267d3cf316d@example.com>"
+      },
+      "uuid" : "F41E5BFE-51A7-DA62-4A62-FFFE7CFEBE09"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 978 finished.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1755981839,
+      "presented" : true,
+      "threadID" : "build-38",
+      "title" : "The Design Review moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/919"
+      },
+      "uuid" : "A6CD8D1C-B4D4-C1D4-504C-10AA9FF60195"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch moved to Thursday.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1755982030,
+      "presented" : false,
+      "sender" : "linus@example.com",
+      "subtitle" : "Re: lunch",
+      "title" : "Linus Johnson",
+      "userInfo" : {
+        "from" : "linus@example.com",
+        "messageID" : "<5f1ed334-73df-923c-6438-74558aa0278e@example.com>"
+      },
+      "uuid" : "CC1E6EC0-7204-C9C9-5416-4ABB3F7EEE1E"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch is blocked",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1755991907,
+      "presented" : true,
+      "sender" : "Edsger Lovelace",
+      "threadID" : "chat-7",
+      "title" : "Edsger Lovelace",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0111"
+      },
+      "uuid" : "D05E31E7-C004-BD1B-D37E-6E734E06E62C"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 166 moved to Thursday.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756001459,
+      "presented" : false,
+      "threadID" : "build-29",
+      "title" : "Tomorrow's Standup is ready",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/367"
+      },
+      "uuid" : "D25B7EEA-4E32-2133-4BA5-79A851591261"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 537 is blocked.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756007665,
+      "presented" : true,
+      "threadID" : "build-5",
+      "title" : "The Design Review is ready",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/803"
+      },
+      "uuid" : "72B4DF54-E9F9-04E7-1D98-6A9AD3A0C77E"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 994 is blocked.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756015454,
+      "presented" : true,
+      "threadID" : "build-31",
+      "title" : "The Deploy is ready",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/639"
+      },
+      "uuid" : "0678B2D0-ADB8-4687-ECEF-840BA0702BC4"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch moved to Thursday",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756024602,
+      "presented" : false,
+      "sender" : "Katherine Turing",
+      "threadID" : "chat-5",
+      "title" : "Katherine Turing",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0151"
+      },
+      "uuid" : "5E96D4AA-6707-9045-3CE3-FD42D7967D0C"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy is ready",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756031540,
+      "presented" : true,
+      "sender" : "Ada Hopper",
+      "subtitle" : "Ada Hopper",
+      "threadID" : "#incidents",
+      "title" : "#incidents",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Ada Hopper"
+      },
+      "uuid" : "9AA718A9-B07F-58C1-64A0-B6FC91C32030"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy needs a look.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756032355,
+      "presented" : true,
+      "sender" : "edsger@example.com",
+      "subtitle" : "Re: lunch",
+      "title" : "Edsger Torvalds",
+      "userInfo" : {
+        "from" : "edsger@example.com",
+        "messageID" : "<d419f3dd-7f37-8964-ff56-c0eb86ade292@example.com>"
+      },
+      "uuid" : "FD3A12CD-E197-3274-49FB-8A7758F9DE82"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 119 is blocked.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756037381,
+      "presented" : true,
+      "threadID" : "build-0",
+      "title" : "Tomorrow's Standup is blocked",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/265"
+      },
+      "uuid" : "27A702F0-70BD-1ED6-37BD-D8CF08E1C83C"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch is blocked",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756044402,
+      "presented" : true,
+      "sender" : "Ada Lovelace",
+      "threadID" : "chat-16",
+      "title" : "Ada Lovelace",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0116"
+      },
+      "uuid" : "AEC3181C-D8B1-59B0-CF3E-E842C22A83A0"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 942 finished.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756046879,
+      "presented" : true,
+      "threadID" : "build-2",
+      "title" : "Lunch moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/999"
+      },
+      "uuid" : "E400AC7C-8F8D-C7CF-546B-46C126D97C29"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration is blocked.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756047204,
+      "presented" : true,
+      "sender" : "barbara@example.com",
+      "subtitle" : "Re: the design review",
+      "title" : "Barbara Liskov",
+      "userInfo" : {
+        "from" : "barbara@example.com",
+        "messageID" : "<c5a11e92-f26a-c167-a0ed-56c35e1ce87e@example.com>"
+      },
+      "uuid" : "7D6DCEAF-B20C-3548-C6C0-55B6B71F09D6"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup is blocked",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756048326,
+      "presented" : false,
+      "sender" : "Grace Turing",
+      "subtitle" : "Grace Turing",
+      "threadID" : "#design",
+      "title" : "#design",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Grace Turing"
+      },
+      "uuid" : "1B199B62-C8EC-1D07-698E-3C7FBD02B750"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration moved to Thursday.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756055766,
+      "presented" : true,
+      "sender" : "alan@example.com",
+      "subtitle" : "Re: the deploy",
+      "title" : "Alan Hopper",
+      "userInfo" : {
+        "from" : "alan@example.com",
+        "messageID" : "<0b032627-4085-af43-b3a9-e0b52663c474@example.com>"
+      },
+      "uuid" : "DA7C307C-8942-F990-0324-7FD8118ABF2E"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 583 is blocked.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756055988,
+      "presented" : true,
+      "threadID" : "build-3",
+      "title" : "Lunch moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/785"
+      },
+      "uuid" : "586FA804-922F-25B3-7B01-695FFFDAE598"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy is ready",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756060582,
+      "presented" : false,
+      "sender" : "Barbara Lovelace",
+      "subtitle" : "Barbara Lovelace",
+      "threadID" : "#backglance",
+      "title" : "#backglance",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Barbara Lovelace"
+      },
+      "uuid" : "276AD4EF-B4DD-B9AA-7A47-7D1780A9F46B"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration finished",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756063831,
+      "presented" : true,
+      "sender" : "Alan Johnson",
+      "threadID" : "chat-11",
+      "title" : "Alan Johnson",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0159"
+      },
+      "uuid" : "3E35A27B-D7A6-9521-9E96-FBF9BBCBD16D"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-747.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "lunch is blocked",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756066448,
+      "presented" : false,
+      "sender" : "Barbara Torvalds",
+      "threadID" : "chat-18",
+      "title" : "Barbara Torvalds",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0158"
+      },
+      "uuid" : "D106E351-69AE-1B02-2C29-765F04F5A6FC"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 199 is blocked.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756070077,
+      "presented" : false,
+      "threadID" : "build-21",
+      "title" : "Tomorrow's Standup is ready",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/144"
+      },
+      "uuid" : "78AF0C24-3695-A2D6-AD6A-C38ED6EB7912"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 248 moved to Thursday.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756080356,
+      "presented" : true,
+      "threadID" : "build-33",
+      "title" : "The Deploy finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/202"
+      },
+      "uuid" : "813371D8-FFDC-EFC0-7E8B-091E4B9ADFF0"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 133 needs a look.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756087700,
+      "presented" : true,
+      "threadID" : "build-33",
+      "title" : "Lunch needs a look",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/908"
+      },
+      "uuid" : "EAFC5FCA-9F2F-DA9A-B47C-82A7982F3320"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 43 is blocked.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756098027,
+      "presented" : true,
+      "threadID" : "build-17",
+      "title" : "The Design Review finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/18"
+      },
+      "uuid" : "FD9DCEAC-4799-45A5-C2DB-02E2A11E4D11"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch finished.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756104283,
+      "presented" : true,
+      "sender" : "linus@example.com",
+      "subtitle" : "Re: lunch",
+      "title" : "Linus Johnson",
+      "userInfo" : {
+        "from" : "linus@example.com",
+        "messageID" : "<e371f0f5-1123-aca1-811f-c08d6e0f6a2a@example.com>"
+      },
+      "uuid" : "E74AA388-84E3-C7E6-05FB-5A20EB7A5D92"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 244 moved to Thursday.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756112346,
+      "presented" : false,
+      "threadID" : "build-30",
+      "title" : "The Migration needs a look",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/124"
+      },
+      "uuid" : "FD95CB83-87F2-BF03-9772-EB6D1041B833"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 578 moved to Thursday.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756119950,
+      "presented" : true,
+      "threadID" : "build-6",
+      "title" : "Tomorrow's Standup moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/469"
+      },
+      "uuid" : "3CCFEEAC-0935-CD6C-A24A-16C094DF77FE"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-565.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "Build 585 is ready.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756126713,
+      "presented" : false,
+      "threadID" : "build-11",
+      "title" : "The Design Review finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/818"
+      },
+      "uuid" : "CEEF4EE8-BE80-3AFC-FC20-735204DCB015"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the design review is blocked.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756133714,
+      "presented" : true,
+      "sender" : "radia@example.com",
+      "subtitle" : "Re: tomorrow's standup",
+      "title" : "Radia Turing",
+      "userInfo" : {
+        "from" : "radia@example.com",
+        "messageID" : "<431e4dfb-4f0e-fa97-9c2c-2469292b21dd@example.com>"
+      },
+      "uuid" : "9E118380-BB20-BECA-61C3-9DC437EEDCEC"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 952 is blocked.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756142568,
+      "presented" : true,
+      "threadID" : "build-8",
+      "title" : "The Deploy is blocked",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/10"
+      },
+      "uuid" : "35221CF5-9768-059F-80C3-63E12EAB0BA3"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 186 needs a look.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756152888,
+      "presented" : true,
+      "threadID" : "build-12",
+      "title" : "Lunch needs a look",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/535"
+      },
+      "uuid" : "834CD2EA-E962-57A4-0D03-826DC7E9A4FF"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-452.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "tomorrow's standup moved to Thursday.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756158936,
+      "presented" : false,
+      "sender" : "edsger@example.com",
+      "subtitle" : "Re: the deploy",
+      "title" : "Edsger Liskov",
+      "userInfo" : {
+        "from" : "edsger@example.com",
+        "messageID" : "<5834cf84-399f-3b55-1123-d7486a53ca7f@example.com>"
+      },
+      "uuid" : "67642088-D0D8-8EE2-1383-E11EBF5A5E29"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup is blocked.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756160794,
+      "presented" : true,
+      "sender" : "katherine@example.com",
+      "subtitle" : "Re: tomorrow's standup",
+      "title" : "Katherine Torvalds",
+      "userInfo" : {
+        "from" : "katherine@example.com",
+        "messageID" : "<683930f8-5305-2577-dc1e-53333da1cd4d@example.com>"
+      },
+      "uuid" : "067DCE05-4E08-2163-7540-77A86A84F8C6"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup moved to Thursday",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756162768,
+      "presented" : false,
+      "sender" : "Barbara Dijkstra",
+      "subtitle" : "Barbara Dijkstra",
+      "threadID" : "#general",
+      "title" : "#general",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Barbara Dijkstra"
+      },
+      "uuid" : "52D004F2-68EF-07FC-64E7-3A956D533B68"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration is blocked",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756166677,
+      "presented" : true,
+      "sender" : "Barbara Dijkstra",
+      "subtitle" : "Barbara Dijkstra",
+      "threadID" : "#backglance",
+      "title" : "#backglance",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Barbara Dijkstra"
+      },
+      "uuid" : "5682210D-6FC9-F821-E2AA-958796DDD497"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 887 moved to Thursday.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756175529,
+      "presented" : true,
+      "threadID" : "build-6",
+      "title" : "The Deploy needs a look",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/765"
+      },
+      "uuid" : "2F547BAE-3B30-B7E5-A2F6-F71F4DDE5C97"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-240.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "Build 197 moved to Thursday.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756179465,
+      "presented" : false,
+      "threadID" : "build-47",
+      "title" : "The Deploy needs a look",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/16"
+      },
+      "uuid" : "E645FB90-FFC1-8982-DDA0-91104D57204C"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration moved to Thursday",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756183141,
+      "presented" : false,
+      "sender" : "Grace Torvalds",
+      "subtitle" : "Grace Torvalds",
+      "threadID" : "#incidents",
+      "title" : "#incidents",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Grace Torvalds"
+      },
+      "uuid" : "B2FFDB0D-C2CC-9472-64BB-B69C739CF72E"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration moved to Thursday",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756190149,
+      "presented" : true,
+      "sender" : "Radia Liskov",
+      "subtitle" : "Radia Liskov",
+      "threadID" : "#design",
+      "title" : "#design",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Radia Liskov"
+      },
+      "uuid" : "45434BB4-78E0-714B-71B8-07ED9873485B"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 326 moved to Thursday.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756191496,
+      "presented" : true,
+      "threadID" : "build-10",
+      "title" : "The Deploy is blocked",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/23"
+      },
+      "uuid" : "663E0B7F-9802-741A-3390-C910D99BD33A"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration is ready.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756192518,
+      "presented" : true,
+      "sender" : "linus@example.com",
+      "subtitle" : "Re: the design review",
+      "title" : "Linus Hopper",
+      "userInfo" : {
+        "from" : "linus@example.com",
+        "messageID" : "<dd8aecc4-d199-0e8b-7c9a-ee7e676eb4ce@example.com>"
+      },
+      "uuid" : "D7C31630-BB17-1093-DCD6-06BDCB6657F1"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 130 needs a look.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756198703,
+      "presented" : true,
+      "threadID" : "build-45",
+      "title" : "Lunch moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/289"
+      },
+      "uuid" : "9A184E0A-C311-EEE2-8BA3-8DA18B246726"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 818 needs a look.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756208656,
+      "presented" : true,
+      "threadID" : "build-44",
+      "title" : "The Design Review moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/260"
+      },
+      "uuid" : "97185EC6-3313-19EB-213B-AA5D8CE14679"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy is ready.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756211349,
+      "presented" : false,
+      "sender" : "radia@example.com",
+      "subtitle" : "Re: lunch",
+      "title" : "Radia Turing",
+      "userInfo" : {
+        "from" : "radia@example.com",
+        "messageID" : "<37ff2a45-b379-ef05-5538-6ba31ca20880@example.com>"
+      },
+      "uuid" : "DD7A6CF2-467E-911E-62DF-3448825AF9C8"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 645 moved to Thursday.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756217802,
+      "presented" : true,
+      "threadID" : "build-3",
+      "title" : "Tomorrow's Standup needs a look",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/851"
+      },
+      "uuid" : "44C0A310-C038-6FDD-104D-73300BCBD8DA"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup is blocked.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756228231,
+      "presented" : true,
+      "sender" : "barbara@example.com",
+      "subtitle" : "Re: lunch",
+      "title" : "Barbara Dijkstra",
+      "userInfo" : {
+        "from" : "barbara@example.com",
+        "messageID" : "<f92f79c5-5257-c237-3977-cb29fa6a0b55@example.com>"
+      },
+      "uuid" : "E9CBC894-616F-D55E-C65F-A2AA3F786F25"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-166.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "the deploy needs a look",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756234668,
+      "presented" : false,
+      "sender" : "Alan Turing",
+      "subtitle" : "Alan Turing",
+      "threadID" : "#incidents",
+      "title" : "#incidents",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Alan Turing"
+      },
+      "uuid" : "A428F494-5DBF-1EFF-9A39-AE008609535A"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the design review moved to Thursday",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756242161,
+      "presented" : true,
+      "sender" : "Radia Hopper",
+      "subtitle" : "Radia Hopper",
+      "threadID" : "#general",
+      "title" : "#general",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Radia Hopper"
+      },
+      "uuid" : "00E2038A-5AD7-BEE1-2BC1-8B8C677C9A1D"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch moved to Thursday",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756245846,
+      "presented" : false,
+      "sender" : "Barbara Johnson",
+      "threadID" : "chat-11",
+      "title" : "Barbara Johnson",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0134"
+      },
+      "uuid" : "FDFB9C30-E504-FCE8-9CA2-648E58F1DF7B"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 799 finished.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756254395,
+      "presented" : true,
+      "threadID" : "build-23",
+      "title" : "The Deploy is blocked",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/217"
+      },
+      "uuid" : "09790E0C-E03B-4B5B-8C87-2E2EB15976BB"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-351.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "the deploy needs a look",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756255268,
+      "presented" : false,
+      "sender" : "Linus Liskov",
+      "subtitle" : "Linus Liskov",
+      "threadID" : "#incidents",
+      "title" : "#incidents",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Linus Liskov"
+      },
+      "uuid" : "2CD572B5-E2E8-D84B-46C2-C660513A26B2"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup is ready",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756261483,
+      "presented" : true,
+      "sender" : "Grace Johnson",
+      "subtitle" : "Grace Johnson",
+      "threadID" : "#incidents",
+      "title" : "#incidents",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Grace Johnson"
+      },
+      "uuid" : "B302FAD6-EEE6-DA85-F194-A0D4732F3B64"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup is blocked.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756272194,
+      "presented" : false,
+      "sender" : "barbara@example.com",
+      "subtitle" : "Re: lunch",
+      "title" : "Barbara Johnson",
+      "userInfo" : {
+        "from" : "barbara@example.com",
+        "messageID" : "<7a9c3b1d-b78a-7f32-54c6-58dca0a2aea1@example.com>"
+      },
+      "uuid" : "7BE1F1F7-279B-090F-D1D7-CDFC5D77B9EC"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Your verification code is 555237",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756272396,
+      "presented" : true,
+      "sender" : "Radia Johnson",
+      "threadID" : "chat-19",
+      "title" : "Radia Johnson",
+      "userInfo" : {
+        "bg.fixture" : "[synthetic-otp]",
+        "senderHandle" : "+1 555 0150"
+      },
+      "uuid" : "B21C1BF2-4D55-79DC-75F1-C156469D7B1E"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 526 finished.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756275491,
+      "presented" : true,
+      "threadID" : "build-8",
+      "title" : "The Design Review moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/786"
+      },
+      "uuid" : "11683A1A-B097-26F9-50D4-696A9F1A7FCB"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration moved to Thursday",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756276313,
+      "presented" : true,
+      "sender" : "Ada Turing",
+      "threadID" : "chat-8",
+      "title" : "Ada Turing",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0107"
+      },
+      "uuid" : "3F6A3DC2-76EF-9CDB-53EB-1C7AB3A189D2"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 819 is blocked.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756283236,
+      "presented" : true,
+      "threadID" : "build-28",
+      "title" : "The Design Review finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/369"
+      },
+      "uuid" : "85799D7E-BFE2-584C-80F6-00D3ECB2165D"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 905 needs a look.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756291036,
+      "presented" : true,
+      "threadID" : "build-14",
+      "title" : "Lunch is blocked",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/33"
+      },
+      "uuid" : "0C936065-DB4D-1240-9AA6-C70E378814D1"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup is ready",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756292789,
+      "presented" : true,
+      "sender" : "Linus Lovelace",
+      "subtitle" : "Linus Lovelace",
+      "threadID" : "#design",
+      "title" : "#design",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Linus Lovelace"
+      },
+      "uuid" : "5CF236A3-9505-7653-1BEF-078E21DB0B6C"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration is blocked",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756299525,
+      "presented" : false,
+      "sender" : "Ada Johnson",
+      "subtitle" : "Ada Johnson",
+      "threadID" : "#backglance",
+      "title" : "#backglance",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Ada Johnson"
+      },
+      "uuid" : "1818B69E-86FB-63EF-592C-F50AB60F4A54"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration is ready",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756308838,
+      "presented" : true,
+      "sender" : "Alan Dijkstra",
+      "subtitle" : "Alan Dijkstra",
+      "threadID" : "#design",
+      "title" : "#design",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Alan Dijkstra"
+      },
+      "uuid" : "ED2B3978-9DBA-5348-8DBA-2A8741DF520B"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 334 is ready.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756315631,
+      "presented" : false,
+      "threadID" : "build-7",
+      "title" : "The Deploy is ready",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/532"
+      },
+      "uuid" : "662B3190-83E5-1216-484F-6C2295720DB3"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 730 needs a look.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756320410,
+      "presented" : true,
+      "threadID" : "build-30",
+      "title" : "Lunch needs a look",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/521"
+      },
+      "uuid" : "8B1D4F00-C392-A1B8-7FB8-4D2E65D998F3"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration moved to Thursday",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756326399,
+      "presented" : false,
+      "sender" : "Edsger Turing",
+      "threadID" : "chat-4",
+      "title" : "Edsger Turing",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0118"
+      },
+      "uuid" : "765B5214-6EB7-4317-C0F8-C7CA813D95D9"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the design review needs a look",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756335834,
+      "presented" : true,
+      "sender" : "Radia Torvalds",
+      "threadID" : "chat-7",
+      "title" : "Radia Torvalds",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0107"
+      },
+      "uuid" : "2900184A-7E40-2D30-6512-C837D7504248"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the design review needs a look",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756338633,
+      "presented" : false,
+      "sender" : "Katherine Johnson",
+      "subtitle" : "Katherine Johnson",
+      "threadID" : "#design",
+      "title" : "#design",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Katherine Johnson"
+      },
+      "uuid" : "D5D67A85-4E8A-4E91-F75D-12C868F4B82D"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 282 finished.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756344206,
+      "presented" : true,
+      "threadID" : "build-12",
+      "title" : "Lunch is blocked",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/963"
+      },
+      "uuid" : "A2023F93-159B-E6ED-113A-A4744EA0347B"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy moved to Thursday",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756350660,
+      "presented" : true,
+      "sender" : "Katherine Johnson",
+      "subtitle" : "Katherine Johnson",
+      "threadID" : "#design",
+      "title" : "#design",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Katherine Johnson"
+      },
+      "uuid" : "D021E7BC-8886-5F61-DD0C-1EB53E0B43D6"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch moved to Thursday",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756357343,
+      "presented" : false,
+      "sender" : "Radia Lovelace",
+      "threadID" : "chat-6",
+      "title" : "Radia Lovelace",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0137"
+      },
+      "uuid" : "6C3319BC-74D1-583C-1D3D-FF0E357A642D"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration needs a look.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756363823,
+      "presented" : true,
+      "sender" : "alan@example.com",
+      "subtitle" : "Re: the deploy",
+      "title" : "Alan Hopper",
+      "userInfo" : {
+        "from" : "alan@example.com",
+        "messageID" : "<c5032181-afc2-9d11-76b3-0311265668fd@example.com>"
+      },
+      "uuid" : "47C8B758-83DA-118C-F7B3-9E4DE73929AE"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup needs a look.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756373960,
+      "presented" : false,
+      "sender" : "grace@example.com",
+      "subtitle" : "Re: tomorrow's standup",
+      "title" : "Grace Turing",
+      "userInfo" : {
+        "from" : "grace@example.com",
+        "messageID" : "<4ee193c7-91d6-5711-36f7-25e3b90c7e0f@example.com>"
+      },
+      "uuid" : "59A837B4-C998-F409-4762-7BE8F1697DBE"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 462 needs a look.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756380980,
+      "presented" : false,
+      "threadID" : "build-19",
+      "title" : "The Design Review finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/598"
+      },
+      "uuid" : "7AA6AF71-1F79-BBD6-EE7B-BCFC3C503DC8"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 620 is blocked.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756381639,
+      "presented" : true,
+      "threadID" : "build-21",
+      "title" : "Lunch is blocked",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/704"
+      },
+      "uuid" : "EFBC3F04-EDB8-54CC-255B-24D62394DDE7"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the design review moved to Thursday.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756390498,
+      "presented" : false,
+      "sender" : "edsger@example.com",
+      "subtitle" : "Re: tomorrow's standup",
+      "title" : "Edsger Lovelace",
+      "userInfo" : {
+        "from" : "edsger@example.com",
+        "messageID" : "<62efdd81-57c8-8af4-b902-588081550974@example.com>"
+      },
+      "uuid" : "A2E60713-3965-4038-5405-ECCF875F8314"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the design review is blocked",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756398638,
+      "presented" : false,
+      "sender" : "Radia Turing",
+      "threadID" : "chat-15",
+      "title" : "Radia Turing",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0138"
+      },
+      "uuid" : "81597326-2BCB-C1FE-4D7F-3BCC221C4395"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch moved to Thursday.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756399853,
+      "presented" : true,
+      "sender" : "radia@example.com",
+      "subtitle" : "Re: lunch",
+      "title" : "Radia Dijkstra",
+      "userInfo" : {
+        "from" : "radia@example.com",
+        "messageID" : "<39241802-0ca5-2e4c-721b-fdc7dec43227@example.com>"
+      },
+      "uuid" : "E223ACC0-F886-36E6-763A-31A21E817378"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy is blocked",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756400188,
+      "presented" : false,
+      "sender" : "Barbara Liskov",
+      "subtitle" : "Barbara Liskov",
+      "threadID" : "#incidents",
+      "title" : "#incidents",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Barbara Liskov"
+      },
+      "uuid" : "3AB2E53F-7A70-8B66-3C23-FFADF2D2A887"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-898.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "lunch finished",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756410243,
+      "presented" : true,
+      "sender" : "Katherine Turing",
+      "threadID" : "chat-18",
+      "title" : "Katherine Turing",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0146"
+      },
+      "uuid" : "45195537-5AB5-CA76-17FA-276FF4FCF8FD"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy needs a look",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756417750,
+      "presented" : true,
+      "sender" : "Alan Turing",
+      "subtitle" : "Alan Turing",
+      "threadID" : "#design",
+      "title" : "#design",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Alan Turing"
+      },
+      "uuid" : "34A289D4-2B72-B553-E856-6270BC8836AC"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 456 needs a look.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756423118,
+      "presented" : true,
+      "threadID" : "build-1",
+      "title" : "The Deploy needs a look",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/829"
+      },
+      "uuid" : "E680CA73-3BDC-75AD-4FF8-873740319688"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch is blocked",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756433029,
+      "presented" : true,
+      "sender" : "Alan Johnson",
+      "threadID" : "chat-7",
+      "title" : "Alan Johnson",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0183"
+      },
+      "uuid" : "770AE49D-76D1-E21E-EC4B-FCC0BFB2EBCA"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch is ready",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756435509,
+      "presented" : false,
+      "sender" : "Barbara Torvalds",
+      "subtitle" : "Barbara Torvalds",
+      "threadID" : "#general",
+      "title" : "#general",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Barbara Torvalds"
+      },
+      "uuid" : "FA273778-21A1-ACB5-7B62-AB428F03C0B8"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the design review finished.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756441409,
+      "presented" : false,
+      "sender" : "linus@example.com",
+      "subtitle" : "Re: tomorrow's standup",
+      "title" : "Linus Hopper",
+      "userInfo" : {
+        "from" : "linus@example.com",
+        "messageID" : "<8b4348b2-5031-db55-b7ee-6656aa0a48b4@example.com>"
+      },
+      "uuid" : "034BB7A5-E95C-120A-B18D-5E3030904FB8"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup is blocked.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756446518,
+      "presented" : true,
+      "sender" : "edsger@example.com",
+      "subtitle" : "Re: the deploy",
+      "title" : "Edsger Lovelace",
+      "userInfo" : {
+        "from" : "edsger@example.com",
+        "messageID" : "<1eda82c5-0cde-86e0-8601-e3a5644bec67@example.com>"
+      },
+      "uuid" : "0F1309A6-0762-5288-C091-ABD035875527"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch is blocked",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756448338,
+      "presented" : true,
+      "sender" : "Alan Liskov",
+      "subtitle" : "Alan Liskov",
+      "threadID" : "#backglance",
+      "title" : "#backglance",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Alan Liskov"
+      },
+      "uuid" : "2E715D4B-9C30-0199-B0CB-685EC1151204"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 636 finished.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756449947,
+      "presented" : true,
+      "threadID" : "build-40",
+      "title" : "The Deploy finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/589"
+      },
+      "uuid" : "2E71ACE0-7C4F-DAF3-1C19-2733AD9849C5"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 169 moved to Thursday.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756452771,
+      "presented" : true,
+      "threadID" : "build-15",
+      "title" : "The Migration needs a look",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/812"
+      },
+      "uuid" : "6B176F5B-F875-0749-C0F0-7B6349662C4C"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup is ready",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756459227,
+      "presented" : true,
+      "sender" : "Grace Liskov",
+      "threadID" : "chat-3",
+      "title" : "Grace Liskov",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0113"
+      },
+      "uuid" : "5CE17688-C82C-1FCE-FD80-67C1782C6099"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 709 moved to Thursday.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756461631,
+      "presented" : false,
+      "threadID" : "build-14",
+      "title" : "Tomorrow's Standup is blocked",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/28"
+      },
+      "uuid" : "0BD57183-C10A-B8BD-4B27-1F3593A0FF09"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch moved to Thursday",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756462191,
+      "presented" : true,
+      "sender" : "Katherine Liskov",
+      "threadID" : "chat-10",
+      "title" : "Katherine Liskov",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0187"
+      },
+      "uuid" : "7E25500D-4927-EB9C-AC16-6F1EB3B2736E"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the design review finished",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756465065,
+      "presented" : true,
+      "sender" : "Katherine Torvalds",
+      "subtitle" : "Katherine Torvalds",
+      "threadID" : "#backglance",
+      "title" : "#backglance",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Katherine Torvalds"
+      },
+      "uuid" : "24876C15-78E9-04A4-118C-03A52C9CE2D2"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch needs a look.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756467836,
+      "presented" : false,
+      "sender" : "radia@example.com",
+      "subtitle" : "Re: lunch",
+      "title" : "Radia Dijkstra",
+      "userInfo" : {
+        "from" : "radia@example.com",
+        "messageID" : "<862c8c31-1241-dc61-57b3-9862441a7b81@example.com>"
+      },
+      "uuid" : "0CF64C25-AA53-19E8-DA1E-652F24CB5F1F"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration is blocked.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756477847,
+      "presented" : false,
+      "sender" : "alan@example.com",
+      "subtitle" : "Re: tomorrow's standup",
+      "title" : "Alan Torvalds",
+      "userInfo" : {
+        "from" : "alan@example.com",
+        "messageID" : "<7bb47a7c-f5d6-a170-36f6-27faff375a8e@example.com>"
+      },
+      "uuid" : "F02460C5-095D-72D1-5867-FC2121A115EE"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the design review needs a look",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756480690,
+      "presented" : true,
+      "sender" : "Katherine Lovelace",
+      "threadID" : "chat-17",
+      "title" : "Katherine Lovelace",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0179"
+      },
+      "uuid" : "03BDD9D0-AD78-F167-9C01-FF2E64A28C85"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch finished.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756484969,
+      "presented" : true,
+      "sender" : "linus@example.com",
+      "subtitle" : "Re: tomorrow's standup",
+      "title" : "Linus Johnson",
+      "userInfo" : {
+        "from" : "linus@example.com",
+        "messageID" : "<19e043af-b91c-ebd1-d145-1f7a5ef6b1d3@example.com>"
+      },
+      "uuid" : "A6666C77-CC14-B8DB-4356-30F3B4314949"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-941.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "Build 680 moved to Thursday.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756495143,
+      "presented" : false,
+      "threadID" : "build-47",
+      "title" : "The Deploy needs a look",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/580"
+      },
+      "uuid" : "637E2FB4-762A-159E-8764-B2207784D441"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration moved to Thursday.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756501518,
+      "presented" : true,
+      "sender" : "grace@example.com",
+      "subtitle" : "Re: lunch",
+      "title" : "Grace Dijkstra",
+      "userInfo" : {
+        "from" : "grace@example.com",
+        "messageID" : "<c12ec517-f36e-e6e4-858a-45c8ff54cda7@example.com>"
+      },
+      "uuid" : "158218F9-312F-A15D-EC08-F391E75ED31D"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the design review is ready",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756510220,
+      "presented" : false,
+      "sender" : "Edsger Turing",
+      "threadID" : "chat-10",
+      "title" : "Edsger Turing",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0137"
+      },
+      "uuid" : "394A0625-71B5-2EE5-FFCD-DD9D3B57556D"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 499 finished.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756514419,
+      "presented" : true,
+      "threadID" : "build-22",
+      "title" : "The Design Review moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/501"
+      },
+      "uuid" : "13F575CE-2A59-FB94-094C-37D6CB8AC88C"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 352 is ready.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756519053,
+      "presented" : true,
+      "threadID" : "build-47",
+      "title" : "The Deploy needs a look",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/186"
+      },
+      "uuid" : "36F6A3C1-4FBC-C073-4359-6C9E96BEB490"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration finished",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756529072,
+      "presented" : true,
+      "sender" : "Alan Dijkstra",
+      "threadID" : "chat-6",
+      "title" : "Alan Dijkstra",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0157"
+      },
+      "uuid" : "4B375EAE-229A-3F21-D0CE-1986CF0A8F56"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration is ready",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756536060,
+      "presented" : false,
+      "sender" : "Edsger Torvalds",
+      "subtitle" : "Edsger Torvalds",
+      "threadID" : "#backglance",
+      "title" : "#backglance",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Edsger Torvalds"
+      },
+      "uuid" : "5D65EBB0-B38F-69B7-9122-BFBAC5CE5A51"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch is ready",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756541926,
+      "presented" : true,
+      "sender" : "Ada Johnson",
+      "subtitle" : "Ada Johnson",
+      "threadID" : "#design",
+      "title" : "#design",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Ada Johnson"
+      },
+      "uuid" : "285501E8-EBF3-E2BA-51E5-8735016BD2ED"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch is blocked.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756548501,
+      "presented" : true,
+      "sender" : "radia@example.com",
+      "subtitle" : "Re: the migration",
+      "title" : "Radia Johnson",
+      "userInfo" : {
+        "from" : "radia@example.com",
+        "messageID" : "<550cba4d-597f-12bc-7bcd-56db506a81d5@example.com>"
+      },
+      "uuid" : "104E227C-6290-921F-B6CE-CA1E66522381"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 23 moved to Thursday.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756553982,
+      "presented" : false,
+      "threadID" : "build-44",
+      "title" : "The Design Review is blocked",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/688"
+      },
+      "uuid" : "B05BB0B5-518B-DD39-1A54-B6EBF5B558F1"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch finished.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756563488,
+      "presented" : true,
+      "sender" : "edsger@example.com",
+      "subtitle" : "Re: the migration",
+      "title" : "Edsger Hopper",
+      "userInfo" : {
+        "from" : "edsger@example.com",
+        "messageID" : "<218422dd-6b2d-0289-f21b-f0f8ee00d8b1@example.com>"
+      },
+      "uuid" : "F3520970-F640-F2DC-8D6E-85E49BF909BD"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 71 is ready.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756571182,
+      "presented" : true,
+      "threadID" : "build-36",
+      "title" : "The Design Review finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/241"
+      },
+      "uuid" : "534DD8E4-A9EF-744E-9103-215FA1879EE6"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the design review moved to Thursday",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756572185,
+      "presented" : true,
+      "sender" : "Ada Torvalds",
+      "subtitle" : "Ada Torvalds",
+      "threadID" : "#design",
+      "title" : "#design",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Ada Torvalds"
+      },
+      "uuid" : "94F7D1B9-8F92-B21D-6DDF-5B9B07BBB7E1"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch moved to Thursday",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756575473,
+      "presented" : false,
+      "sender" : "Katherine Turing",
+      "threadID" : "chat-15",
+      "title" : "Katherine Turing",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0192"
+      },
+      "uuid" : "DBF561E3-D961-DA2A-31C1-4E9A499C093F"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 609 needs a look.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756583875,
+      "presented" : true,
+      "threadID" : "build-23",
+      "title" : "The Design Review finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/330"
+      },
+      "uuid" : "75E4EBC4-174B-B8C8-DF38-D3D5F3FBE579"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration finished",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756591705,
+      "presented" : true,
+      "sender" : "Linus Torvalds",
+      "threadID" : "chat-12",
+      "title" : "Linus Torvalds",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0136"
+      },
+      "uuid" : "8974B912-E04C-61D1-09E9-FCC73E47B537"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "lunch is ready",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756592750,
+      "presented" : false,
+      "sender" : "Barbara Torvalds",
+      "threadID" : "chat-4",
+      "title" : "Barbara Torvalds",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0160"
+      },
+      "uuid" : "9F009C7E-6BC3-8A0B-B11F-D3BD534210E5"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 515 finished.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756601322,
+      "presented" : true,
+      "threadID" : "build-32",
+      "title" : "Tomorrow's Standup is ready",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/899"
+      },
+      "uuid" : "C7D9311F-39A1-1784-DF5B-740A5052B40D"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 916 needs a look.",
+      "bundleID" : "com.example.demo",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756606638,
+      "presented" : true,
+      "threadID" : "build-9",
+      "title" : "The Deploy is blocked",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/352"
+      },
+      "uuid" : "8C3F4A88-5FC1-A00B-A047-C427A4E79F10"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "tomorrow's standup moved to Thursday.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756608224,
+      "presented" : true,
+      "sender" : "radia@example.com",
+      "subtitle" : "Re: the migration",
+      "title" : "Radia Turing",
+      "userInfo" : {
+        "from" : "radia@example.com",
+        "messageID" : "<90e0cc68-fe3a-f859-7de4-fd77d8015068@example.com>"
+      },
+      "uuid" : "71FEB47B-286E-CF92-A03E-DB18DD64DF1A"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the deploy moved to Thursday",
+      "bundleID" : "com.tinyspeck.slackmacgap",
+      "category" : "Message",
+      "deliveredAt" : 1756614863,
+      "presented" : false,
+      "sender" : "Radia Turing",
+      "subtitle" : "Radia Turing",
+      "threadID" : "#backglance",
+      "title" : "#backglance",
+      "userInfo" : {
+        "deeplink" : "slack:\/\/channel?team=T0EXAMPLE&id=C0EXAMPLE",
+        "sender" : "Radia Turing"
+      },
+      "uuid" : "259CA8CC-17A2-9F57-0649-92B193A6A722"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 486 needs a look.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756621678,
+      "presented" : true,
+      "threadID" : "build-20",
+      "title" : "The Design Review moved to Thursday",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/525"
+      },
+      "uuid" : "6203665B-2EAA-7B34-EF19-494BB3BD71BE"
+    },
+    {
+      "attachments" : [
+        {
+          "name" : "photo-964.jpg",
+          "size" : 40960,
+          "type" : "public.jpeg"
+        }
+      ],
+      "body" : "the deploy is ready",
+      "bundleID" : "com.apple.MobileSMS",
+      "category" : "MessageReceived",
+      "deliveredAt" : 1756623239,
+      "presented" : true,
+      "sender" : "Grace Dijkstra",
+      "threadID" : "chat-12",
+      "title" : "Grace Dijkstra",
+      "userInfo" : {
+        "senderHandle" : "+1 555 0149"
+      },
+      "uuid" : "7DEDE042-492A-2295-D788-7BD5A11D1484"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "Build 651 finished.",
+      "bundleID" : "com.example.chat",
+      "category" : "BuildStatus",
+      "deliveredAt" : 1756625184,
+      "presented" : true,
+      "threadID" : "build-24",
+      "title" : "The Deploy finished",
+      "userInfo" : {
+        "url" : "https:\/\/example.com\/builds\/429"
+      },
+      "uuid" : "EF442EE2-75CF-7D42-1534-22619D958F42"
+    },
+    {
+      "attachments" : [
+
+      ],
+      "body" : "the migration is ready.",
+      "bundleID" : "com.apple.mail",
+      "category" : "NewMail",
+      "deliveredAt" : 1756627422,
+      "presented" : true,
+      "sender" : "alan@example.com",
+      "subtitle" : "Re: the migration",
+      "title" : "Alan Dijkstra",
+      "userInfo" : {
+        "from" : "alan@example.com",
+        "messageID" : "<b644150f-1652-f23d-ac98-97f44f2972c4@example.com>"
+      },
+      "uuid" : "6851DA73-2B6A-144D-21FA-25250F6CFC3B"
+    }
+  ]
+}

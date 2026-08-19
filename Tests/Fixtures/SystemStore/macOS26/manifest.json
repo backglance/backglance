@@ -1,0 +1,12 @@
+{
+  "adapter_id" : "v26",
+  "build" : "reconstructed",
+  "created_at" : "2026-08-19T00:00:00Z",
+  "dbinfo_version" : "26",
+  "generator_version" : "1.0.0",
+  "notes" : "Synthetic. Schema reconstructed from the layout documented in docs\/architecture\/OS_COMPATIBILITY_PLAYBOOK.md for macOS 26, not captured from a running machine; all rows generated from the seed. Never a copy of a real store. Refresh with Scripts\/make_fixture.sh --os 26 --capture-schema on a macOS 26 Mac.",
+  "os_version" : "26.0",
+  "record_count" : 250,
+  "schema_sha256" : "4c785e1a6d3c8bca33c08936d446c576bbcec7e9d362589b3171d468d1c0d053",
+  "seed" : 20260817
+}
