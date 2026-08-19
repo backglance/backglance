@@ -22,7 +22,11 @@ import Foundation
 public struct RecordParser: Sendable {
     // MARK: Lifecycle
 
-    public init() {}
+    /// - Parameter guard: the limits every payload is read under. The default is the one
+    ///   the security model documents; tests narrow it.
+    public init(guard plistGuard: PlistGuard = PlistGuard()) {
+        self.plistGuard = plistGuard
+    }
 
     // MARK: Public
 
@@ -31,7 +35,7 @@ public struct RecordParser: Sendable {
     /// - Throws: ``CaptureError/parseFailed(recID:reason:)``. One bad record must never
     ///   abort a batch: the caller logs this and moves to the next row.
     public func parse(_ raw: RawStoreRecord) throws -> ParsedNotification {
-        let root = try Self.rootDictionary(of: raw)
+        let root = try rootDictionary(of: raw)
 
         // The payload usually nests the notification request under `req`; some rows put
         // the fields at the top level. Reading the root as a fallback costs nothing and
@@ -83,21 +87,8 @@ public struct RecordParser: Sendable {
 
     // MARK: Private
 
-    /// The payload's root dictionary.
-    private static func rootDictionary(of raw: RawStoreRecord) throws -> [String: Any] {
-        let object: Any
-        do {
-            object = try PropertyListSerialization.propertyList(from: raw.plistData, options: [], format: nil)
-        } catch {
-            // The underlying error names a byte offset and sometimes quotes the data, so
-            // it is dropped in favour of a fixed reason.
-            throw CaptureError.parseFailed(recID: raw.recID, reason: "not a property list")
-        }
-        guard let root = object as? [String: Any] else {
-            throw CaptureError.parseFailed(recID: raw.recID, reason: "root is not a dictionary")
-        }
-        return root
-    }
+    /// The limits the payload is decoded under. See ``PlistGuard``.
+    private let plistGuard: PlistGuard
 
     /// The first non-empty string among the candidates.
     ///
@@ -187,6 +178,21 @@ public struct RecordParser: Sendable {
 
         default:
             return nil
+        }
+    }
+
+    /// The payload's root dictionary, decoded under the guard's limits.
+    ///
+    /// The guard runs before anything else in ``parse(_:)``: a payload that breaks a limit
+    /// is never walked for keys, so a hostile record costs one size check rather than an
+    /// unbounded traversal.
+    private func rootDictionary(of raw: RawStoreRecord) throws -> [String: Any] {
+        do {
+            return try plistGuard.decode(raw.plistData)
+        } catch let error as PlistGuardError {
+            // The guard's descriptions are shapes — a count, a depth, a length — so they
+            // can be used as the reason verbatim.
+            throw CaptureError.parseFailed(recID: raw.recID, reason: error.logDescription)
         }
     }
 }
