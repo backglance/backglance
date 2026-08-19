@@ -68,12 +68,30 @@ public protocol StoreAdapter: Sendable {
     /// ordered. An empty array means "nothing new", which is the common case on a tick.
     func records(after cursor: StoreCursor, in db: Database) throws -> [RawStoreRecord]
 
+    /// The highest `rec_id` the store currently holds, or `0` if it holds nothing.
+    ///
+    /// Used to notice that the store was replaced under us: `rec_id` only ever climbs
+    /// while a store lives, so a tail *below* the cursor means this is not the store that
+    /// cursor came from (see ``StoreCursor/isStale(givenTailRecID:)``).
+    func tailRecID(in db: Database) throws -> Int64
+
     /// The cursor to persist once `record` has been archived.
     ///
     /// The adapter owns this because it owns which store column the cursor's `rec_id`
     /// came from. Callers persist it *after* the batch's inserts commit — see
     /// ``StoreCursor``.
     func cursor(for record: RawStoreRecord) -> StoreCursor
+}
+
+// MARK: - Default reader
+
+public extension StoreAdapter {
+    /// Every shipping adapter reads the layout ``RecordQuery`` implements, so the tail
+    /// comes from the same place the batches do. An adapter for a store that numbers its
+    /// rows differently overrides this.
+    func tailRecID(in db: Database) throws -> Int64 {
+        try RecordQuery.tailRecID(in: db)
+    }
 }
 
 // MARK: - Existential conveniences

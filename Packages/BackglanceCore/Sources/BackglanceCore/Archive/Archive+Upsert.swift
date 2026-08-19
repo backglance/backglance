@@ -81,6 +81,29 @@ public extension Archive {
     }
 }
 
+// MARK: - Store resets
+
+public extension Archive {
+    /// Forgets which store row each notification came from.
+    ///
+    /// Called when the system's notification database has plainly been replaced — the
+    /// user reset it, or macOS did — because the new store numbers its rows from the
+    /// start, and the old `store_rec_id` values would make its first notifications look
+    /// like duplicates of ours and be dropped forever.
+    ///
+    /// Nothing is deleted: the notifications stay, and deduplication falls back to `uuid`,
+    /// which is stable across a reset for anything the new store genuinely repeats.
+    ///
+    /// - Returns: how many rows were cleared.
+    @discardableResult
+    func forgetStoreRecordIDs() throws -> Int {
+        try pool.write { db in
+            try db.execute(sql: "UPDATE notifications SET store_rec_id = NULL WHERE store_rec_id IS NOT NULL")
+            return db.changesCount
+        }
+    }
+}
+
 // MARK: - Refreshing an existing row
 
 private extension Archive {

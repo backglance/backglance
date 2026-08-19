@@ -372,10 +372,32 @@ public actor CaptureEngine {
         let snapshot = try StoreSnapshot.take(of: storeLocation())
         defer { snapshot.discard() }
 
+        let tail = try snapshot.read { db in try adapter.tailRecID(in: db) }
+        if cursor.isStale(givenTailRecID: tail) {
+            try handleStoreReset()
+        }
+
         let startCursor = cursor
         return try snapshot.read { db in
             try adapter.records(after: startCursor, in: db)
         }
+    }
+
+    /// The store was replaced under us — the user reset the notification database, or
+    /// macOS did.
+    ///
+    /// Resuming from the old cursor would skip everything in the new store, quite possibly
+    /// forever, because the new store numbers its rows from the start. So the cursor goes
+    /// back to the beginning, and the archive forgets which store row each notification
+    /// came from — otherwise the new store's first notifications would look like
+    /// duplicates of ours and be dropped. Nothing is deleted; deduplication falls back to
+    /// `uuid`, which is still right for anything the new store genuinely repeats.
+    private func handleStoreReset() throws {
+        try archive.forgetStoreRecordIDs()
+        cursor = .start
+        try archive.saveCursor(cursor)
+        metrics.storeResets += 1
+        Log.capture.notice("store reset detected: cursor reset, store rec ids forgotten")
     }
 
     /// Snapshot, fingerprint, adapter, cursor — in that order, because each step's
