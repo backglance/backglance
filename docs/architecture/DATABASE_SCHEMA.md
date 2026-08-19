@@ -1340,18 +1340,23 @@ public struct RecordParser: Sendable {
 Backglance never opens Apple's live file for writing, and never holds a long-lived handle on it. Each capture pass:
 
 ```
-1. copy   db, db-wal, db-shm  →  ~/Library/Application Support/Backglance/tmp/snapshot-<uuid>/
-2. open   snapshot read-write ONCE (our own copy) → PRAGMA wal_checkpoint(TRUNCATE)   -- folds WAL into main file
-3. open   snapshot with  file:<path>?immutable=1  and  Configuration.readonly = true  → fingerprint, probe, records
-4. delete the snapshot directory
+1. copy   db, db-wal  (NOT db-shm)  →  ~/Library/Application Support/Backglance/tmp/<uuid>/
+2. open   the copy on a plain path with Configuration.readonly = true and PRAGMA query_only = 1
+          → SQLite recovers the copied WAL and builds a fresh -shm beside it
+          → fingerprint, probe, records
+3. delete the snapshot directory (taking the -shm with it)
 ```
 
-Step 2 exists because `immutable=1` tells SQLite to skip WAL processing entirely; without a checkpoint on the copy, the newest rows (which live in `db-wal`) would be invisible.
+Two things this ordering gets right, both of which earlier drafts of this document and of [ARCHITECTURE.md](./ARCHITECTURE.md) got wrong:
+
+- **No `immutable=1`.** `immutable=1` promises SQLite the file cannot change, and SQLite takes that as licence to skip WAL processing entirely — so the newest rows, which live in `db-wal`, become invisible with no error at all. Measured on macOS 26: a copy holding one checkpointed row and one WAL-only row returned only the checkpointed one. There is no checkpoint step to compensate, because there is nothing to compensate for: a plain read-only open recovers the WAL by itself.
+- **`-shm` is not copied.** It is a live wal-index belonging to `usernoted`, and a stale one can point at WAL frames our copy does not contain. SQLite rebuilds it from the copied `-wal`. The rebuilt `-shm` lands inside Backglance's own `0700` snapshot directory, never Apple's, and `discard()` removes it with everything else.
+
+Opening our own copy read-write to checkpoint it — which an earlier draft prescribed — is therefore unnecessary, and the `sqlite3_config(SQLITE_CONFIG_URI, …)` call that went with it is not callable from Swift at all: it is a variadic C function and is marked unavailable.
 
 ```swift
 import Foundation
 import GRDB
-import SQLite3
 
 public enum StoreSnapshotError: Error, Sendable {
     case storeNotFound
@@ -1370,7 +1375,7 @@ public struct StoreSnapshot: Sendable {
         let dir = ArchivePaths.tmpDirectory.appendingPathComponent("snapshot-\(UUID().uuidString)", isDirectory: true)
         do {
             try fm.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-            for suffix in ["", "-wal", "-shm"] {
+            for suffix in ["", "-wal"] {                       // never -shm: usernoted's live wal-index
                 let src = URL(fileURLWithPath: store.path + suffix)
                 if fm.fileExists(atPath: src.path) {
                     try fm.copyItem(at: src, to: URL(fileURLWithPath: dir.appendingPathComponent("db").path + suffix))
@@ -1386,22 +1391,17 @@ public struct StoreSnapshot: Sendable {
         return StoreSnapshot(directory: dir, dbURL: dir.appendingPathComponent("db"))
     }
 
-    /// Step 2: fold the WAL into the main file of OUR copy so the immutable open sees everything.
-    public func checkpoint() throws {
-        let queue = try DatabaseQueue(path: dbURL.path)          // read-write on our own copy only
-        try queue.inDatabase { db in
-            try db.execute(sql: "PRAGMA wal_checkpoint(TRUNCATE)")
-        }
-    }
-
-    /// Step 3: open immutable + read-only.
+    /// Step 2: open read-only on a plain path. No checkpoint step and no `immutable=1` —
+    /// SQLite recovers the copied WAL itself, which is the only way the newest rows are
+    /// visible. See "Read-only snapshot open" above.
     public func openReadOnly() throws -> DatabaseQueue {
-        // Ensure "file:" URIs are honored regardless of how the system SQLite was compiled.
-        _ = sqlite3_config(SQLITE_CONFIG_URI, 1)               // must run before any connection is opened
         var config = Configuration()
         config.readonly = true
         config.label = "app.backglance.Backglance.store-snapshot"
-        return try DatabaseQueue(path: "file:\(dbURL.path)?immutable=1", configuration: config)
+        config.prepareDatabase { db in
+            try db.execute(sql: "PRAGMA query_only = 1")       // belt and braces
+        }
+        return try DatabaseQueue(path: dbURL.path, configuration: config)
     }
 
     public func dispose() {
@@ -1416,7 +1416,6 @@ Usage inside `CaptureEngine`:
 func capturePass() async throws -> [RawStoreRecord] {
     let snapshot = try StoreSnapshot.make(from: try StoreLocation.current())
     defer { snapshot.dispose() }
-    try snapshot.checkpoint()
     let db = try snapshot.openReadOnly()
     return try db.read { db in
         let fp = try StoreFingerprinter.fingerprint(db)
@@ -1428,7 +1427,7 @@ func capturePass() async throws -> [RawStoreRecord] {
 }
 ```
 
-> ⚠️ **Warning:** `sqlite3_config` is process-global and must be called before GRDB opens its first connection. In the app it runs from `AppDelegate.applicationWillFinishLaunching` (before `Archive.shared` is touched); in tests, from the test bundle's principal class.
+> ⚠️ **Warning:** Do not reintroduce a `wal_checkpoint` step or an `immutable=1` open here. They travel together — the checkpoint only exists to paper over the rows `immutable=1` hides — and dropping both is what makes a plain read-only open correct. A regression test in `BackglanceCaptureTests` asserts that a row living only in `db-wal` is visible through `StoreSnapshot.read`.
 
 ### Fixtures-based test strategy
 

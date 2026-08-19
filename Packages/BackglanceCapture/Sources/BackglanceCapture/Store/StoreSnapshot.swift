@@ -1,4 +1,7 @@
 import Foundation
+import GRDB
+
+// MARK: - StoreSnapshot
 
 /// A private, read-only copy of the system store taken for one capture tick or import
 /// batch.
@@ -32,6 +35,44 @@ public struct StoreSnapshot: Sendable {
     /// leaves a fragment of the user's notifications behind.
     public static func take(of location: URL) throws -> StoreSnapshot {
         try take(of: location, into: SnapshotDirectory.fresh())
+    }
+
+    /// Runs `body` on a read-only connection to the copied database.
+    ///
+    /// Read-only twice over: `Configuration.readonly` opens with `SQLITE_OPEN_READONLY`,
+    /// and `PRAGMA query_only = 1` makes SQLite refuse a write even if some future bug
+    /// finds a path to one. Neither is what protects Apple's database — that is
+    /// ``take(of:)`` copying first — but a snapshot is a copy of the user's entire
+    /// notification history, and nothing should be mutating it.
+    ///
+    /// > ⚠️ Opened on a plain path, deliberately **not** as `file:…?immutable=1`.
+    /// > `immutable=1` tells SQLite the file cannot change and, as part of that, to skip
+    /// > WAL recovery entirely — so every row still sitting in the copied `-wal` becomes
+    /// > invisible, silently and without an error. Those rows are the most recent
+    /// > notifications, which is the whole reason ``take(of:)`` copies the `-wal` at all.
+    /// > See docs/features/CAPTURE.md#snapshot-copy.
+    ///
+    /// Opening a WAL database read-only makes SQLite build a wal-index (`-shm`) beside
+    /// it. That is fine and expected here: the file it writes is inside Backglance's own
+    /// `0700` snapshot directory, which ``discard()`` removes at the end of the tick.
+    /// Apple's directory is never written to, because Apple's files are never opened.
+    public func read<T>(_ body: (Database) throws -> T) throws -> T {
+        var config = Configuration()
+        config.readonly = true
+        config.label = "backglance.store-snapshot"
+        config.prepareDatabase { db in
+            try db.execute(sql: "PRAGMA query_only = 1")
+        }
+        do {
+            let queue = try DatabaseQueue(path: databaseURL.path, configuration: config)
+            return try queue.read(body)
+        } catch let error as DatabaseError where error.isTornCopy {
+            // usernoted was mid-write while we cloned. Not fatal, and not worth a
+            // degraded state: the next tick copies again.
+            throw CaptureError.snapshotFailed(underlying: "torn copy (\(error.resultCode.rawValue))")
+        } catch let error as DatabaseError {
+            throw CaptureError.readFailed("sqlite \(error.resultCode.rawValue)")
+        }
     }
 
     /// Removes the copy. Safe to call twice, and safe to call after a failed read.
@@ -128,5 +169,27 @@ public struct StoreSnapshot: Sendable {
             return nil
         }
         return posixCode(of: underlying)
+    }
+}
+
+// MARK: - DatabaseError + torn copies
+
+extension DatabaseError {
+    /// Whether this error looks like a copy taken while `usernoted` was mid-write.
+    ///
+    /// `FileManager.copyItem` is not atomic with respect to another process's writes, so
+    /// a clone taken during a checkpoint can land internally inconsistent. That is an
+    /// ordinary race, not a corrupt store and not a reason to degrade: the next tick
+    /// copies again and almost always succeeds.
+    var isTornCopy: Bool {
+        switch resultCode {
+        case .SQLITE_CORRUPT,
+             .SQLITE_NOTADB,
+             .SQLITE_IOERR:
+            true
+
+        default:
+            false
+        }
     }
 }

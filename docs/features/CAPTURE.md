@@ -67,7 +67,7 @@ Capture is a background loop with a small footprint (idle CPU under 0.1 %, poll 
    ┌────────────────────────────── CaptureEngine (actor) — one tick at a time ────────────────────┐
    │ 1. StoreSnapshot.take(of:)      copy db + db-wal → ~/Library/Application Support/Backglance/ │
    │                                 tmp/<uuid>/ (APFS clone, ms) — never touch Apple's live file │
-   │ 2. snapshot.read { }            GRDB DatabaseQueue, readonly, "file:…?immutable=1"           │
+   │ 2. snapshot.read { }            GRDB DatabaseQueue, readonly + query_only, plain path        │
    │ 3. adapter.tail(in:)            store reset? (tail.rec_id < cursor.rec_id) → reset cursor    │
    │ 4. adapter.records(after:)      SELECT … FROM record JOIN app USING(app_id)                  │
    │                                 WHERE rec_id > ? ORDER BY rec_id LIMIT 500                    │
@@ -386,17 +386,15 @@ public struct StoreSnapshot: Sendable {
         config.prepareDatabase { db in
             try db.execute(sql: "PRAGMA query_only = 1")     // belt and braces
         }
-        // immutable=1: no locking, no change detection. Needs SQLITE_CONFIG_URI, which
-        // the app enables at launch before any GRDB connection exists.
-        let path = SQLiteURIFilenames.isEnabled
-            ? "file:\(databaseURL.path)?immutable=1"
-            : databaseURL.path
+        // A plain path, NOT file:…?immutable=1 — see the warning below.
         do {
-            let queue = try DatabaseQueue(path: path, configuration: config)
+            let queue = try DatabaseQueue(path: databaseURL.path, configuration: config)
             return try queue.read(body)
         } catch let error as DatabaseError where error.isTornCopy {
             // usernoted was mid-write while we cloned. Not fatal: the next tick copies again.
             throw CaptureError.snapshotFailed(underlying: "torn copy (\(error.resultCode.rawValue))")
+        } catch let error as DatabaseError {
+            throw CaptureError.readFailed("sqlite \(error.resultCode.rawValue)")
         }
     }
 
@@ -415,6 +413,12 @@ extension DatabaseError {
     }
 }
 ```
+
+> ❌ **Don't:** open the snapshot as `file:…?immutable=1`. `immutable=1` promises SQLite the file cannot change, and SQLite takes that to mean it may **skip WAL recovery entirely** — so every row still sitting in the copied `-wal` becomes invisible, with no error and no warning. Those are precisely the rows capture came for: everything delivered since the last checkpoint. Measured on macOS 26 against a copy holding one checkpointed row and one WAL-only row, `immutable=1` returned only the checkpointed one; against a copy whose table had not been checkpointed at all it reported `no such table`. This flatly contradicts the reason the `-wal` is copied in the first place.
+>
+> The original rationale for `immutable=1` — "no locking, no wal-index writes" — was aimed at a risk that does not exist here. Locking and `-shm` creation are only dangerous on *Apple's* file, and `StoreSnapshot` never opens Apple's file. On our own copy, SQLite building a `-shm` inside the `0700` snapshot directory is exactly what makes the WAL rows readable, and `discard()` removes it with the rest of the directory at the end of the tick.
+>
+> (`SQLiteURIFilenames`, which earlier drafts of this document referenced, does not exist and is not needed. It would have wrapped `sqlite3_config(SQLITE_CONFIG_URI, …)`, which is a variadic C function and therefore unavailable from Swift without a C shim. macOS's system SQLite parses `file:` URIs regardless.)
 
 > ❌ **Don't:** open the live `db` "just for a quick count". Not with `sqlite3`, not with GRDB, not read-only. Every code path goes through `StoreSnapshot`.
 
@@ -1314,7 +1318,7 @@ All capture tests run against **synthetic fixtures** under `Tests/Fixtures/Syste
 | `RecordParserFuzzTests` | `BackglanceCaptureTests` | 10k seeded mutations of fixture plists (byte flips, truncation, key renames, wrong types) never crash; every outcome is a `ParsedNotification` or a `CaptureError.parseFailed` |
 | `ExclusionOrderTests` | `BackglanceCaptureTests` | A spy parser proves excluded bundle IDs are never parsed |
 | `StoreWatcherTests` | `BackglanceCaptureTests` | Appending a row to a temp copy of a fixture emits `.fileChanged` within 2 s; a `-wal` rename re-arms; poll fires without file changes |
-| `SnapshotTests` | `BackglanceCaptureTests` | A row present only in `store.db-wal` is visible through `StoreSnapshot.read` (guards the `?immutable=1` + copied WAL assumption); torn copy → `snapshotFailed` |
+| `SnapshotTests` | `BackglanceCaptureTests` | A row present only in `store.db-wal` is visible through `StoreSnapshot.read` (guards against reintroducing `?immutable=1`, which hides it); torn copy → `snapshotFailed` |
 | `PauseSemanticsTests` | `BackglanceCaptureTests` | Rows added during pause are absent after resume with the default; present with `importWhilePaused = true` |
 | `ImportTests` | `BackglanceCaptureTests` | Import then live overlap yields no duplicates; summary sentence; cancellation keeps partial results |
 

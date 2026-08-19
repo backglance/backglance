@@ -207,7 +207,7 @@ Redacted notifications stay redacted in sync because the originals never existed
 
 FDA is a blunt permission: once granted, a process can read almost anything in the home directory. Users are right to ask what we do with it. The answer is checkable in `Packages/BackglanceCapture/`:
 
-- `StoreLocation.current()` returns exactly one path (`…/group.com.apple.usernoted/db2/db`) and the reader opens that plus its `-wal`/`-shm` siblings, copied to `tmp/` and opened read-only with `?immutable=1`.
+- `StoreLocation.current()` returns exactly one path (`…/group.com.apple.usernoted/db2/db`) and the reader copies that plus its `-wal` sibling to `tmp/`, then opens the *copy* read-only (`Configuration.readonly` + `PRAGMA query_only = 1`). Apple's files are only ever read, never opened by SQLite.
 - `AwaySessionTracker` reads two JSON files under `~/Library/DoNotDisturb/DB/` when Focus detection is enabled.
 - There is no other file read outside our own directory. There is no Accessibility, Screen Recording, Input Monitoring, Contacts, Calendar, or Location request. Attachments are recorded as metadata (`attachments_json`: type, name, size), never bytes.
 - A CI job (`fixtures.yml`) runs the capture package against synthetic fixtures under a `TMPDIR`-scoped home and asserts that no path outside the fixture root and the archive root is opened (`fs_usage`-style hook via `DYLD_INSERT_LIBRARIES` is not used; we use an `FSEvents`-free approach: `StoreLocation` is injectable, and tests pass a sandboxed root).

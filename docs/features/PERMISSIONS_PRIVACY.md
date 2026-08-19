@@ -126,7 +126,7 @@ Responsibilities:
 
 That is the whole list of paths outside Backglance's own directories. Backglance additionally reads and writes its own files under `~/Library/Application Support/Backglance/` (archive, icon cache, tmp snapshots), `~/Library/Logs/Backglance/`, and its `UserDefaults` suite `app.backglance.Backglance`.
 
-The store is never opened live. `StoreWatcher` copies `db`, `db-wal` and `db-shm` into `~/Library/Application Support/Backglance/tmp/`, opens the copy read-only with `?immutable=1`, reads new records, and deletes the copy. Apple's file is opened with `O_RDONLY` for the copy and never for write. See [CAPTURE.md](./CAPTURE.md) for the code.
+The store is never opened live. `StoreSnapshot` copies `db` and `db-wal` (never `db-shm`) into `~/Library/Application Support/Backglance/tmp/<uuid>/`, opens the copy read-only, reads new records, and deletes the copy. Apple's file is opened with `O_RDONLY` for the copy and never for write. See [CAPTURE.md](./CAPTURE.md) for the code.
 
 ### Never touches
 

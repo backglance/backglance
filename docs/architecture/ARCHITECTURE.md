@@ -337,13 +337,12 @@ public struct StoreSnapshot: Sendable {
             // Second line of defence: even if a bug tries to write, SQLite refuses.
             try db.execute(sql: "PRAGMA query_only = 1")
         }
-        // `?immutable=1` tells SQLite the file cannot change underneath it, so no
-        // locking or wal-index writes happen. URI filenames need SQLITE_CONFIG_URI,
-        // which the app enables at launch before any GRDB connection exists.
-        let path = SQLiteURIFilenames.isEnabled
-            ? "file:\(databaseURL.path)?immutable=1"
-            : databaseURL.path
-        let queue = try DatabaseQueue(path: path, configuration: config)
+        // A plain path, deliberately NOT `file:…?immutable=1`: immutable makes SQLite
+        // skip WAL recovery, which silently hides every row still in the copied -wal —
+        // the most recent notifications, and the reason the -wal is copied at all.
+        // Building a -shm inside our own 0700 snapshot directory is harmless; Apple's
+        // file is never opened. See CAPTURE.md#snapshot-copy.
+        let queue = try DatabaseQueue(path: databaseURL.path, configuration: config)
         return try queue.read(body)
     }
 
