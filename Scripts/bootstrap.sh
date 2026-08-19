@@ -42,23 +42,85 @@ else
 fi
 
 # 4. Local signing config -----------------------------------------------------
-if [[ ! -f "$LOCAL_XCCONFIG" ]]; then
-  # Try to discover a team from the login keychain; fall back to a placeholder.
-  TEAM_ID="$(security find-identity -v -p codesigning 2>/dev/null \
-    | grep -oE '\(([A-Z0-9]{10})\)' | head -n1 | tr -d '()' || true)"
-  if [[ -z "${TEAM_ID:-}" ]]; then
-    TEAM_ID="TEAMID1234"
-    warn "No signing identity found; wrote placeholder DEVELOPMENT_TEAM. Edit Config/Local.xcconfig."
-  fi
+#
+# The Team ID is the certificate's OU field, *not* the ten characters in the
+# common name: "Apple Development: Jane Doe (AB12CD34EF)" names the developer,
+# while the team the certificate belongs to is OU. Signing against the wrong one
+# fails with `No signing certificate "Mac Development" found`, which reads like a
+# missing certificate but is a mismatched team.
+discover_team() {
+  local valid_identities cert_name line pem subject common_name team
+  valid_identities="$(security find-identity -v -p codesigning 2>/dev/null || true)"
+  [[ -z "$valid_identities" ]] && return 1
+
+  for cert_name in "Apple Development" "Mac Development" "Developer ID Application"; do
+    pem=""
+    while IFS= read -r line; do
+      pem+="$line"$'\n'
+      [[ "$line" == "-----END CERTIFICATE-----" ]] || continue
+
+      subject="$(printf '%s' "$pem" | openssl x509 -noout -subject 2>/dev/null || true)"
+      pem=""
+      common_name="$(sed -n 's/.*CN *= *\([^,\/]*\).*/\1/p' <<<"$subject")"
+      team="$(sed -n 's/.*OU *= *\([A-Z0-9]\{10\}\).*/\1/p' <<<"$subject")"
+
+      # Only certificates the keychain reports as valid *and* usable for signing.
+      [[ -n "$team" && -n "$common_name" && "$valid_identities" == *"$common_name"* ]] || continue
+      printf '%s' "$team"
+      return 0
+    done < <(security find-certificate -a -c "$cert_name" -p 2>/dev/null)
+  done
+  return 1
+}
+
+write_local_xcconfig() {
   mkdir -p "$(dirname "$LOCAL_XCCONFIG")"
-  cat > "$LOCAL_XCCONFIG" <<EOF
+  if [[ -n "${1:-}" ]]; then
+    cat > "$LOCAL_XCCONFIG" <<EOF
 // Local, git-ignored overrides. Created by Scripts/bootstrap.sh.
-DEVELOPMENT_TEAM = $TEAM_ID
+//
+// $1 is this Mac's Team ID, read from the OU field of a valid development
+// certificate. If you have more than one team, edit it here.
+DEVELOPMENT_TEAM = $1
 CODE_SIGN_STYLE = Automatic
 EOF
-  info "Wrote $LOCAL_XCCONFIG (DEVELOPMENT_TEAM = $TEAM_ID)"
+    info "Wrote $LOCAL_XCCONFIG (DEVELOPMENT_TEAM = $1)"
+    return
+  fi
+
+  cat > "$LOCAL_XCCONFIG" <<'EOF'
+// Local, git-ignored overrides. Created by Scripts/bootstrap.sh.
+//
+// No valid development certificate was found on this Mac, so local builds are
+// ad-hoc signed. They run, and capture works once you grant Full Disk Access —
+// but Xcode disables the hardened runtime for an ad-hoc signature, and the
+// signature changes on every build, so macOS asks for Full Disk Access again
+// each time (Scripts/grant_fda_hint.sh prints the tccutil reset commands).
+//
+// To sign properly: sign in under Xcode ▸ Settings ▸ Accounts, then delete this
+// file and re-run Scripts/bootstrap.sh.
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =
+PROVISIONING_PROFILE_SPECIFIER =
+EOF
+  warn "No development certificate found; wrote an ad-hoc signing config to Config/Local.xcconfig."
+}
+
+if [[ ! -f "$LOCAL_XCCONFIG" ]]; then
+  write_local_xcconfig "$(discover_team || true)"
 else
   info "Config/Local.xcconfig already exists; leaving it alone"
+
+  # It is worth one check: a Team ID that matches no certificate on this Mac is
+  # the most common reason a clean clone fails to build here.
+  CONFIGURED_TEAM="$(sed -n 's/^[[:space:]]*DEVELOPMENT_TEAM[[:space:]]*=[[:space:]]*\([A-Z0-9]\{10\}\).*/\1/p' "$LOCAL_XCCONFIG" | head -n1)"
+  if [[ -n "${CONFIGURED_TEAM:-}" ]]; then
+    DISCOVERED_TEAM="$(discover_team || true)"
+    if [[ -n "${DISCOVERED_TEAM:-}" && "$DISCOVERED_TEAM" != "$CONFIGURED_TEAM" ]]; then
+      warn "Config/Local.xcconfig sets DEVELOPMENT_TEAM = $CONFIGURED_TEAM, but this Mac's development certificate belongs to team $DISCOVERED_TEAM. Builds will fail with 'No signing certificate \"Mac Development\" found' until one of them changes."
+    fi
+  fi
 fi
 
 # 5. Optional tooling report ----------------------------------------------------

@@ -125,7 +125,7 @@ xcodebuild -scheme Backglance -configuration Debug -showBuildSettings 2>/dev/nul
 1. Verifies that the selected Xcode is at least 16.2.
 2. Resolves Swift packages so the first Xcode open does not stall.
 3. Installs the git hooks from `Scripts/hooks/` into `.git/hooks/`.
-4. Creates `Config/Local.xcconfig` (git-ignored) with your `DEVELOPMENT_TEAM` if it does not exist yet.
+4. Creates `Config/Local.xcconfig` (git-ignored) with your `DEVELOPMENT_TEAM` if it does not exist yet — or, if this Mac has no development certificate, with an ad-hoc signing configuration that still builds. If the file already exists, it is left alone, but a `DEVELOPMENT_TEAM` that matches no certificate on this Mac is called out as a warning.
 
 The full script:
 
@@ -174,23 +174,85 @@ else
 fi
 
 # 4. Local signing config -----------------------------------------------------
-if [[ ! -f "$LOCAL_XCCONFIG" ]]; then
-  # Try to discover a team from the login keychain; fall back to a placeholder.
-  TEAM_ID="$(security find-identity -v -p codesigning 2>/dev/null \
-    | grep -oE '\(([A-Z0-9]{10})\)' | head -n1 | tr -d '()' || true)"
-  if [[ -z "${TEAM_ID:-}" ]]; then
-    TEAM_ID="TEAMID1234"
-    warn "No signing identity found; wrote placeholder DEVELOPMENT_TEAM. Edit Config/Local.xcconfig."
-  fi
+#
+# The Team ID is the certificate's OU field, *not* the ten characters in the
+# common name: "Apple Development: Jane Doe (AB12CD34EF)" names the developer,
+# while the team the certificate belongs to is OU. Signing against the wrong one
+# fails with `No signing certificate "Mac Development" found`, which reads like a
+# missing certificate but is a mismatched team.
+discover_team() {
+  local valid_identities cert_name line pem subject common_name team
+  valid_identities="$(security find-identity -v -p codesigning 2>/dev/null || true)"
+  [[ -z "$valid_identities" ]] && return 1
+
+  for cert_name in "Apple Development" "Mac Development" "Developer ID Application"; do
+    pem=""
+    while IFS= read -r line; do
+      pem+="$line"$'\n'
+      [[ "$line" == "-----END CERTIFICATE-----" ]] || continue
+
+      subject="$(printf '%s' "$pem" | openssl x509 -noout -subject 2>/dev/null || true)"
+      pem=""
+      common_name="$(sed -n 's/.*CN *= *\([^,\/]*\).*/\1/p' <<<"$subject")"
+      team="$(sed -n 's/.*OU *= *\([A-Z0-9]\{10\}\).*/\1/p' <<<"$subject")"
+
+      # Only certificates the keychain reports as valid *and* usable for signing.
+      [[ -n "$team" && -n "$common_name" && "$valid_identities" == *"$common_name"* ]] || continue
+      printf '%s' "$team"
+      return 0
+    done < <(security find-certificate -a -c "$cert_name" -p 2>/dev/null)
+  done
+  return 1
+}
+
+write_local_xcconfig() {
   mkdir -p "$(dirname "$LOCAL_XCCONFIG")"
-  cat > "$LOCAL_XCCONFIG" <<EOF
+  if [[ -n "${1:-}" ]]; then
+    cat > "$LOCAL_XCCONFIG" <<EOF
 // Local, git-ignored overrides. Created by Scripts/bootstrap.sh.
-DEVELOPMENT_TEAM = $TEAM_ID
+//
+// $1 is this Mac's Team ID, read from the OU field of a valid development
+// certificate. If you have more than one team, edit it here.
+DEVELOPMENT_TEAM = $1
 CODE_SIGN_STYLE = Automatic
 EOF
-  info "Wrote $LOCAL_XCCONFIG (DEVELOPMENT_TEAM = $TEAM_ID)"
+    info "Wrote $LOCAL_XCCONFIG (DEVELOPMENT_TEAM = $1)"
+    return
+  fi
+
+  cat > "$LOCAL_XCCONFIG" <<'EOF'
+// Local, git-ignored overrides. Created by Scripts/bootstrap.sh.
+//
+// No valid development certificate was found on this Mac, so local builds are
+// ad-hoc signed. They run, and capture works once you grant Full Disk Access —
+// but Xcode disables the hardened runtime for an ad-hoc signature, and the
+// signature changes on every build, so macOS asks for Full Disk Access again
+// each time (Scripts/grant_fda_hint.sh prints the tccutil reset commands).
+//
+// To sign properly: sign in under Xcode ▸ Settings ▸ Accounts, then delete this
+// file and re-run Scripts/bootstrap.sh.
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =
+PROVISIONING_PROFILE_SPECIFIER =
+EOF
+  warn "No development certificate found; wrote an ad-hoc signing config to Config/Local.xcconfig."
+}
+
+if [[ ! -f "$LOCAL_XCCONFIG" ]]; then
+  write_local_xcconfig "$(discover_team || true)"
 else
   info "Config/Local.xcconfig already exists; leaving it alone"
+
+  # It is worth one check: a Team ID that matches no certificate on this Mac is
+  # the most common reason a clean clone fails to build here.
+  CONFIGURED_TEAM="$(sed -n 's/^[[:space:]]*DEVELOPMENT_TEAM[[:space:]]*=[[:space:]]*\([A-Z0-9]\{10\}\).*/\1/p' "$LOCAL_XCCONFIG" | head -n1)"
+  if [[ -n "${CONFIGURED_TEAM:-}" ]]; then
+    DISCOVERED_TEAM="$(discover_team || true)"
+    if [[ -n "${DISCOVERED_TEAM:-}" && "$DISCOVERED_TEAM" != "$CONFIGURED_TEAM" ]]; then
+      warn "Config/Local.xcconfig sets DEVELOPMENT_TEAM = $CONFIGURED_TEAM, but this Mac's development certificate belongs to team $DISCOVERED_TEAM. Builds will fail with 'No signing certificate \"Mac Development\" found' until one of them changes."
+    fi
+  fi
 fi
 
 # 5. Optional tooling report ----------------------------------------------------
@@ -212,6 +274,24 @@ info "Done. Next: open Backglance.xcodeproj, or run xcodebuild -scheme Backglanc
 Local development uses **automatic signing with your Personal Team**. That is enough to build, run, debug, and grant Full Disk Access; nothing about the capture path depends on a Developer ID certificate.
 
 - `CODE_SIGN_STYLE = Automatic` and `DEVELOPMENT_TEAM` come from `Config/Local.xcconfig` (see above). Do not put your team ID in the project file; that is what the local xcconfig is for.
+- **Your Team ID is the certificate's `OU`, not the name in brackets.** `security find-identity -v -p codesigning` prints something like `Apple Development: Jane Doe (AB12CD34EF)`, and those ten characters identify *you*, not your team. The team is the `OU` field:
+
+  ```bash
+  security find-certificate -c "Apple Development" -p \
+    | openssl x509 -noout -subject
+  # subject=UID=…, CN=Apple Development: Jane Doe (AB12CD34EF), OU=9Z8Y7X6W5V, O=Jane Doe, C=US
+  #                                                              ^^^^^^^^^^ this is DEVELOPMENT_TEAM
+  ```
+
+  Putting the bracketed value in `DEVELOPMENT_TEAM` produces a build error that sounds like a missing certificate but is a mismatched team: `No signing certificate "Mac Development" found: No "Mac Development" signing certificate matching team ID "…" with a private key was found.` `bootstrap.sh` reads the `OU`, and warns when an existing `Config/Local.xcconfig` names a team no certificate on this Mac belongs to.
+- **No certificate at all is fine.** With no Apple ID configured, `bootstrap.sh` writes an ad-hoc configuration (`CODE_SIGN_STYLE = Manual`, `CODE_SIGN_IDENTITY = -`) and the app builds and runs. Two consequences: Xcode disables the hardened runtime for an ad-hoc signature, and the signature changes on every build, so macOS asks for Full Disk Access again each time. For a one-off build you can also skip signing entirely:
+
+  ```bash
+  xcodebuild -scheme Backglance -destination 'platform=macOS' build \
+    CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=
+  ```
+
+  That is enough to check that the code compiles — it is what CI does — but an unsigned build cannot hold a Full Disk Access grant, so it cannot capture anything.
 - **Hardened Runtime stays on** in every configuration, including Debug. Backglance ships with the hardened runtime because notarization requires it, and we do not want debug builds to behave differently from release builds with respect to library loading or entitlements. The entitlements file `Backglance/Backglance.entitlements` contains no sandbox entitlement — Backglance is not sandboxed, because Full Disk Access is incompatible with App Sandbox — and no hardened-runtime exceptions such as `com.apple.security.cs.disable-library-validation`; if a build ever seems to need one, something is wrong with a dependency, not with the project.
 - Release signing (Developer ID Application, notarization, stapling) is handled by `Scripts/sign_and_notarize.sh` and CI; you do not need it locally. See [PACKAGING_NOTARIZATION.md](../deployment/PACKAGING_NOTARIZATION.md).
 
@@ -545,7 +625,8 @@ If any of these steps fails, the next section lists the usual causes.
 | `degraded(storeNotFound)` | `~/Library/Group Containers/group.com.apple.usernoted/db2/db` does not exist (fresh user account, or `BACKGLANCE_STORE_PATH` points at a missing file) | On a fresh account, trigger any notification once so `usernoted` creates its database. Otherwise check the path in the env var; the DEBUG log prints the resolved path at startup. |
 | `degraded(unknownSchema)` on a beta macOS | The store's fingerprint matches no adapter, and the OS-major fallback probe failed | Expected on 27 beta until an adapter exists. Run `Scripts/verify_fixture.sh` to confirm current fixtures still pass, then follow the [OS Compatibility Playbook](../architecture/OS_COMPATIBILITY_PLAYBOOK.md) to capture a schema (schema only, never contents) and add `StoreAdapterV27`. |
 | `degraded(readError)` right after login or wake | Snapshot copy raced with a WAL checkpoint | Transient; the watcher retries on the next poll. If it persists, check free space in `~/Library/Application Support/Backglance/tmp/`. |
-| Xcode: "No account for team" / "Signing for Backglance requires a development team" | `Config/Local.xcconfig` missing or has the `TEAMID1234` placeholder | Add your Apple ID in Xcode ▸ Settings ▸ Accounts, then rerun `Scripts/bootstrap.sh` or edit `DEVELOPMENT_TEAM` by hand. |
+| Xcode: "No account for team" / "Signing for Backglance requires a development team" | `Config/Local.xcconfig` missing or naming a team you have no account for | Add your Apple ID in Xcode ▸ Settings ▸ Accounts, then delete `Config/Local.xcconfig` and rerun `Scripts/bootstrap.sh`, or edit `DEVELOPMENT_TEAM` by hand. |
+| `No signing certificate "Mac Development" found: No "Mac Development" signing certificate matching team ID "…" with a private key was found` | `DEVELOPMENT_TEAM` is not the team your certificate belongs to — most often the ten characters from the certificate's name in brackets, which identify the developer, not the team | Read the real Team ID from the certificate's `OU` field (see [Signing configuration](#signing-configuration-for-local-development)), or delete `Config/Local.xcconfig` and rerun `Scripts/bootstrap.sh`, which now reads `OU` and warns about a mismatch. |
 | `xcodebuild -resolvePackageDependencies` fails, or Xcode shows "package resolution failed" | Network blocked, stale `Package.resolved`, or a corrupted SPM cache | `rm -rf ~/Library/Caches/org.swift.swiftpm ~/Library/Developer/Xcode/DerivedData/Backglance-*` then rerun `Scripts/bootstrap.sh`. Behind a proxy, set `HTTPS_PROXY` for `xcodebuild`. |
 | Console warns "SUPublicEDKey missing" / updater not running in a debug build | Intentional: DEBUG builds do not embed the Sparkle public key and `SparkleUpdaterController` skips startup | Nothing to fix. To test the updater locally, build Release with a throwaway key pair generated by Sparkle's `generate_keys` and a local appcast; see [DEPLOYMENT_GUIDE.md](../deployment/DEPLOYMENT_GUIDE.md). |
 | Hundreds of concurrency warnings under Xcode 26 | Strict concurrency checking is set to `complete` as a goal; a few third-party or AppKit call sites still warn | Warnings in *your* diff should be fixed (see [DEVELOPMENT_GUIDE.md](./DEVELOPMENT_GUIDE.md#swift-style-guide)). Warnings pre-existing on `main` are tracked in issues labelled `concurrency`. Do not add `@unchecked Sendable` to silence them without a comment explaining why it is safe. |
