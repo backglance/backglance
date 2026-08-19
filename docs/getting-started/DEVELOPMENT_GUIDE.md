@@ -381,12 +381,18 @@ final class StoreWatcher {
 
 ```swift
 public enum CaptureError: Error, Sendable {
-    case storeNotFound(searched: URL)
-    case snapshotFailed(underlying: Error)
-    case unknownSchema(StoreFingerprint)
-    case parse(recID: Int64, underlying: Error)   // never includes record contents
+    case fullDiskAccessDenied
+    case storeNotFound(URL)                          // only the last path component is logged
+    case snapshotFailed(underlying: String)
+    case degraded(DegradedReason)                    // a state, thrown to unwind the tick
+    case parseFailed(recID: Int64, reason: String)   // reason is one of a fixed set of strings
+    case readFailed(String)                          // a SQLite error description
+
+    public var degradedReason: DegradedReason { … }  // what the engine's status becomes
 }
 ```
+
+No case carries notification content — no title, subtitle, body, sender, thread id or deep link — because every case ends up in a log line and in the diagnostics export. Adding one that carries a payload is a security bug, not a style issue. The same shape is described in [ARCHITECTURE.md](../architecture/ARCHITECTURE.md#degraded-mode) and [CAPTURE.md](../features/CAPTURE.md).
 
 ### Optionals and force unwraps
 
