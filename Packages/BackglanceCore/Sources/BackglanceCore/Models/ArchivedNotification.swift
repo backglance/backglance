@@ -21,6 +21,65 @@ import GRDB
 public struct ArchivedNotification: Codable, FetchableRecord, MutablePersistableRecord, Identifiable, Hashable,
     Sendable
 {
+    // MARK: Lifecycle
+
+    /// A row ready to insert.
+    ///
+    /// A public initializer because the capture layer builds these: a `public struct`'s
+    /// memberwise initializer is internal, so without this one `BackglanceCapture` could
+    /// not construct the very type it exists to produce.
+    ///
+    /// The defaults are the state a freshly captured notification is in — unread,
+    /// unpinned, not deleted, unredacted, not attributed to an away session — so a caller
+    /// names only what the store actually told it.
+    public init(
+        id: Int64? = nil,
+        uuid: String,
+        appId: Int64,
+        title: String? = nil,
+        subtitle: String? = nil,
+        body: String? = nil,
+        sender: String? = nil,
+        threadId: String? = nil,
+        category: String? = nil,
+        deliveredAt: UnixDate,
+        capturedAt: UnixDate,
+        source: Source = .live,
+        presented: Bool = true,
+        awaySessionId: Int64? = nil,
+        deepLink: String? = nil,
+        attachmentsJson: String? = nil,
+        redaction: Redaction = .none,
+        isRead: Bool = false,
+        isPinned: Bool = false,
+        isDeleted: Bool = false,
+        storeRecId: Int64? = nil
+    ) {
+        self.id = id
+        self.uuid = uuid
+        self.appId = appId
+        self.title = title
+        self.subtitle = subtitle
+        self.body = body
+        self.sender = sender
+        self.threadId = threadId
+        self.category = category
+        self.deliveredAt = deliveredAt
+        self.capturedAt = capturedAt
+        self.source = source
+        self.presented = presented
+        self.awaySessionId = awaySessionId
+        self.deepLink = deepLink
+        self.attachmentsJson = attachmentsJson
+        self.redaction = redaction
+        self.isRead = isRead
+        self.isPinned = isPinned
+        self.isDeleted = isDeleted
+        self.storeRecId = storeRecId
+    }
+
+    // MARK: Public
+
     /// `'live'` (the store watcher) or `'import'` (`CaptureEngine.importExisting()`).
     /// `import` is a Swift keyword, hence `imports`; the raw value is what
     /// actually lands in the `source` column.

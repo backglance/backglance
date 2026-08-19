@@ -41,6 +41,48 @@ enum MiniatureStore {
     /// A fixed instant, so date assertions do not depend on when the test runs.
     static let delivered = Date(timeIntervalSinceReferenceDate: 774_000_000)
 
+    /// A binary plist shaped like the ones the store carries.
+    ///
+    /// ⚠️ The keys are the observed ones. Synthetic content only — every value here is
+    /// written by the test that asks for it.
+    static func payload(
+        bundleID: String? = nil,
+        title: String? = "Ada",
+        subtitle: String? = nil,
+        body: String? = "Landing at six",
+        threadID: String? = nil,
+        attachments: [[String: Any]] = []
+    ) -> Data {
+        var request: [String: Any] = [:]
+        request["titl"] = title
+        request["subt"] = subtitle
+        request["body"] = body
+        request["thre"] = threadID
+        if !attachments.isEmpty {
+            request["atta"] = attachments
+        }
+
+        var root: [String: Any] = ["req": request]
+        root["app"] = bundleID
+
+        // swiftlint:disable:next force_try - a dictionary of plist scalars always encodes
+        return try! PropertyListSerialization.data(fromPropertyList: root, format: .binary, options: 0)
+    }
+
+    /// A row whose payload is a real notification, rather than opaque bytes.
+    static func notification(
+        recID: Int64,
+        bundleID: String = "app.backglance.Fixture",
+        payloadBundleID: String? = nil,
+        title: String? = "Ada",
+        body: String? = "Landing at six"
+    ) -> Row {
+        var row = Row(recID: recID)
+        row.bundleID = bundleID
+        row.payload = payload(bundleID: payloadBundleID, title: title, body: body)
+        return row
+    }
+
     /// `count` rows numbered from 1, each with a distinct payload.
     static func rows(_ count: Int) -> [Row] {
         (1 ... count).map { recID in

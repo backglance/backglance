@@ -17,6 +17,32 @@ import GRDB
 /// > Redaction is irreversible by design: there is no "undo" path, because
 /// > there is nothing left anywhere in the archive to undo from.
 public struct RedactionEvent: Codable, FetchableRecord, MutablePersistableRecord, Identifiable, Hashable, Sendable {
+    // MARK: Lifecycle
+
+    /// An audit row ready to insert.
+    ///
+    /// Public for the same reason as ``ArchivedNotification``'s: a `public struct`'s
+    /// memberwise initializer is internal, and the redactor that produces these lives
+    /// outside this module.
+    ///
+    /// `notificationId` is filled in by ``Archive/insert(_:redaction:)`` from the row it
+    /// just wrote, so a caller that does not know the id yet passes `0`.
+    public init(
+        id: Int64? = nil,
+        notificationId: Int64 = 0,
+        kind: Kind = .otp,
+        patternId: String,
+        redactedAt: UnixDate
+    ) {
+        self.id = id
+        self.notificationId = notificationId
+        self.kind = kind
+        self.patternId = patternId
+        self.redactedAt = redactedAt
+    }
+
+    // MARK: Public
+
     /// What kind of pattern was redacted. `.otp` is the only kind in v1.0.
     public enum Kind: String, Codable, Hashable, Sendable {
         case otp

@@ -28,15 +28,24 @@ public actor CaptureEngine {
     /// - Parameters:
     ///   - archive: where captured notifications and the capture state are written.
     ///   - watcher: the wake stream that drives the loop.
+    ///   - exclusions: which apps may be archived. Checked before a payload is decoded.
+    ///   - redactor: removes one-time codes before anything is written.
+    ///   - enrichment: fills in the icon and the deep link.
     ///   - storeLocation: resolves the system store's path. Injected so tests can point
     ///     the engine at a store they built, rather than at the machine's real one.
     public init(
         archive: Archive,
         watcher: StoreWatcher,
+        exclusions: any AppExclusionList = AllowAllApps(),
+        redactor: any NotificationRedactor = NoRedaction(),
+        enrichment: any NotificationEnricher = NoEnrichment(),
         storeLocation: @escaping @Sendable () throws -> URL = StoreLocation.current
     ) {
         self.archive = archive
         self.watcher = watcher
+        self.exclusions = exclusions
+        self.redactor = redactor
+        self.enrichment = enrichment
         self.storeLocation = storeLocation
         let (stream, continuation) = AsyncStream.makeStream(of: CaptureStatus.self)
         statusStream = stream
@@ -70,6 +79,10 @@ public actor CaptureEngine {
     /// How many store records the engine has read since it was created. A capture metric,
     /// and content-free by construction.
     public private(set) var recordsRead = 0
+
+    /// How many of those became rows in the archive. The gap between this and
+    /// ``recordsRead`` is exclusions, duplicates and records that would not parse.
+    public private(set) var recordsArchived = 0
 
     /// How far capture has read. Settings shows its date; tests read it directly.
     public var currentCursor: StoreCursor {
@@ -150,7 +163,7 @@ public actor CaptureEngine {
     /// **A read failure degrades rather than throws.** A tick runs on a wake, with no
     /// caller waiting on it, so there is nobody to throw to — the engine records why it
     /// stopped and tries again on the next wake.
-    func tick(reason: WakeReason) {
+    func tick(reason: WakeReason) async {
         lastWake = reason
 
         if case .degraded = status {
@@ -170,11 +183,16 @@ public actor CaptureEngine {
                 return
             }
 
+            var archived = 0
             for raw in batch {
+                if await archiveOne(raw, source: .live) == .archived {
+                    archived += 1
+                }
                 cursor = adapter.cursor(for: raw)
             }
             try archive.saveCursor(cursor)
             recordsRead += batch.count
+            recordsArchived += archived
 
             // Bound to a local: an os_log interpolation is an autoclosure, and reaching
             // through `self` there is what the formatter and the compiler disagree about.
@@ -211,7 +229,11 @@ public actor CaptureEngine {
     // MARK: Private
 
     private let archive: Archive
+    private let exclusions: any AppExclusionList
+    private let redactor: any NotificationRedactor
+    private let enrichment: any NotificationEnricher
     private let storeLocation: @Sendable () throws -> URL
+    private let parser = RecordParser()
     private let watcher: StoreWatcher
     private let logger = Logger(subsystem: "app.backglance.Backglance", category: "capture")
     private let statusContinuation: AsyncStream<CaptureStatus>.Continuation
@@ -224,6 +246,69 @@ public actor CaptureEngine {
 
     /// How far the archive has read. Loaded here, advanced by ticks.
     private var cursor: StoreCursor = .start
+
+    /// Parse, exclude, redact, enrich, insert — for one record.
+    ///
+    /// The order is the privacy model, not a preference:
+    ///
+    /// 1. **Exclusion first, on the raw row.** `RawStoreRecord.appIdentifier` comes from
+    ///    the store's own `app` table, so an excluded app's payload is never decoded into
+    ///    objects at all. A password manager's notification does not become a `String` in
+    ///    this process.
+    /// 2. **Then parse**, and check exclusion *again* against the parsed bundle id: the
+    ///    payload's own `app` key can differ from the joined row for helper processes and
+    ///    iPhone Mirroring, and the app the user excluded is the one the payload names.
+    /// 3. **Redact before anything is written**, in memory and irreversibly.
+    /// 4. **Enrich**, then insert the app row and the notification.
+    ///
+    /// One record's failure never stops the batch, and never reaches the user: it is
+    /// counted, and logged by `rec_id` and a fixed reason.
+    private func archiveOne(_ raw: RawStoreRecord, source: ArchivedNotification.Source) async -> ArchiveOutcome {
+        guard exclusions.allows(raw.appIdentifier) else {
+            return .excluded
+        }
+
+        do {
+            let parsed = try parser.parse(raw)
+            guard exclusions.allows(parsed.bundleID) else {
+                return .excluded
+            }
+
+            let (redacted, redaction) = redactor.redact(parsed)
+            let enriched = await enrichment.enrich(redacted)
+
+            let now = Date()
+            let app = try archive.upsertApp(bundleID: enriched.bundleID, now: now)
+            guard let appID = app.id else {
+                logger.error("archive rec \(raw.recID, privacy: .public): app row has no id")
+                return .failed
+            }
+
+            try archive.insert(
+                ArchivedNotification(
+                    parsed: enriched,
+                    appID: appID,
+                    storeRecID: raw.recID,
+                    source: source,
+                    capturedAt: now
+                ),
+                redaction: redaction
+            )
+            return .archived
+        } catch ArchiveError.duplicate {
+            // The import and live capture overlapping. Expected, and not worth a line.
+            return .duplicate
+        } catch let error as CaptureError {
+            logger.error("skip rec \(raw.recID, privacy: .public): \(error.logDescription, privacy: .public)")
+            return .failed
+        } catch let error as ArchiveError {
+            logger.error("archive rec \(raw.recID, privacy: .public): \(error.logDescription, privacy: .public)")
+            return .failed
+        } catch {
+            logger.error("rec \(raw.recID, privacy: .public): \(String(describing: type(of: error)), privacy: .public)")
+            return .failed
+        }
+    }
 
     /// One batch of records newer than the cursor, read from a fresh snapshot.
     ///
