@@ -863,33 +863,51 @@ migrator.registerMigration("v6_example_backfill") { db in
 
 ### Integrity checks
 
-`Archive.checkIntegrity(level:)` runs on launch (quick) and from Settings ▸ Advanced ▸ "Check archive" (full). Results go to `backglance.log` and, on failure, to a non-modal banner offering "Rebuild search index" and "Reveal archive in Finder".
+`Archive.checkIntegrity(level:)` runs on launch (quick) and from Settings ▸ Advanced ▸ "Check archive" (full). It reports a failed check as a *value* — `ArchiveHealth.ok == false` with messages — and throws `ArchiveError.integrityCheckFailed` only when the check could not be run at all. Results go to `backglance.log` and, on failure, to a non-modal banner offering "Rebuild search index" and "Reveal archive in Finder".
 
 ```swift
 import GRDB
 
-extension Archive {
-    public enum IntegrityLevel { case quick, full }
-    public struct IntegrityReport: Sendable { public var ok: Bool; public var messages: [String] }
+public struct ArchiveHealth: Sendable {
+    public enum Level: Sendable { case quick, full }
+    public let ok: Bool
+    public let messages: [String]
+}
 
-    public func checkIntegrity(level: IntegrityLevel) throws -> IntegrityReport {
-        try pool.read { db in
-            let sql = level == .quick ? "PRAGMA quick_check" : "PRAGMA integrity_check"
-            let rows = try String.fetchAll(db, sql: sql)
-            let fk = try Row.fetchAll(db, sql: "PRAGMA foreign_key_check")
-            var messages = rows.filter { $0 != "ok" }
-            if !fk.isEmpty { messages.append("foreign_key_check: \(fk.count) violation(s)") }
-            // FTS self-check: compares index against content table.
+extension Archive {
+    public func checkIntegrity(level: ArchiveHealth.Level) throws -> ArchiveHealth {
+        do {
+            // Read-only checks share one snapshot.
+            var messages = try pool.read { db -> [String] in
+                let sql = level == .quick ? "PRAGMA quick_check" : "PRAGMA integrity_check"
+                let rows = try String.fetchAll(db, sql: sql)
+                var messages = rows.filter { $0 != "ok" }
+                let fk = try Row.fetchAll(db, sql: "PRAGMA foreign_key_check")
+                if !fk.isEmpty { messages.append("foreign_key_check: \(fk.count) violation(s)") }
+                return messages
+            }
+
+            // FTS self-check: compares index against content table. Needs a
+            // write-capable connection — see the note below.
             do {
-                try db.execute(sql: "INSERT INTO notifications_fts(notifications_fts, rank) VALUES ('integrity-check', 1)")
+                try pool.write { db in
+                    try db.execute(sql: "INSERT INTO notifications_fts(notifications_fts, rank) VALUES ('integrity-check', 1)")
+                }
             } catch {
                 messages.append("fts integrity-check failed: \(error)")
             }
-            return IntegrityReport(ok: messages.isEmpty, messages: messages)
+
+            return ArchiveHealth(ok: messages.isEmpty, messages: messages)
+        } catch {
+            throw ArchiveError.integrityCheckFailed(String(describing: error))
         }
     }
 }
 ```
+
+> ⚠️ **Warning:** The FTS check cannot live inside `pool.read`. SQLite treats `INSERT INTO notifications_fts(notifications_fts, rank) VALUES ('integrity-check', 1)` as a write against the virtual table — the `xUpdate` hook fires even though nothing is persisted — and GRDB's read access (a `DatabasePool` reader opened `SQLITE_OPEN_READONLY`, or a `DatabaseQueue` read under `PRAGMA query_only`) refuses it with "attempt to write a readonly database". Folding the four checks back into one `pool.read` makes a healthy archive report itself unhealthy. The cost of the split is a moment of the single writer lock on a diagnostic call, and the two blocks not sharing one snapshot — acceptable, because a health check does not need snapshot isolation across its own checks.
+
+> ℹ️ **Info:** The result type is named `ArchiveHealth`, with `Level` nested inside it — that is the name the code, the UI banner and [ARCHITECTURE.md](ARCHITECTURE.md#error-handling-patterns) use. Earlier drafts of this document called it `IntegrityReport` with a separate `IntegrityLevel`.
 
 | Check | When | Cost at 100k notifications |
 |---|---|---|

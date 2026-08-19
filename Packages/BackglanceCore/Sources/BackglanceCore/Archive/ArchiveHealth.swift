@@ -6,11 +6,11 @@ import GRDB
 /// The result of `Archive.checkIntegrity(level:)`.
 ///
 /// docs/architecture/ARCHITECTURE.md#error-handling-patterns names this the surfaced
-/// type — the timeline shows a non-modal banner built from it. The reference snippet
-/// in docs/architecture/DATABASE_SCHEMA.md#integrity-checks calls the same shape
-/// `IntegrityReport`; `ArchiveHealth` is the name that won, because it is the one the
-/// rest of the codebase and the UI banner already use. Do not "fix" this file back to
-/// `IntegrityReport` — that would just re-introduce the mismatch the doc predicts.
+/// type — the timeline shows a non-modal banner built from it. Early drafts of
+/// docs/architecture/DATABASE_SCHEMA.md#integrity-checks called the same shape
+/// `IntegrityReport` with a separate `IntegrityLevel`; `ArchiveHealth` with a nested
+/// `Level` is the name that won, and both documents now say so. Do not "fix" this
+/// file back to `IntegrityReport`.
 ///
 /// A failed check is a *value*, not a thrown error: `ok == false` with an explanatory
 /// message is an expected outcome of running the check, in the same sense that
@@ -76,8 +76,8 @@ public extension Archive {
     ///    message — it is a finding, not a reason to abort the other checks.
     /// 4. ``ArchiveHealth/ok`` is `messages.isEmpty`.
     ///
-    /// > Note: docs/architecture/DATABASE_SCHEMA.md#integrity-checks shows all four
-    /// > checks inside one `pool.read`. That does not run: SQLite treats the FTS5
+    /// > Note: the FTS check runs in its own `pool.write`, and cannot be folded back
+    /// > into the read alongside the other three. SQLite treats the FTS5
     /// > `'integrity-check'` special command as an INSERT against the virtual table
     /// > (its `xUpdate` hook fires even though nothing is persisted), and GRDB's read
     /// > access — a `DatabasePool` reader opened `SQLITE_OPEN_READONLY`, or a
