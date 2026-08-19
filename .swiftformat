@@ -8,7 +8,7 @@
 --binarygrouping 4,8
 --closingparen balanced
 --commas always
---decimalgrouping 3,6
+--decimalgrouping 3,4   # 4 digits, not 6: swiftlint number_separator wants a separator from 1_000 up
 --elseposition same-line
 --empty void
 --exponentcase lowercase
