@@ -15,7 +15,11 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OS_MAJOR=""; HYGIENE_ONLY=0; LIVE=0
 
 usage() {
-  echo "usage: verify_fixture.sh --os <major> [--hygiene-only] | --live"
+  cat <<'EOF'
+usage: verify_fixture.sh --os <major> [--hygiene-only]
+       verify_fixture.sh <path/to/store.db>          # hygiene only, for the pre-commit hook
+       verify_fixture.sh --live                      # report this Mac's own store fingerprint
+EOF
 }
 
 while [[ $# -gt 0 ]]; do
@@ -24,6 +28,13 @@ while [[ $# -gt 0 ]]; do
     --hygiene-only) HYGIENE_ONLY=1; shift ;;
     --live) LIVE=1; shift ;;
     -h|--help) usage; exit 0 ;;
+    # A bare path is how Scripts/hooks/pre-commit calls this: it is about to commit a
+    # fixture and wants the synthetic-data check, not the whole verification.
+    /*|./*|Tests/*)
+      OS_MAJOR="$(basename "$(dirname "$1")" | sed -E 's/^macOS//')"
+      HYGIENE_ONLY=1
+      shift
+      ;;
     *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
@@ -82,15 +93,26 @@ trap 'rm -f "$TEXT_DUMP"' EXIT
 # plists, so the database's own printable strings are scanned too.
 { cat "$DIR/expected.json"; strings -n 6 "$DIR/store.db"; } > "$TEXT_DUMP"
 
-if grep -Eio '[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}' "$TEXT_DUMP" \
-    | grep -Eiv '@(example\.(com|org|net)|[a-z0-9-]+\.example)$' | grep -q .; then
+# Addresses: anything whose domain is not an example.* one. The match is tested for
+# "example." rather than anchored, because a match taken out of a binary plist has the
+# next field's bytes glued to it — the check has to survive that or it cries wolf on every
+# fixture. The shape is strict (a real TLD) so that binary noise like "x@bplist00" is not
+# mistaken for an address.
+if grep -Eio '[A-Z0-9._%+-]{2,}@[A-Z0-9-]+(\.[A-Z0-9-]+)*\.[A-Z]{2,}' "$TEXT_DUMP" \
+    | grep -vi 'example\.' | grep -q .; then
   echo "hygiene   FAIL: email address outside the example.* domains"; FAIL=1
 fi
 
-# Phone-shaped runs outside the +1 555 01xx block reserved for fiction.
-if grep -Eo '\+?[0-9][0-9 ().-]{6,}[0-9]' "$TEXT_DUMP" \
-    | grep -Ev '555[ .-]?01[0-9]{2}$' | grep -Ev '^[0-9]{10,}$' | grep -q .; then
-  echo "hygiene   FAIL: phone-number-like text outside the +1 555 01xx range"; FAIL=1
+# Phone-shaped runs, in the human-readable fields only. Raw bytes and JSON numbers are
+# full of digit runs — UUIDs, epochs, row ids — and flagging those would make this check
+# noise nobody reads. A store copied from a real Mac is caught by the address, path and
+# iCloud rules, which do scan the binary.
+if command -v jq > /dev/null 2>&1; then
+  if jq -r '.notifications[] | [.title, .subtitle, .body, .sender] | map(select(. != null)) | join(" ")' \
+      "$DIR/expected.json" \
+      | grep -Eo '\+?[0-9][0-9 ().-]{6,}[0-9]' | grep -Ev '555[ .-]?01[0-9]{2}$' | grep -q .; then
+    echo "hygiene   FAIL: phone-number-like text outside the +1 555 01xx range"; FAIL=1
+  fi
 fi
 
 # Code-shaped text is only allowed in records the generator marked as its own.
@@ -151,10 +173,24 @@ fi
 # Deliberately not `presented` or `app_id`: those are also the archive's own column
 # names and ordinary domain words, and a rule that cries wolf gets switched off.
 STORE_COLUMNS='rec_id|delivered_date|request_date|request_last_date|snooze_fire_date'
+# Comments are exempt, and so is FixtureGenerator: explaining the boundary is not
+# crossing it, and the generator's whole job is to write a store-shaped database. What the
+# rule is actually looking for is a column name reaching live code that has no business
+# knowing it.
 LEAKS="$(grep -REn "\b(${STORE_COLUMNS})\b" \
   --include='*.swift' \
-  "$REPO_ROOT/Packages" "$REPO_ROOT/Backglance" 2>/dev/null \
-  | grep -v '/Adapters/' | grep -v '/Parsing/' | grep -v '/\.build/' || true)"
+  "$REPO_ROOT/Packages" "$REPO_ROOT/Backglance" 2> /dev/null \
+  | grep -v '/Adapters/' | grep -v '/Parsing/' | grep -v '/FixtureGenerator/' | grep -v '/\.build/' \
+  | awk -v pat="${STORE_COLUMNS}" '
+      {
+        rest = substr($0, index($0, ":") + 1)
+        code = substr(rest, index(rest, ":") + 1)
+        sub(/\/\/.*/, "", code)
+        sub(/--.*/, "", code)
+        # POSIX awk has no word-boundary escape, so the boundary is spelled out here.
+        # Without it, store_rec_id — a column of the archive, not of the store — matches.
+        if (code ~ "(^|[^A-Za-z0-9_])(" pat ")([^A-Za-z0-9_]|$)") { print }
+      }' || true)"
 if [[ -n "$LEAKS" ]]; then
   echo "columns   FAIL: store column names outside Adapters/ and Parsing/:" >&2
   echo "$LEAKS" >&2
@@ -165,6 +201,17 @@ echo "columns   OK"
 # ---- 5. The fixture parses the way expected.json says. ----
 # The package's own test target rather than `xcodebuild test`: the fixture harness needs no
 # app bundle, and running it this way works on a machine with no signing identity.
-swift test --package-path "$REPO_ROOT/Packages/BackglanceCapture" \
-  --filter "FixtureMacOS${OS_MAJOR}Tests" 2>&1 | tail -n 5
-echo "fixture   macOS${OS_MAJOR} OK"
+TEST_LOG="$(mktemp)"
+trap 'rm -f "$TEXT_DUMP" "$TEST_LOG"' EXIT
+if ! swift test --package-path "$REPO_ROOT/Packages/BackglanceCapture" \
+    --filter "FixtureMacOS${OS_MAJOR}Tests" > "$TEST_LOG" 2>&1; then
+  tail -n 20 "$TEST_LOG" >&2
+  echo "fixture   macOS${OS_MAJOR} FAILED" >&2
+  exit 1
+fi
+# A filter that matches nothing exits 0 and proves nothing — the harness has to have run.
+if ! grep -Eq "Executed [1-9][0-9]* tests?" "$TEST_LOG"; then
+  echo "fixture   FAIL: no FixtureMacOS${OS_MAJOR}Tests ran (is the harness written?)" >&2
+  exit 1
+fi
+echo "fixture   macOS${OS_MAJOR} OK ($(grep -Eo 'Executed [0-9]+ tests?' "$TEST_LOG" | head -1))"

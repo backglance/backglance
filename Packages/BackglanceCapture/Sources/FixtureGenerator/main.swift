@@ -35,6 +35,11 @@ struct Arguments {
     var records: Int?
     var build: String
 
+    /// Overrides the manifest's `notes`. The default claims the schema was captured with
+    /// `sqlite3 .schema` on that macOS, which is only true when it was — a fixture built
+    /// from a reconstructed schema has to say so.
+    var notes: String?
+
     static func parse(_ arguments: [String]) throws -> Arguments {
         var values: [String: String] = [:]
         var flags: Set<String> = []
@@ -76,7 +81,8 @@ struct Arguments {
                 sourceManifestURL: nil,
                 seed: nil,
                 records: nil,
-                build: "unknown"
+                build: "unknown",
+                notes: nil
             )
         }
 
@@ -88,7 +94,8 @@ struct Arguments {
             sourceManifestURL: values["source-manifest"].map { URL(fileURLWithPath: $0) },
             seed: values["seed"].flatMap { UInt64($0) },
             records: values["records"].flatMap { Int($0) },
-            build: values["build"] ?? "unknown"
+            build: values["build"] ?? "unknown",
+            notes: values["notes"]
         )
     }
 }
@@ -109,7 +116,8 @@ enum GeneratorError: Error, CustomStringConvertible {
 
             usage: FixtureGenerator --os <major> --db <store.db> --expected <expected.json> \
             --manifest <manifest.json> [--source-manifest <manifest.json>] [--seed <int>] \
-            [--records <n>] [--build <build>]
+            [--records <n>] [--build <build>] [--notes <text>]
+                   FixtureGenerator --print-fingerprint --db <store.db>
             """
 
         case let .noAdapter(major):
@@ -226,7 +234,7 @@ do {
         adapterID: adapter.adapterID,
         seed: seed,
         recordCount: notifications.count,
-        notes: source?.notes ?? """
+        notes: arguments.notes ?? source?.notes ?? """
         Synthetic. Schema captured with sqlite3 .schema on macOS \(arguments.osMajor); \
         all rows generated from the seed. Never a copy of a real store.
         """

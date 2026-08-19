@@ -11,7 +11,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OS_MAJOR=""; FROM=""; SEED=""; RECORDS=""; CAPTURE_SCHEMA=0
+OS_MAJOR=""; FROM=""; SEED=""; RECORDS=""; CAPTURE_SCHEMA=0; BUILD=""; NOTES=""
 
 usage() {
   cat <<'EOF'
@@ -21,6 +21,9 @@ usage: make_fixture.sh --os <major> [--from <major>] [--seed <int>] [--records <
   --seed            RNG seed (default: the source manifest's, else 20260817)
   --records         records to generate (default: the source manifest's, else 250)
   --capture-schema  refresh Scripts/fixtures/schema_v<major>.sql from the live store's .schema (DDL only)
+  --build           build number to record (default: this machine's, which is only right
+                    if the schema was captured here)
+  --notes           manifest notes; must start with "Synthetic."
 EOF
 }
 
@@ -31,6 +34,8 @@ while [[ $# -gt 0 ]]; do
     --seed) SEED="$2"; shift 2 ;;
     --records) RECORDS="$2"; shift 2 ;;
     --capture-schema) CAPTURE_SCHEMA=1; shift ;;
+    --build) BUILD="$2"; shift 2 ;;
+    --notes) NOTES="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage; exit 2 ;;
   esac
@@ -88,8 +93,9 @@ GENERATOR_ARGS=(
   --db "$OUT_DIR/store.db"
   --expected "$OUT_DIR/expected.json"
   --manifest "$OUT_DIR/manifest.json"
-  --build "$(sw_vers -buildVersion)"
+  --build "${BUILD:-$(sw_vers -buildVersion)}"
 )
+[[ -n "$NOTES" ]] && GENERATOR_ARGS+=(--notes "$NOTES")
 [[ -f "$SRC_MANIFEST" ]] && GENERATOR_ARGS+=(--source-manifest "$SRC_MANIFEST")
 [[ -n "$SEED" ]] && GENERATOR_ARGS+=(--seed "$SEED")
 [[ -n "$RECORDS" ]] && GENERATOR_ARGS+=(--records "$RECORDS")
