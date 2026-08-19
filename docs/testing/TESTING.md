@@ -565,9 +565,9 @@ Rules for fixture tests:
 
 ## Parser fuzz tests
 
-`RecordParser` decodes a binary plist that Apple never promised us. It must be impossible to crash it with a store record — corrupt, truncated, oversized, or simply from a macOS we have not seen. Every failure is a thrown `RecordParser.ParseError`; a crash on parse would take the whole menu bar app down on every poll.
+`RecordParser` decodes a binary plist that Apple never promised us. It must be impossible to crash it with a store record — corrupt, truncated, oversized, or simply from a macOS we have not seen. Every failure is a thrown `CaptureError.parseFailed(recID:reason:)`; a crash on parse would take the whole menu bar app down on every poll, since the same record is read again on the next tick.
 
-`RecordParser.ParseError` carries a `key` (the plist key that was missing or wrong) and a `reasonCode` (`missingKey`, `wrongType`, `notAPlist`, `payloadTooLarge`, `nestingTooDeep`, `badDate`), never a value. The parser refuses payloads larger than 4 MB and dictionaries nested deeper than 32 levels before handing anything to `PropertyListSerialization`.
+The failure carries the `rec_id` and one of a small fixed set of reason strings — `not a property list`, `root is not a dictionary`, `empty payload`, `no delivered date`, and the `PlistGuard` shapes (`payload too large: N bytes`, `payload too deep: N`, `collection too large: N`, `string too long: N`) — never a value from the payload. The limits are `PlistGuard`'s (see [SECURITY.md](../security/SECURITY.md#hostile-store-content-the-plist-guard)): 64 KB per record, checked before anything is decoded, then depth 8, 512 entries per collection and 16 K characters per string on the decoded graph.
 
 The generator is a `SplitMix64` in `Tests/…/Support/SplitMix64.swift`, shared by the fuzz tests, the redaction tests, and (via a copy in `FixtureGenerator`) fixture generation:
 
@@ -647,12 +647,14 @@ final class RecordParserFuzzTests: XCTestCase {
         )
     }
 
-    /// Either succeeds or throws ParseError. Any other error type, or a crash, is a bug.
-    private func assertParsesOrThrowsParseError(_ data: Data, _ context: @autoclosure () -> String, file: StaticString = #filePath, line: UInt = #line) {
+    /// Either succeeds or throws CaptureError.parseFailed. Any other error type, or a crash, is a bug.
+    private func assertParsesOrFailsCleanly(_ data: Data, _ context: @autoclosure () -> String, file: StaticString = #filePath, line: UInt = #line) {
         do {
             _ = try parser.parse(raw(data))
-        } catch is RecordParser.ParseError {
-            // acceptable
+        } catch let error as CaptureError {
+            guard case .parseFailed = error else {
+                return XCTFail("\(context()): wrong CaptureError case", file: file, line: line)
+            }
         } catch {
             XCTFail("\(context()): unexpected error type \(type(of: error)): \(error)", file: file, line: line)
         }
@@ -686,7 +688,7 @@ final class RecordParserFuzzTests: XCTestCase {
                 let i = rng.int(below: bytes.count)
                 bytes[i] ^= UInt8(truncatingIfNeeded: rng.next() | 1)   // | 1 guarantees a change
             }
-            assertParsesOrThrowsParseError(Data(bytes), "flip iteration \(iteration)")
+            assertParsesOrFailsCleanly(Data(bytes), "flip iteration \(iteration)")
         }
     }
 
@@ -694,14 +696,14 @@ final class RecordParserFuzzTests: XCTestCase {
         var rng = SplitMix64(seed: 0x5EED_0002)
         let base = try validPlist(&rng)
         for length in 0..<base.count {
-            assertParsesOrThrowsParseError(base.prefix(length), "truncated to \(length) bytes")
+            assertParsesOrFailsCleanly(base.prefix(length), "truncated to \(length) bytes")
         }
         XCTAssertThrowsError(try parser.parse(raw(Data()))) { error in
-            XCTAssertEqual((error as? RecordParser.ParseError)?.reasonCode, .notAPlist)
+            XCTAssertEqual(reason(of: error), "not a property list")
         }
     }
 
-    func test_whenValuesHaveWrongTypes_thenThrowsParseErrorNotCrash() throws {
+    func test_whenValuesHaveWrongTypes_thenFailsCleanlyNotCrash() throws {
         let wrongTyped: [[String: Any]] = [
             ["app": 42, "date": "not a date", "req": ["titl": 1, "body": [1, 2, 3]]],
             ["app": "com.example.demo", "date": Date(), "req": "a string, not a dict"],
@@ -711,22 +713,25 @@ final class RecordParserFuzzTests: XCTestCase {
         ]
         for (i, dict) in wrongTyped.enumerated() {
             let data = try PropertyListSerialization.data(fromPropertyList: dict, format: .binary, options: 0)
-            assertParsesOrThrowsParseError(data, "wrong-typed case \(i)")
+            assertParsesOrFailsCleanly(data, "wrong-typed case \(i)")
         }
     }
 
-    func test_whenNestingIsAbsurdlyDeep_thenThrowsNestingTooDeep() throws {
+    func test_whenNestingPastTheGuardsLimit_thenThrowsTooDeep() throws {
+        // 12 levels: past PlistGuard's depth 8, but still something Foundation will decode.
+        // (At 2 000 levels PropertyListSerialization refuses first, with "not a property list" —
+        // two independent defences, and neither may be removed on the strength of the other.)
         var inner: Any = "leaf"
-        for _ in 0..<2_000 { inner = ["d": inner] }
+        for _ in 0..<12 { inner = ["d": inner] }
         let dict: [String: Any] = ["app": "com.example.demo", "date": Date(), "req": ["usda": inner]]
         let data = try PropertyListSerialization.data(fromPropertyList: dict, format: .binary, options: 0)
         XCTAssertThrowsError(try parser.parse(raw(data))) { error in
-            XCTAssertEqual((error as? RecordParser.ParseError)?.reasonCode, .nestingTooDeep)
+            XCTAssertEqual(reason(of: error), "payload too deep: 9")
         }
     }
 
     func test_whenPayloadIsTenMegabytes_thenThrowsPayloadTooLargeBeforeDecoding() throws {
-        // A 10 MB body inside an otherwise valid plist. The parser must reject on size, not try to decode.
+        // A 10 MB body inside an otherwise valid plist. The guard must reject on size, not try to decode.
         let big = String(repeating: "x", count: 10 * 1_024 * 1_024)
         let dict: [String: Any] = ["app": "com.example.demo", "date": Date(), "req": ["body": big]]
         let data = try PropertyListSerialization.data(fromPropertyList: dict, format: .binary, options: 0)
@@ -734,7 +739,7 @@ final class RecordParserFuzzTests: XCTestCase {
 
         let started = Date()
         XCTAssertThrowsError(try parser.parse(raw(data))) { error in
-            XCTAssertEqual((error as? RecordParser.ParseError)?.reasonCode, .payloadTooLarge)
+            XCTAssertEqual(reason(of: error), "payload too large: \(data.count) bytes")
         }
         XCTAssertLessThan(Date().timeIntervalSince(started), 0.05, "size check must happen before any decoding")
     }
@@ -745,7 +750,7 @@ final class RecordParserFuzzTests: XCTestCase {
             let length = rng.int(below: 512)
             var bytes = [UInt8](repeating: 0, count: length)
             for i in 0..<length { bytes[i] = UInt8(truncatingIfNeeded: rng.next()) }
-            assertParsesOrThrowsParseError(Data(bytes), "garbage iteration \(iteration)")
+            assertParsesOrFailsCleanly(Data(bytes), "garbage iteration \(iteration)")
         }
     }
 }
@@ -1392,7 +1397,7 @@ Go through this before pushing anything under `Tests/`:
 - [CI/CD](../deployment/CI_CD.md) — `ci.yml`, `fixtures.yml`, runners, secrets
 - [Performance Guide](../deployment/PERFORMANCE_GUIDE.md) — `XCTMetric` tests, budgets, nightly policy
 - [Deployment Guide](../deployment/DEPLOYMENT_GUIDE.md) — release checklist that depends on green fixtures
-- [Monitoring & Logging](../operations/MONITORING_LOGGING.md) — `no_content_in_logs`, `ParseError` logging
+- [Monitoring & Logging](../operations/MONITORING_LOGGING.md) — `no_content_in_logs`, parse-failure logging
 - [Security](../security/SECURITY.md) — threat model, why fixtures are synthetic
 - [Contributing](../contributing/CONTRIBUTING.md) — PR process, adapter guard, contributing a fixture
 - [Accessibility](../reference/ACCESSIBILITY.md) — identifiers the UI tests rely on
