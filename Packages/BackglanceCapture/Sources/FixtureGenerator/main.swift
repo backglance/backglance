@@ -18,6 +18,14 @@ let generatorVersion = "1.0.0"
 // MARK: - Arguments
 
 struct Arguments {
+    /// `--print-fingerprint --db <path>`: report a database's schema hash and stop.
+    ///
+    /// Exists so `Scripts/verify_fixture.sh` can check a fixture's manifest without
+    /// reimplementing ``StoreFingerprinter``'s normalization in bash. One space apart
+    /// would be a different hash, and a different hash reads as "macOS changed the
+    /// store" — so there is exactly one implementation, and the script calls it.
+    var printFingerprintOnly = false
+
     var osMajor: Int
     var databaseURL: URL
     var expectedURL: URL
@@ -29,13 +37,25 @@ struct Arguments {
 
     static func parse(_ arguments: [String]) throws -> Arguments {
         var values: [String: String] = [:]
+        var flags: Set<String> = []
         var index = 0
         while index < arguments.count {
             let key = arguments[index]
-            guard key.hasPrefix("--"), index + 1 < arguments.count else {
+            guard key.hasPrefix("--") else {
                 throw GeneratorError.usage("unexpected argument: \(key)")
             }
-            values[String(key.dropFirst(2))] = arguments[index + 1]
+            let name = String(key.dropFirst(2))
+
+            // The only boolean flag; everything else takes a value.
+            if name == "print-fingerprint" {
+                flags.insert(name)
+                index += 1
+                continue
+            }
+            guard index + 1 < arguments.count else {
+                throw GeneratorError.usage("--\(name) needs a value")
+            }
+            values[name] = arguments[index + 1]
             index += 2
         }
 
@@ -44,6 +64,20 @@ struct Arguments {
                 throw GeneratorError.usage("missing --\(name)")
             }
             return value
+        }
+
+        if flags.contains("print-fingerprint") {
+            return try Arguments(
+                printFingerprintOnly: true,
+                osMajor: 0,
+                databaseURL: URL(fileURLWithPath: required("db")),
+                expectedURL: URL(fileURLWithPath: "/dev/null"),
+                manifestURL: URL(fileURLWithPath: "/dev/null"),
+                sourceManifestURL: nil,
+                seed: nil,
+                records: nil,
+                build: "unknown"
+            )
         }
 
         return try Arguments(
@@ -139,6 +173,12 @@ func fingerprint(of url: URL) throws -> StoreFingerprint {
 
 do {
     let arguments = try Arguments.parse(Array(CommandLine.arguments.dropFirst()))
+
+    if arguments.printFingerprintOnly {
+        let computed = try fingerprint(of: arguments.databaseURL)
+        FileHandle.standardOutput.write(Data("\(computed.schemaHash) \(computed.dbinfoVersion ?? "-")\n".utf8))
+        exit(EXIT_SUCCESS)
+    }
 
     let source = arguments.sourceManifestURL
         .flatMap { try? Data(contentsOf: $0) }

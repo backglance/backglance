@@ -175,6 +175,20 @@ enum SeededContent {
         var email: String
         var code: String?
         var attachments: [GeneratedAttachment]
+
+        /// Marks a record whose body is OTP-shaped.
+        ///
+        /// `Scripts/verify_fixture.sh` refuses any code-looking text in a fixture that is
+        /// not marked, which is what stops a real verification code from ever being
+        /// committed — the marker is the generator saying "these digits are mine".
+        func markingOTP(_ userInfo: [String: String]) -> [String: String] {
+            guard code != nil else {
+                return userInfo
+            }
+            var marked = userInfo
+            marked["bg.fixture"] = "[synthetic-otp]"
+            return marked
+        }
     }
 
     private static let firstNames = ["Ada", "Grace", "Alan", "Katherine", "Linus", "Barbara", "Edsger", "Radia"]
@@ -248,7 +262,7 @@ enum SeededContent {
             category: "MessageReceived",
             deliveredAt: base.deliveredAt,
             presented: rng.int(below: 4) != 0,
-            userInfo: ["senderHandle": base.handle],
+            userInfo: base.markingOTP(["senderHandle": base.handle]),
             attachments: base.attachments
         )
     }
@@ -268,10 +282,10 @@ enum SeededContent {
             category: "NewMail",
             deliveredAt: base.deliveredAt,
             presented: rng.int(below: 3) != 0,
-            userInfo: [
+            userInfo: base.markingOTP([
                 "messageID": "<\(rng.uuid().uuidString.lowercased())@example.com>",
                 "from": base.email,
-            ],
+            ]),
             attachments: base.attachments
         )
     }
