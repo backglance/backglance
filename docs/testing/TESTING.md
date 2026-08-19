@@ -152,7 +152,7 @@ Tests/Fixtures/SystemStore/
 }
 ```
 
-`expected.json` is an array of objects with the `ParsedNotification` fields (`bundleID`, `uuid`, `title`, `subtitle`, `body`, `sender`, `threadID`, `category`, `deliveredAt` as Unix seconds, `presented`, `attachments`, `userInfo`) plus a trailing `cursor` object (`lastRecID`, `lastDeliveredDate`). Because generation is seeded, the same manifest always yields the same `store.db` and the same `expected.json`.
+`expected.json` is one object with two keys: `notifications`, an array of the `ParsedNotification` fields (`bundleID`, `uuid`, `title`, `subtitle`, `body`, `sender`, `threadID`, `category`, `deliveredAt` as Unix seconds, `presented`, `attachments`, `userInfo`), and `cursor` (`lastRecID`, `lastDeliveredDate`) — where a full read of the fixture must leave the cursor. Because generation is seeded, the same manifest always yields the same `store.db` and the same `expected.json`.
 
 ### Why fixtures are synthetic
 
