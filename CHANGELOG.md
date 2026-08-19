@@ -99,6 +99,19 @@ which macOS it is looking at, and keeps what it finds in its own database.
 - **Observability.** The nine `Log` categories behind a `RedactingLogger` whose API cannot be
   handed a notification, and `CaptureMetrics`, which counts what each tick did and nothing else
 
+### Fixed
+
+- `Scripts/bootstrap.sh` reads the Team ID from a signing certificate's `OU` field rather
+  than the ten characters in its common name, which name the developer and not the team.
+  With no certificate at all it now writes an ad-hoc signing configuration that still
+  builds, and it warns when an existing `Config/Local.xcconfig` names a team this Mac has
+  no certificate for
+- The test bundles find `Tests/Fixtures/` through `BackglanceTestSupport.Fixtures`, which
+  derives the path from its own source location. `Bundle.module` exists only in the
+  SwiftPM build of these sources, so the Xcode test targets the test plan runs could not
+  compile — `xcodebuild test -scheme Backglance -testPlan Backglance` now runs green, as
+  does `swift test` for each package
+
 ### Security
 
 - Excluded apps are checked against the store row before the payload is decoded, so their
