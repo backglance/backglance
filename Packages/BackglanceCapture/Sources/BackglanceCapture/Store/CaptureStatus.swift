@@ -33,6 +33,29 @@ public enum CaptureStatus: Sendable, Equatable {
     /// The engine has not been started, or has been stopped. The resting state before
     /// `start()` and after `stop()`.
     case stopped
+
+    // MARK: Public
+
+    /// Safe for the file log and `os_log` with `privacy: .public`.
+    ///
+    /// A pause's end time is a wall-clock date the user chose from a menu, not anything
+    /// derived from a notification, so it is safe to log; ``degraded(_:)`` defers to
+    /// ``DegradedReason/logDescription``, which is content-free by construction.
+    public var logDescription: String {
+        switch self {
+        case .running:
+            "running"
+
+        case let .paused(until):
+            until.map { "paused until \($0.timeIntervalSince1970)" } ?? "paused indefinitely"
+
+        case let .degraded(reason):
+            "degraded: \(reason.logDescription)"
+
+        case .stopped:
+            "stopped"
+        }
+    }
 }
 
 // MARK: - DegradedReason

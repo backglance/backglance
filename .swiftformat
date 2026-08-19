@@ -24,7 +24,7 @@
 --lifecycle
 --linebreaks lf
 --maxwidth 120
---modifierorder
+--modifierorder nonisolated,override,acl,setterACL,dynamic,mutators,lazy,final,required,convenience,typeMethods,owned
 --nospaceoperators
 --nowrapoperators
 --octalgrouping 4,8
