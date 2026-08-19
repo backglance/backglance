@@ -125,6 +125,19 @@ public actor CaptureEngine {
 
     // MARK: Internal
 
+    let archive: Archive
+    let logger = Logger(subsystem: "app.backglance.Backglance", category: "capture")
+
+    /// The adapter reads go through, or `nil` while degraded.
+    var currentAdapter: (any StoreAdapter)? {
+        adapter
+    }
+
+    /// The store's path, as this engine resolves it.
+    func storeURL() throws -> URL {
+        try storeLocation()
+    }
+
     /// Resolves everything a tick needs, or records why it could not.
     ///
     /// Every failure here is a *state*, never an error thrown at a caller: a missing
@@ -226,27 +239,6 @@ public actor CaptureEngine {
         logger.debug("status: \(newStatus.logDescription, privacy: .public)")
     }
 
-    // MARK: Private
-
-    private let archive: Archive
-    private let exclusions: any AppExclusionList
-    private let redactor: any NotificationRedactor
-    private let enrichment: any NotificationEnricher
-    private let storeLocation: @Sendable () throws -> URL
-    private let parser = RecordParser()
-    private let watcher: StoreWatcher
-    private let logger = Logger(subsystem: "app.backglance.Backglance", category: "capture")
-    private let statusContinuation: AsyncStream<CaptureStatus>.Continuation
-
-    /// The task consuming ``StoreWatcher/wakes``. Its presence is what "started" means.
-    private var loopTask: Task<Void, Never>?
-
-    /// The adapter reads go through, set by ``bootstrap()``.
-    private var adapter: (any StoreAdapter)?
-
-    /// How far the archive has read. Loaded here, advanced by ticks.
-    private var cursor: StoreCursor = .start
-
     /// Parse, exclude, redact, enrich, insert — for one record.
     ///
     /// The order is the privacy model, not a preference:
@@ -263,7 +255,7 @@ public actor CaptureEngine {
     ///
     /// One record's failure never stops the batch, and never reaches the user: it is
     /// counted, and logged by `rec_id` and a fixed reason.
-    private func archiveOne(_ raw: RawStoreRecord, source: ArchivedNotification.Source) async -> ArchiveOutcome {
+    func archiveOne(_ raw: RawStoreRecord, source: ArchivedNotification.Source) async -> ArchiveOutcome {
         guard exclusions.allows(raw.appIdentifier) else {
             return .excluded
         }
@@ -309,6 +301,25 @@ public actor CaptureEngine {
             return .failed
         }
     }
+
+    // MARK: Private
+
+    private let exclusions: any AppExclusionList
+    private let redactor: any NotificationRedactor
+    private let enrichment: any NotificationEnricher
+    private let storeLocation: @Sendable () throws -> URL
+    private let parser = RecordParser()
+    private let watcher: StoreWatcher
+    private let statusContinuation: AsyncStream<CaptureStatus>.Continuation
+
+    /// The task consuming ``StoreWatcher/wakes``. Its presence is what "started" means.
+    private var loopTask: Task<Void, Never>?
+
+    /// The adapter reads go through, set by ``bootstrap()``.
+    private var adapter: (any StoreAdapter)?
+
+    /// How far the archive has read. Loaded here, advanced by ticks.
+    private var cursor: StoreCursor = .start
 
     /// One batch of records newer than the cursor, read from a fresh snapshot.
     ///
