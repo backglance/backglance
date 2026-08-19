@@ -554,7 +554,7 @@ The `LIMIT 500` is not optional. It bounds memory per tick, lets import report p
 
 ### RecordParser
 
-`record.data` is a binary property list. The keys are undocumented and abbreviated; the parser reads with tolerant fallbacks and treats absence as `nil`, never as an error. Only two things fail a parse: data that is not a plist at all, and a plist with no text and no attachments (nothing to show).
+`record.data` is a binary property list. The keys are undocumented and abbreviated; the parser reads with tolerant fallbacks and treats absence as `nil`, never as an error. Three things fail a parse: data that is not a plist at all, a plist with no text and no attachments (nothing to show), and one with no usable date anywhere (nothing to place on a timeline).
 
 ```swift
 // Packages/BackglanceCapture/Sources/BackglanceCapture/RecordParser.swift
@@ -593,8 +593,12 @@ public struct RecordParser: Sendable {
             throw CaptureError.parseFailed(recID: raw.recID, reason: "empty payload")
         }
 
-        // Preference order: the row's delivered_date, the plist `date`, the request date, now.
-        let deliveredAt = raw.deliveredDate ?? Self.date(root["date"]) ?? raw.requestDate ?? Date()
+        // Preference order: the row's delivered_date, the plist `date`, the request date.
+        // There is no fallback to `Date()`: an invented timestamp files the notification
+        // under the wrong day permanently, and a timeline is only useful if its order is real.
+        guard let deliveredAt = raw.deliveredDate ?? Self.date(root["date"]) ?? raw.requestDate else {
+            throw CaptureError.parseFailed(recID: raw.recID, reason: "no delivered date")
+        }
 
         return ParsedNotification(
             bundleID: bundleID,
@@ -638,7 +642,6 @@ public struct RecordParser: Sendable {
             switch raw {
             case let s as String: out[key] = s
             case let n as NSNumber: out[key] = n.stringValue
-            case let u as URL: out[key] = u.absoluteString
             default: continue
             }
         }
