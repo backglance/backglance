@@ -431,7 +431,7 @@ Models, the archive, migrations, retention, redaction, rules, digests, away sess
 
 ### `Archive`
 
-**Purpose.** The one door to `archive.sqlite`. Wraps a `DatabasePool` (WAL, `0600`, directory `0700`), runs migrations `v1_initial` … `v5_sync_metadata`, and offers typed reads/writes. **Stability: Stable** for `read`/`write`/`insert`/`upsertApp`/lookup methods; `pool` **Evolving** (exposed for `ValueObservation` and streaming reads).
+**Purpose.** The one door to `archive.sqlite`. Wraps a GRDB `DatabaseWriter` — a `DatabasePool` on disk (WAL, `0600`, directory `0700`), a `DatabaseQueue` in memory for tests — runs migrations `v1_initial` … `v5_sync_metadata`, and offers typed reads/writes. **Stability: Stable** for `read`/`write`/`insert`/`upsertApp`/lookup methods; `pool` **Evolving** (exposed for `ValueObservation` and streaming reads).
 
 ```swift
 public final class Archive: Sendable {
@@ -439,7 +439,8 @@ public final class Archive: Sendable {
     public init(inMemory: Bool) throws                    // full migration chain against :memory:
     public init(path: String) throws
 
-    public let pool: DatabasePool
+    /// `DatabasePool` on disk, `DatabaseQueue` in memory (tests). Both are `DatabaseWriter`.
+    public var pool: any DatabaseWriter
 
     // Generic access
     public func read<T: Sendable>(_ body: @Sendable (Database) throws -> T) async throws -> T
@@ -464,7 +465,9 @@ public final class Archive: Sendable {
 }
 ```
 
-**Isolation.** `Sendable`; call from any actor. Async `read`/`write` are non-blocking; the synchronous variants (`insert`, `upsertApp`, `notification(id:)`) are meant for the capture actor and tests. `pool.read` snapshots are consistent even while capture inserts.
+**Isolation.** `Sendable`; call from any actor. Async `read`/`write` are non-blocking; the synchronous variants (`insert`, `upsertApp`, `notification(id:)`) are meant for the capture actor and tests. On disk, where `pool` is a `DatabasePool`, `pool.read` snapshots are consistent even while capture inserts; in-memory it is a `DatabaseQueue`, which serialises reads against writes instead — same code path, no WAL.
+
+> ℹ️ **Info:** `pool` is typed `any DatabaseWriter`, not `DatabasePool`, so the in-memory `DatabaseQueue` behind `Archive(inMemory:)` and the on-disk `DatabasePool` share one code path. Every `Archive` method goes through `pool.read { }` / `pool.write { }`, which both types provide. See [DATABASE_SCHEMA.md](../architecture/DATABASE_SCHEMA.md#migration-strategy).
 
 **Errors.** `ArchiveError`: `.openFailed`, `.migrationFailed`, `.duplicate` (uuid or `store_rec_id` already archived), `.insertFailed`, `.integrityCheckFailed`, `.observationFailed`, `.wipeIncomplete`, plus `.unavailable` while a wipe or migration holds the pool. GRDB `DatabaseError` from custom `read`/`write` bodies passes through unchanged.
 
