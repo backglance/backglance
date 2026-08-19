@@ -99,25 +99,46 @@ final class CaptureEnginePipelineTests: XCTestCase {
         XCTAssertEqual(cursor.lastRecID, 3, "the cursor must move past a record that will not parse")
     }
 
-    /// The import and live capture overlap by design; the unique index on `store_rec_id`
-    /// is what makes a re-read cost nothing.
-    func testARecordAlreadyArchivedIsNotArchivedTwice() async throws {
+    /// The import and live capture overlap by design; matching on `store_rec_id` is what
+    /// makes the overlap cost nothing.
+    func testARowLiveCaptureAlreadyArchivedIsADuplicateForTheImport() async throws {
         let archive = try XCTUnwrap(archive)
-        let sharedUUID = Data(UUID().rawBytes)
-        var first = MiniatureStore.notification(recID: 1)
-        first.uuidBlob = sharedUUID
-        var repeated = MiniatureStore.notification(recID: 2)
-        repeated.uuidBlob = sharedUUID
-        try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: [first, repeated])
+        try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: [
+            MiniatureStore.notification(recID: 1),
+            MiniatureStore.notification(recID: 2),
+        ])
+        let engine = try makeEngine()
+        await engine.start()
+        await engine.tick(reason: .manual)
+
+        let summary = try await engine.importExisting()
+
+        let count = try await archive.pool.read { db in try ArchivedNotification.fetchCount(db) }
+        XCTAssertEqual(count, 2)
+        XCTAssertEqual(summary.archived, 0)
+        XCTAssertEqual(summary.duplicates, 2)
+    }
+
+    /// The store rewrites rows in place: Messages replaces a conversation's banner under
+    /// a new rec_id but the same uuid. That is one notification, refreshed — not two.
+    func testAThreadUpdateRefreshesTheRowRatherThanAddingOne() async throws {
+        let archive = try XCTUnwrap(archive)
+        let storeURL = try XCTUnwrap(storeURL)
+        let uuid = Data(UUID().rawBytes)
+        var first = MiniatureStore.notification(recID: 1, body: "One message")
+        first.uuidBlob = uuid
+        var rewritten = MiniatureStore.notification(recID: 2, body: "Two messages")
+        rewritten.uuidBlob = uuid
+        try MiniatureStore.makeFile(at: storeURL, rows: [first, rewritten])
         let engine = try makeEngine()
 
         await engine.start()
         await engine.tick(reason: .manual)
 
-        let count = try await archive.pool.read { db in try ArchivedNotification.fetchCount(db) }
-        let archived = await engine.recordsArchived
-        XCTAssertEqual(count, 1)
-        XCTAssertEqual(archived, 1)
+        let stored = try await archive.pool.read { db in try ArchivedNotification.fetchAll(db) }
+        XCTAssertEqual(stored.count, 1)
+        XCTAssertEqual(stored.first?.body, "Two messages")
+        XCTAssertEqual(stored.first?.storeRecId, 2)
     }
 
     // MARK: - Exclusion

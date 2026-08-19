@@ -225,8 +225,15 @@ public actor CaptureEngine {
 
             var archived = 0
             for raw in batch {
-                if await archiveOne(raw, source: .live) == .archived {
+                switch await archiveOne(raw, source: .live) {
+                case .archived,
+                     .updated:
                     archived += 1
+
+                case .excluded,
+                     .duplicate,
+                     .failed:
+                    break
                 }
                 cursor = adapter.cursor(for: raw)
             }
@@ -303,7 +310,7 @@ public actor CaptureEngine {
                 return .failed
             }
 
-            try archive.insert(
+            let outcome = try archive.insertOrUpdate(
                 ArchivedNotification(
                     parsed: enriched,
                     appID: appID,
@@ -313,7 +320,17 @@ public actor CaptureEngine {
                 ),
                 redaction: redaction
             )
-            return .archived
+
+            switch outcome {
+            case .inserted:
+                return .archived
+
+            case .updated:
+                return .updated
+
+            case .duplicate:
+                return .duplicate
+            }
         } catch ArchiveError.duplicate {
             // The import and live capture overlapping. Expected, and not worth a line.
             return .duplicate

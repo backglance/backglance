@@ -84,7 +84,10 @@ public extension Archive {
 
 // MARK: - Building blocks
 
-private extension Archive {
+/// Internal rather than private: ``Archive/insertOrUpdate(_:redaction:)`` in
+/// `Archive+Upsert.swift` needs the same app bookkeeping and the same "already have this
+/// one" test, and two copies of either would be two places to get it wrong.
+extension Archive {
     /// The `apps` upsert, scoped to an existing transaction.
     static func upsertApp(
         _ db: Database,

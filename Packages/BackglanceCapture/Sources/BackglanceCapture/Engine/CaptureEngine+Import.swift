@@ -122,7 +122,8 @@ public extension CaptureEngine {
 
             for raw in batch {
                 switch await archiveOne(raw, source: .imports) {
-                case .archived:
+                case .archived,
+                     .updated:
                     summary.archived += 1
 
                 case .duplicate:

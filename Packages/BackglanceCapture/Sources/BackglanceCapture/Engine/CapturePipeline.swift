@@ -103,8 +103,12 @@ public struct NoEnrichment: NotificationEnricher {
 /// would not be — and would be forty chances to interpolate something that should not be
 /// there.
 public enum ArchiveOutcome: Sendable, Equatable {
-    /// Written to the archive.
+    /// Written to the archive as a new row.
     case archived
+
+    /// The store re-delivered a notification the archive already had — a thread update —
+    /// and the existing row was refreshed in place.
+    case updated
 
     /// The app is excluded. The payload was never decoded.
     case excluded
