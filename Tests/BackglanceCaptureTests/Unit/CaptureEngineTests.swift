@@ -21,7 +21,8 @@ final class CaptureEngineTests: XCTestCase {
         self.archive = archive
         self.directory = directory
         self.watcher = watcher
-        engine = CaptureEngine(archive: archive, watcher: watcher)
+        storeURL = directory.appendingPathComponent("db")
+        engine = Self.makeEngine(archive: archive, watcher: watcher, storeURL: directory.appendingPathComponent("db"))
     }
 
     override func tearDownWithError() throws {
@@ -88,6 +89,78 @@ final class CaptureEngineTests: XCTestCase {
         try await Self.waitUntil { await engine.lastWake == .manual }
     }
 
+    // MARK: - Bootstrap
+
+    /// The ordinary case: a store that reads, an adapter that probes clean, and the
+    /// bookkeeping a later run resumes from.
+    func testStartingOnAReadableStoreRunsAndRecordsWhatItResolved() async throws {
+        let engine = try XCTUnwrap(engine)
+        let archive = try XCTUnwrap(archive)
+        try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: MiniatureStore.rows(3))
+
+        await engine.start()
+
+        let status = await engine.status
+        let adapterID = await engine.adapterID
+        XCTAssertEqual(status, .running)
+        XCTAssertEqual(adapterID, Self.adapterForThisMac)
+        try XCTAssertEqual(archive.adapterID(), Self.adapterForThisMac)
+        try XCTAssertNotNil(archive.loadFingerprint())
+    }
+
+    /// A fresh user account, where `usernoted` has not created its database yet. The
+    /// engine says so and stays alive rather than failing to launch.
+    func testAMissingStoreDegradesRatherThanThrowing() async throws {
+        let engine = try XCTUnwrap(engine)
+
+        await engine.start()
+
+        let status = await engine.status
+        XCTAssertEqual(status, .degraded(.storeNotFound))
+    }
+
+    /// The macOS-changed-the-store case. Capture stops; the archive is untouched.
+    func testAStoreNoAdapterUnderstandsDegradesWithItsFingerprint() async throws {
+        let engine = try XCTUnwrap(engine)
+        let archive = try XCTUnwrap(archive)
+        try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), droppingTables: ["record", "app"])
+
+        await engine.start()
+
+        let status = await engine.status
+        let adapterID = await engine.adapterID
+        guard case let .degraded(.unknownSchema(fingerprint)) = status else {
+            return XCTFail("expected .unknownSchema, got \(status.logDescription)")
+        }
+        XCTAssertNil(adapterID)
+        // Recorded even though nothing could read it: it is what a report needs to turn
+        // into the adapter that would.
+        try XCTAssertEqual(archive.loadFingerprint(), fingerprint)
+    }
+
+    /// Resumable state. A cursor from a previous run is where the next tick starts.
+    func testBootstrapResumesFromThePersistedCursor() async throws {
+        let engine = try XCTUnwrap(engine)
+        let archive = try XCTUnwrap(archive)
+        try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: MiniatureStore.rows(3))
+        try archive.saveCursor(StoreCursor(lastRecID: 2, lastDeliveredDate: MiniatureStore.delivered))
+
+        await engine.start()
+
+        let cursor = await engine.currentCursor
+        XCTAssertEqual(cursor.lastRecID, 2)
+    }
+
+    func testAFirstLaunchStartsFromTheBeginningOfTheStore() async throws {
+        let engine = try XCTUnwrap(engine)
+        try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: MiniatureStore.rows(1))
+
+        await engine.start()
+
+        let cursor = await engine.currentCursor
+        XCTAssertEqual(cursor, .start)
+    }
+
     // MARK: - Status
 
     func testEveryTransitionReachesTheStatusStream() async throws {
@@ -135,10 +208,29 @@ final class CaptureEngineTests: XCTestCase {
 
     // MARK: Private
 
+    /// Which adapter this Mac's macOS resolves to. Asserting "v26" outright would fail
+    /// on a macOS 14 runner for the right reason and the wrong test.
+    private static var adapterForThisMac: String? {
+        let fingerprint = StoreFingerprint(
+            schemaHash: String(repeating: "0", count: 64),
+            dbinfoVersion: nil,
+            osVersion: ProcessInfo.processInfo.operatingSystemVersion
+        )
+        return StoreAdapterRegistry.resolve(fingerprint: fingerprint)?.adapterID
+    }
+
     private var archive: Archive?
     private var watcher: StoreWatcher?
     private var engine: CaptureEngine?
     private var directory: URL?
+    private var storeURL: URL?
+
+    /// An engine pointed at a store the test owns. Nothing here ever resolves the real
+    /// system store — a test that read the developer's own notifications would be a
+    /// privacy bug in the test suite.
+    private static func makeEngine(archive: Archive, watcher: StoreWatcher, storeURL: URL) -> CaptureEngine {
+        CaptureEngine(archive: archive, watcher: watcher) { storeURL }
+    }
 
     private static func temporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory

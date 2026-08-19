@@ -28,9 +28,16 @@ public actor CaptureEngine {
     /// - Parameters:
     ///   - archive: where captured notifications and the capture state are written.
     ///   - watcher: the wake stream that drives the loop.
-    public init(archive: Archive, watcher: StoreWatcher) {
+    ///   - storeLocation: resolves the system store's path. Injected so tests can point
+    ///     the engine at a store they built, rather than at the machine's real one.
+    public init(
+        archive: Archive,
+        watcher: StoreWatcher,
+        storeLocation: @escaping @Sendable () throws -> URL = StoreLocation.current
+    ) {
         self.archive = archive
         self.watcher = watcher
+        self.storeLocation = storeLocation
         let (stream, continuation) = AsyncStream.makeStream(of: CaptureStatus.self)
         statusStream = stream
         statusContinuation = continuation
@@ -57,6 +64,14 @@ public actor CaptureEngine {
     /// The last wake the loop handled. Diagnostics, and what the tests observe.
     public private(set) var lastWake: WakeReason?
 
+    /// The adapter bootstrap chose, or `nil` while degraded. Diagnostics and tests.
+    public private(set) var adapterID: String?
+
+    /// How far capture has read. Settings shows its date; tests read it directly.
+    public var currentCursor: StoreCursor {
+        cursor
+    }
+
     /// Starts watching and consuming wakes.
     ///
     /// Idempotent: calling it twice does not start a second loop, because two consumers of
@@ -67,6 +82,7 @@ public actor CaptureEngine {
         }
 
         watcher.start()
+        bootstrapOrDegrade()
 
         // The stream is read once here rather than inside the task: two consumers of one
         // AsyncStream split the wakes between them, so there must only ever be one.
@@ -91,6 +107,24 @@ public actor CaptureEngine {
     }
 
     // MARK: Internal
+
+    /// Resolves everything a tick needs, or records why it could not.
+    ///
+    /// Every failure here is a *state*, never an error thrown at a caller: a missing
+    /// store, a revoked Full Disk Access grant and an unrecognised schema are all things
+    /// a person can fix — or that a macOS update can cause and a Backglance update can
+    /// fix — while the app keeps running on what it already captured. The engine stays
+    /// alive and retries on the next wake, which is what lets a user grant Full Disk
+    /// Access in System Settings and see capture resume without relaunching.
+    func bootstrapOrDegrade() {
+        do {
+            try bootstrap()
+        } catch let error as CaptureError {
+            transition(to: .degraded(error.degradedReason))
+        } catch {
+            transition(to: .degraded(.readError("\(type(of: error))")))
+        }
+    }
 
     /// Handles one wake.
     ///
@@ -117,10 +151,60 @@ public actor CaptureEngine {
     // MARK: Private
 
     private let archive: Archive
+    private let storeLocation: @Sendable () throws -> URL
     private let watcher: StoreWatcher
     private let logger = Logger(subsystem: "app.backglance.Backglance", category: "capture")
     private let statusContinuation: AsyncStream<CaptureStatus>.Continuation
 
     /// The task consuming ``StoreWatcher/wakes``. Its presence is what "started" means.
     private var loopTask: Task<Void, Never>?
+
+    /// The adapter reads go through, set by ``bootstrap()``.
+    private var adapter: (any StoreAdapter)?
+
+    /// How far the archive has read. Loaded here, advanced by ticks.
+    private var cursor: StoreCursor = .start
+
+    /// Snapshot, fingerprint, adapter, cursor — in that order, because each step's
+    /// failure means something different to the user.
+    private func bootstrap() throws {
+        let location = try storeLocation()
+        let snapshot = try StoreSnapshot.take(of: location)
+        defer { snapshot.discard() }
+
+        let resolution = try snapshot.read { db -> StoreAdapterRegistry.Resolution in
+            let fingerprint = try StoreFingerprint.compute(in: db)
+            // Recorded before the adapter is chosen, and whether or not one is: the
+            // fingerprint of a store we do not recognise is exactly what the maintainer
+            // needs from a diagnostics report to write the adapter that would.
+            try archive.saveFingerprint(fingerprint)
+            return StoreAdapterRegistry.resolve(fingerprint: fingerprint, probing: db)
+        }
+
+        let selected: any StoreAdapter
+        switch resolution {
+        case let .matched(adapter):
+            selected = adapter
+
+        case let .fallback(adapter, note):
+            selected = adapter
+            // Logged once per bootstrap, not per tick: it is a standing condition, and
+            // the note is content-free by construction.
+            logger.notice("adapter fallback: \(note, privacy: .public)")
+
+        case let .degraded(reason):
+            adapter = nil
+            adapterID = nil
+            throw CaptureError.degraded(reason)
+        }
+
+        adapter = selected
+        adapterID = selected.adapterID
+        try archive.saveAdapterID(selected.adapterID)
+
+        // A cursor from a previous run is resumable state. Its absence means a first
+        // launch, and `.start` is where an import begins.
+        cursor = try archive.loadCursor() ?? .start
+        transition(to: .running)
+    }
 }

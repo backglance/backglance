@@ -65,7 +65,45 @@ enum MiniatureStore {
         renamingDeliveredDateTo deliveredColumn: String = "delivered_date",
         extraRecordColumns: [String] = []
     ) throws -> DatabaseQueue {
-        let queue = try DatabaseQueue()
+        try make(
+            queue: DatabaseQueue(),
+            rows: rows,
+            droppingTables: droppingTables,
+            renamingDeliveredDateTo: deliveredColumn,
+            extraRecordColumns: extraRecordColumns
+        )
+    }
+
+    /// The same store, as a file on disk.
+    ///
+    /// `CaptureEngine` reads through ``StoreSnapshot``, which copies `db` and `-wal`
+    /// before opening anything, so its tests need a real file rather than an in-memory
+    /// database.
+    @discardableResult
+    static func makeFile(
+        at url: URL,
+        rows: [Row] = [],
+        droppingTables: Set<String> = [],
+        renamingDeliveredDateTo deliveredColumn: String = "delivered_date"
+    ) throws -> DatabaseQueue {
+        try make(
+            queue: DatabaseQueue(path: url.path),
+            rows: rows,
+            droppingTables: droppingTables,
+            renamingDeliveredDateTo: deliveredColumn,
+            extraRecordColumns: []
+        )
+    }
+
+    // MARK: Private
+
+    private static func make(
+        queue: DatabaseQueue,
+        rows: [Row],
+        droppingTables: Set<String>,
+        renamingDeliveredDateTo deliveredColumn: String,
+        extraRecordColumns: [String]
+    ) throws -> DatabaseQueue {
         try queue.write { db in
             if !droppingTables.contains("dbinfo") {
                 try db.execute(sql: "CREATE TABLE dbinfo (key TEXT PRIMARY KEY, value)")
@@ -97,8 +135,6 @@ enum MiniatureStore {
         }
         return queue
     }
-
-    // MARK: Private
 
     private static func insert(_ rows: [Row], deliveredColumn: String, into db: Database) throws {
         var appIDs: [String: Int64] = [:]
