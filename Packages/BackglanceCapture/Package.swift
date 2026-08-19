@@ -28,7 +28,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "FixtureGenerator",
-            dependencies: ["BackglanceCapture"],
+            dependencies: [
+                "BackglanceCapture",
+                .product(name: "GRDB", package: "GRDB.swift"),
+            ],
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency"),
             ]
