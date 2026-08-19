@@ -67,6 +67,10 @@ public actor CaptureEngine {
     /// The adapter bootstrap chose, or `nil` while degraded. Diagnostics and tests.
     public private(set) var adapterID: String?
 
+    /// How many store records the engine has read since it was created. A capture metric,
+    /// and content-free by construction.
+    public private(set) var recordsRead = 0
+
     /// How far capture has read. Settings shows its date; tests read it directly.
     public var currentCursor: StoreCursor {
         cursor
@@ -126,12 +130,68 @@ public actor CaptureEngine {
         }
     }
 
-    /// Handles one wake.
+    /// Handles one wake: read whatever is new, archive it, remember how far we got.
     ///
-    /// The body arrives with the bootstrap and read paths; for now it records what woke
-    /// the engine, which is what the loop's own wiring can be tested through.
+    /// Three things about the shape of this method are deliberate.
+    ///
+    /// **A degraded engine retries here rather than anywhere else.** Every wake is a
+    /// chance that the thing that was wrong has been fixed — Full Disk Access granted, a
+    /// store that now exists, an update that added an adapter — and the watcher is
+    /// already waking us on unlock, on wake from sleep and on its own poll. So there is
+    /// no retry timer: the wake stream *is* the retry schedule.
+    ///
+    /// **The cursor is persisted once, after the batch.** Writing it per record would
+    /// cost a transaction each; writing it before the inserts would permanently skip
+    /// anything that failed in between. Writing it after means a crash mid-batch
+    /// re-reads records that were already archived, and the unique index on
+    /// `store_rec_id` turns each of those into a no-op. Losing notifications is the
+    /// failure that matters; re-reading a few is not.
+    ///
+    /// **A read failure degrades rather than throws.** A tick runs on a wake, with no
+    /// caller waiting on it, so there is nobody to throw to — the engine records why it
+    /// stopped and tries again on the next wake.
     func tick(reason: WakeReason) {
         lastWake = reason
+
+        if case .degraded = status {
+            bootstrapOrDegrade()
+            return
+        }
+
+        // Paused and stopped are deliberate states: a wake must not quietly resume
+        // capture behind the user's back.
+        guard case .running = status, let adapter else {
+            return
+        }
+
+        do {
+            let batch = try readBatch(with: adapter)
+            guard !batch.isEmpty else {
+                return
+            }
+
+            for raw in batch {
+                cursor = adapter.cursor(for: raw)
+            }
+            try archive.saveCursor(cursor)
+            recordsRead += batch.count
+
+            // Bound to a local: an os_log interpolation is an autoclosure, and reaching
+            // through `self` there is what the formatter and the compiler disagree about.
+            let reached = cursor.lastRecID
+            logger.debug(
+                """
+                tick \(reason.rawValue, privacy: .public): \(
+                    batch.count,
+                    privacy: .public
+                ) records,                 through rec \(reached, privacy: .public)
+                """
+            )
+        } catch let error as CaptureError {
+            transition(to: .degraded(error.degradedReason))
+        } catch {
+            transition(to: .degraded(.readError("\(type(of: error))")))
+        }
     }
 
     /// Moves to `status` and tells everyone watching.
@@ -164,6 +224,20 @@ public actor CaptureEngine {
 
     /// How far the archive has read. Loaded here, advanced by ticks.
     private var cursor: StoreCursor = .start
+
+    /// One batch of records newer than the cursor, read from a fresh snapshot.
+    ///
+    /// A new snapshot per tick, discarded at the end of it: the copy is the user's entire
+    /// notification history, and it has no business outliving the read that needed it.
+    private func readBatch(with adapter: any StoreAdapter) throws -> [RawStoreRecord] {
+        let snapshot = try StoreSnapshot.take(of: storeLocation())
+        defer { snapshot.discard() }
+
+        let startCursor = cursor
+        return try snapshot.read { db in
+            try adapter.records(after: startCursor, in: db)
+        }
+    }
 
     /// Snapshot, fingerprint, adapter, cursor — in that order, because each step's
     /// failure means something different to the user.

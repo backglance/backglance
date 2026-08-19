@@ -161,6 +161,101 @@ final class CaptureEngineTests: XCTestCase {
         XCTAssertEqual(cursor, .start)
     }
 
+    // MARK: - Ticks
+
+    func testAWakeReadsEverythingNewAndPersistsHowFarItGot() async throws {
+        let engine = try XCTUnwrap(engine)
+        let archive = try XCTUnwrap(archive)
+        try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: MiniatureStore.rows(4))
+        await engine.start()
+
+        await engine.tick(reason: .manual)
+
+        let cursor = await engine.currentCursor
+        let recordsRead = await engine.recordsRead
+        XCTAssertEqual(cursor.lastRecID, 4)
+        XCTAssertEqual(recordsRead, 4)
+        // Persisted after the batch, so the next launch resumes rather than re-reads.
+        try XCTAssertEqual(archive.loadCursor()?.lastRecID, 4)
+    }
+
+    /// The common case on a quiet Mac: the watcher's poll fires, there is nothing new.
+    func testAWakeWithNothingNewLeavesTheCursorAlone() async throws {
+        let engine = try XCTUnwrap(engine)
+        try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: MiniatureStore.rows(2))
+        await engine.start()
+        await engine.tick(reason: .poll)
+
+        await engine.tick(reason: .poll)
+
+        let cursor = await engine.currentCursor
+        let recordsRead = await engine.recordsRead
+        XCTAssertEqual(cursor.lastRecID, 2)
+        XCTAssertEqual(recordsRead, 2)
+    }
+
+    func testATickReadsOnlyWhatArrivedSinceTheLastOne() async throws {
+        let engine = try XCTUnwrap(engine)
+        let storeURL = try XCTUnwrap(storeURL)
+        try MiniatureStore.makeFile(at: storeURL, rows: MiniatureStore.rows(2))
+        await engine.start()
+        await engine.tick(reason: .poll)
+
+        try MiniatureStore.append(Array(MiniatureStore.rows(5).dropFirst(2)), to: storeURL)
+        await engine.tick(reason: .fileChanged)
+
+        let cursor = await engine.currentCursor
+        let recordsRead = await engine.recordsRead
+        XCTAssertEqual(cursor.lastRecID, 5)
+        XCTAssertEqual(recordsRead, 5)
+    }
+
+    /// The wake stream is the retry schedule: every unlock, wake and poll is a chance
+    /// that Full Disk Access was granted or the store finally exists.
+    func testADegradedEngineRetriesItsBootstrapOnTheNextWake() async throws {
+        let engine = try XCTUnwrap(engine)
+        let storeURL = try XCTUnwrap(storeURL)
+        await engine.start()
+        let degraded = await engine.status
+        XCTAssertEqual(degraded, .degraded(.storeNotFound))
+
+        try MiniatureStore.makeFile(at: storeURL, rows: MiniatureStore.rows(1))
+        await engine.tick(reason: .screenUnlocked)
+
+        let recovered = await engine.status
+        XCTAssertEqual(recovered, .running)
+    }
+
+    /// A store that vanishes under a running engine — the user reset their notification
+    /// database, or the account was migrated.
+    func testAReadFailureDegradesInsteadOfThrowing() async throws {
+        let engine = try XCTUnwrap(engine)
+        let storeURL = try XCTUnwrap(storeURL)
+        try MiniatureStore.makeFile(at: storeURL, rows: MiniatureStore.rows(1))
+        await engine.start()
+
+        try FileManager.default.removeItem(at: storeURL)
+        await engine.tick(reason: .poll)
+
+        let status = await engine.status
+        XCTAssertEqual(status, .degraded(.storeNotFound))
+    }
+
+    /// A stopped engine must not resume behind the user's back when a wake arrives.
+    func testAStoppedEngineIgnoresAWake() async throws {
+        let engine = try XCTUnwrap(engine)
+        try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: MiniatureStore.rows(3))
+        await engine.start()
+        await engine.stop()
+
+        await engine.tick(reason: .manual)
+
+        let cursor = await engine.currentCursor
+        let recordsRead = await engine.recordsRead
+        XCTAssertEqual(cursor, .start)
+        XCTAssertEqual(recordsRead, 0)
+    }
+
     // MARK: - Status
 
     func testEveryTransitionReachesTheStatusStream() async throws {

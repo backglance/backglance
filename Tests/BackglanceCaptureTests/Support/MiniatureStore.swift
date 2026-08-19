@@ -95,6 +95,15 @@ enum MiniatureStore {
         )
     }
 
+    /// Adds rows to a store that already exists — notifications arriving over time,
+    /// which is what a tick is supposed to pick up.
+    static func append(_ rows: [Row], to url: URL) throws {
+        let queue = try DatabaseQueue(path: url.path)
+        try queue.write { db in
+            try insert(rows, deliveredColumn: "delivered_date", into: db)
+        }
+    }
+
     // MARK: Private
 
     private static func make(
@@ -146,7 +155,7 @@ enum MiniatureStore {
                 appID = Int64(appIDs.count + 1)
                 appIDs[row.bundleID] = appID
                 try db.execute(
-                    sql: "INSERT INTO app (app_id, identifier, badge) VALUES (?, ?, 0)",
+                    sql: "INSERT OR IGNORE INTO app (app_id, identifier, badge) VALUES (?, ?, 0)",
                     arguments: [appID, row.bundleID]
                 )
             }
