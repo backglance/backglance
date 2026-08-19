@@ -56,10 +56,14 @@ enum MiniatureStore {
     ///   - droppingTables: tables to leave out entirely, for probe tests.
     ///   - renamingDeliveredDateTo: renames `record.delivered_date`, which is the shape a
     ///     future macOS taking a column away would have.
+    ///   - extraRecordColumns: columns on `record` that Backglance does not read. macOS
+    ///     26 has several; adding one is Apple's most common change, and it must be a
+    ///     non-event.
     static func make(
         rows: [Row] = [],
         droppingTables: Set<String> = [],
-        renamingDeliveredDateTo deliveredColumn: String = "delivered_date"
+        renamingDeliveredDateTo deliveredColumn: String = "delivered_date",
+        extraRecordColumns: [String] = []
     ) throws -> DatabaseQueue {
         let queue = try DatabaseQueue()
         try queue.write { db in
@@ -82,7 +86,7 @@ enum MiniatureStore {
                     \(deliveredColumn) REAL,
                     presented INTEGER,
                     style INTEGER,
-                    snooze_fire_date REAL
+                    snooze_fire_date REAL\(extraRecordColumns.map { ",\n                    \($0) TEXT" }.joined())
                 )
                 """)
             }
