@@ -727,7 +727,20 @@ enum ArchiveMigrations {
             try db.execute(sql: "INSERT INTO notifications_fts(notifications_fts) VALUES ('rebuild')")
         }
 
-        migrator.registerMigration("v2_saved_searches") { db in
+        migrator.registerMigration("v2_embeddings") { db in
+            try db.execute(sql: """
+                CREATE TABLE embeddings (
+                  notification_id INTEGER PRIMARY KEY REFERENCES notifications(id) ON DELETE CASCADE,
+                  model TEXT NOT NULL,
+                  dims INTEGER NOT NULL,
+                  vector BLOB NOT NULL,
+                  created_at REAL NOT NULL
+                );
+                """)
+            try setArchiveVersion(db, 2)
+        }
+
+        migrator.registerMigration("v3_saved_searches") { db in
             try db.execute(sql: """
                 CREATE TABLE saved_searches (
                   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -738,10 +751,10 @@ enum ArchiveMigrations {
                   created_at REAL NOT NULL
                 );
                 """)
-            try setArchiveVersion(db, 2)
+            try setArchiveVersion(db, 3)
         }
 
-        migrator.registerMigration("v3_snoozes") { db in
+        migrator.registerMigration("v4_snoozes") { db in
             try db.execute(sql: """
                 CREATE TABLE snoozes (
                   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -751,19 +764,6 @@ enum ArchiveMigrations {
                   reminders_identifier TEXT
                 );
                 CREATE INDEX idx_snoozes_fire ON snoozes(fire_at) WHERE fired_at IS NULL;
-                """)
-            try setArchiveVersion(db, 3)
-        }
-
-        migrator.registerMigration("v4_embeddings") { db in
-            try db.execute(sql: """
-                CREATE TABLE embeddings (
-                  notification_id INTEGER PRIMARY KEY REFERENCES notifications(id) ON DELETE CASCADE,
-                  model TEXT NOT NULL,
-                  dims INTEGER NOT NULL,
-                  vector BLOB NOT NULL,
-                  created_at REAL NOT NULL
-                );
                 """)
             try setArchiveVersion(db, 4)
         }
@@ -834,7 +834,7 @@ public final class Archive: Sendable {
 
 > ℹ️ **Info:** `pool` is typed `any DatabaseWriter` so the in-memory `DatabaseQueue` and the on-disk `DatabasePool` share one code path. All `Archive` methods use `pool.read { }` / `pool.write { }`, which both types provide.
 
-Migration ordering is guaranteed by registration order. A v1.0 archive has `v1_initial` and `v1_fts` applied; upgrading to a v1.x build applies `v2_…` through `v5_…` on first launch, in one transaction each. Downgrading is not supported (GRDB will refuse to open an archive with unknown migrations applied); the app shows a plain dialog explaining that.
+Migrations are numbered in **ship order**, which is not the order the features were designed in: `v2_embeddings` ships with semantic search in `0.3.0`, ahead of saved searches and snoozes, so it takes the number that follows `v1_fts`. This is not cosmetic — migration ordering is guaranteed by registration order, and a migration can never be slipped in front of one that has already been applied on someone's Mac. A new migration is always *appended*, and takes the next number when it does. Migration ordering is guaranteed by registration order. A `0.2.0` archive has `v1_initial` and `v1_fts` applied; upgrading applies `v2_…` through `v5_…` on first launch, in one transaction each. Downgrading is not supported (GRDB will refuse to open an archive with unknown migrations applied); the app shows a plain dialog explaining that.
 
 ### Rules for writing migrations
 

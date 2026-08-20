@@ -31,7 +31,7 @@ enum ArchiveMigrations {
     ///
     /// Bumped by the last migration registered below, and mirrored by
     /// ``BackglanceCore/archiveSchemaVersion``.
-    static let currentArchiveVersion = 1
+    static let currentArchiveVersion = 2
 
     /// The migrator applied by `Archive` when it opens a database.
     ///
@@ -60,6 +60,16 @@ enum ArchiveMigrations {
             try db.execute(sql: "INSERT INTO notifications_fts(notifications_fts) VALUES ('rebuild')")
         }
 
+        // Numbered by ship order, not by the order the features were designed in.
+        // Migrations apply in registration order and GRDB does not allow a new one
+        // to be slipped in front of an applied one, so semantic search — which
+        // ships in 0.3.0 — takes v2 even though docs/architecture/DATABASE_SCHEMA.md
+        // once sketched it as v4. Everything that comes later is *appended*.
+        migrator.registerMigration("v2_embeddings") { db in
+            try db.execute(sql: embeddingsSQL)
+            try setArchiveVersion(db, 2)
+        }
+
         return migrator
     }
 
@@ -78,6 +88,29 @@ enum ArchiveMigrations {
     }
 
     // MARK: Private
+
+    /// The `embeddings` table: one 512-dimension vector per notification, written
+    /// only while semantic search is on.
+    ///
+    /// The migration runs unconditionally and the table simply stays empty for
+    /// anyone who never turns the feature on — a table that exists and is empty
+    /// costs nothing, while a conditional migration would mean two schema shapes
+    /// in the wild for the same version.
+    ///
+    /// `ON DELETE CASCADE` is what makes "delete a notification, delete its
+    /// vector" a database guarantee instead of an app-code promise, which matters
+    /// because a vector is derived from the notification's text: leaving one
+    /// behind would leave a machine-readable trace of a notification the user
+    /// deleted (docs/features/SEARCH.md#the-embeddings-table).
+    private static let embeddingsSQL = """
+    CREATE TABLE embeddings (
+      notification_id INTEGER PRIMARY KEY REFERENCES notifications(id) ON DELETE CASCADE,
+      model TEXT NOT NULL,
+      dims INTEGER NOT NULL,
+      vector BLOB NOT NULL,
+      created_at REAL NOT NULL
+    );
+    """
 
     /// The v1.0 schema: every table, index and constraint the archive ships with,
     /// minus `notifications_fts` (created by `v1_fts`, because the index is derived

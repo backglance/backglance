@@ -111,7 +111,7 @@ SwiftData is a Core Data wrapper with a nicer surface, and its minimum for macOS
 
 - **`DatabasePool` for the archive** — WAL mode, many concurrent readers, one serialized writer. The capture loop writes in batches; the UI reads through `ValueObservation`, which re-runs a query only when the tables it touched change.
 - **`DatabaseQueue` (read-only) for store snapshots** — one queue per copied snapshot, opened with `readonly = true` and `immutable=1`, discarded after the batch. Apple's live file is never opened for write. See [ARCHITECTURE.md](./ARCHITECTURE.md#watch-strategy-poll--dispatchsource--snapshot).
-- **`DatabaseMigrator`** — migrations `v1_initial`, `v1_fts`, `v2_saved_searches`, `v3_snoozes`, `v4_embeddings`, `v5_sync_metadata` in `ArchiveMigrations.swift`, with `eraseDatabaseOnSchemaChange = true` only in DEBUG.
+- **`DatabaseMigrator`** — migrations `v1_initial`, `v1_fts`, `v2_embeddings`, then the v1.x ones (`v3_saved_searches`, `v4_snoozes`, `v5_sync_metadata`) in `ArchiveMigrations.swift`, with `eraseDatabaseOnSchemaChange = true` only in DEBUG.
 - **Record protocols** — models are `Codable, FetchableRecord, PersistableRecord`; no code generation, no `.xcdatamodeld`.
 - **System SQLite** — GRDB links the SQLite that ships with macOS (FTS5, JSON1 and R*Tree are all compiled in on macOS 14+), so there is no bundled SQLite to keep patched. The optional v1.x SQLCipher build (`GRDB.swift/SQLCipher`) swaps in an encrypted SQLite behind the same API.
 

@@ -22,7 +22,7 @@ final class ArchiveTests: XCTestCase {
         let applied = try archive.pool.read { db in
             try ArchiveMigrations.migrator().appliedIdentifiers(db)
         }
-        XCTAssertEqual(applied, ["v1_initial", "v1_fts"])
+        XCTAssertEqual(applied, ["v1_initial", "v1_fts", "v2_embeddings"])
     }
 
     func testInMemoryArchiveCreatesEveryTableInTheCanonicalDDL() throws {
@@ -77,7 +77,7 @@ final class ArchiveTests: XCTestCase {
         let applied = try reopened.pool.read { db in
             try ArchiveMigrations.migrator().appliedIdentifiers(db)
         }
-        XCTAssertEqual(applied, ["v1_initial", "v1_fts"])
+        XCTAssertEqual(applied, ["v1_initial", "v1_fts", "v2_embeddings"])
     }
 
     // MARK: - PRAGMA set

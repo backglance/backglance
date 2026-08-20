@@ -298,7 +298,7 @@ What counts as a security fix for Backglance:
 
 Rules that do not bend:
 
-- **Never delete or edit a released migration.** `v1_initial`, `v1_fts`, `v2_saved_searches`, `v3_snoozes`, `v4_embeddings`, `v5_sync_metadata` — once shipped, a migration's body is frozen. Fix mistakes with a new migration.
+- **Never delete or edit a released migration.** `v1_initial`, `v1_fts`, `v2_embeddings`, `v3_saved_searches`, `v4_snoozes`, `v5_sync_metadata` — once shipped, a migration's body is frozen. Fix mistakes with a new migration.
 - **Never rename a migration identifier.** GRDB tracks applied migrations by name in `grdb_migrations`; renaming re-runs it.
 - `eraseDatabaseOnSchemaChange = true` is `#if DEBUG` only. A release build that hits an unknown schema state stops with `ArchiveError.migrationFailed` and the corruption path above — it never erases.
 

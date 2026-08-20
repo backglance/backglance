@@ -180,7 +180,7 @@ CREATE TABLE embeddings (
 );
 ```
 
-Created by migration `v4_embeddings`, which runs unconditionally; the table simply stays empty while semantic search is off. `ON DELETE CASCADE` is what makes "delete a notification, delete its vector" a database guarantee rather than an app-code promise.
+Created by migration `v2_embeddings`, which runs unconditionally; the table simply stays empty while semantic search is off. `ON DELETE CASCADE` is what makes "delete a notification, delete its vector" a database guarantee rather than an app-code promise.
 
 ## UI Components
 
