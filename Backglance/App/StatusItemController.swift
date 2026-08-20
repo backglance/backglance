@@ -63,7 +63,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             button.target = self
             button.action = #selector(statusItemClicked(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-            button.setAccessibilityLabel(String(localized: "Backglance"))
+            // The label itself is set by `render`, which knows the count and the
+            // state; the help text never varies.
+            button.setAccessibilityHelp(StatusItemAccessibility.help)
             // Named in docs/reference/ACCESSIBILITY.md's identifier table, and
             // what the XCUITests reach for.
             button.setAccessibilityIdentifier("statusItem.button")
@@ -209,6 +211,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         button.title = count == 0 ? "" : (count >= Archive.unreadBadgeCap ? " 99+" : " \(count)")
         button.imagePosition = count == 0 ? .imageOnly : .imageLeft
         button.toolTip = Self.tooltip(count: count, state: state)
+        // The icon says all of this in glyph and digits; VoiceOver needs it in
+        // words (docs/reference/ACCESSIBILITY.md#menu-bar-item).
+        button.setAccessibilityLabel(StatusItemAccessibility.label(unreadCount: count, state: state))
     }
 
     private func contextMenu() -> NSMenu {

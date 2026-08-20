@@ -139,25 +139,33 @@ DigestBanner(digest: digest)
 
 ### Menu bar item
 
-The `NSStatusItem` button gets an explicit label including the unread count, updated whenever the badge changes:
+The `NSStatusItem` button gets an explicit label including the unread count, updated whenever the badge changes.
+The copy itself lives in `BackglanceUI` as `StatusItemAccessibility`, a pure function of the count and the
+capture state: the app target has no test bundle, and this is the only shape in which the string contract can
+be asserted at all.
 
 ```swift
-// StatusItemController.swift (AppKit side)
-func updateAccessibility(unreadCount: Int) {
-    let label: String
-    if unreadCount == 0 {
-        label = String(localized: "Backglance, no unread notifications")
-    } else {
-        let capped = unreadCount > 99 ? "99+" : String(unreadCount)
-        label = String(localized: "Backglance, \(capped) unread notifications")
-    }
-    statusItem.button?.setAccessibilityLabel(label)
-    statusItem.button?.setAccessibilityHelp(
-        String(localized: "Opens the notification timeline. Also available with Control-Option-N."))
+// StatusItemAccessibility.swift (BackglanceUI)
+public static func label(unreadCount: Int, state: TimelineCaptureState) -> String {
+    let unread = unreadPhrase(count: unreadCount)   // "Backglance, no unread notifications",
+                                                    // "…, 1 unread notification",
+                                                    // "…, more than 99 unread notifications"
+    guard let suffix = stateSuffix(for: state) else { return unread }   // nil while running
+    return String(localized: "\(unread), \(suffix)")
 }
+
+// StatusItemController.swift (AppKit side) — set on every badge or state change
+button.setAccessibilityLabel(StatusItemAccessibility.label(unreadCount: count, state: state))
+button.setAccessibilityHelp(StatusItemAccessibility.help)
 ```
 
-When capture is paused or degraded, the label appends the state ("capture paused") so the icon's changed appearance is not the only signal.
+The count is capped exactly where the drawn badge caps it (`Archive.unreadBadgeCap`): announcing an exact
+214 while the icon reads "99+" is its own kind of wrong.
+
+When capture is paused or degraded, the label appends the state ("capture paused", "needs Full Disk Access",
+"capture degraded", "capture stopped") so the icon's changed appearance is not the only signal. The capture
+layer's own degraded sentence stays in the tooltip — a label read aloud on every focus is the wrong place
+for a paragraph.
 
 ## Keyboard navigation
 
