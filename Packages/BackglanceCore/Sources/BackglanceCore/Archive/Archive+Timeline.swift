@@ -1,0 +1,95 @@
+import Foundation
+import GRDB
+
+// MARK: - TimelineCursor
+
+/// Where one timeline page ended, so the next can start exactly there.
+///
+/// The pair, not just the date: two notifications delivered in the same second
+/// are common (a burst from one app shares a `delivered_at`), so `id` is the
+/// tiebreaker that makes `(deliveredAt, id)` a total order. Ordering and the
+/// page predicate both use the pair, which is what lets pages join without
+/// skipping or repeating a row while capture keeps inserting at the head.
+///
+/// See docs/features/TIMELINE.md#keyset-pagination.
+public struct TimelineCursor: Equatable, Hashable, Sendable {
+    // MARK: Lifecycle
+
+    public init(deliveredAt: UnixDate, id: Int64) {
+        self.deliveredAt = deliveredAt
+        self.id = id
+    }
+
+    /// The cursor that points *at* an already-fetched row.
+    ///
+    /// Fails for a row that was never inserted: without `id` there is no
+    /// tiebreaker, and a date-only cursor would silently drop every other row
+    /// sharing that second. A caller holding an unsaved row has a bug, not a
+    /// pagination problem, so this is `nil` rather than a lenient fallback.
+    public init?(row: ArchivedNotification) {
+        guard let id = row.id else {
+            return nil
+        }
+        self.init(deliveredAt: row.deliveredAt, id: id)
+    }
+
+    // MARK: Public
+
+    public let deliveredAt: UnixDate
+    public let id: Int64
+}
+
+// MARK: - Archive + timeline reads
+
+public extension Archive {
+    /// Rows per timeline page.
+    ///
+    /// Big enough that the popover and the window both open on one page of
+    /// scrollback, small enough that a page fetch stays well inside a frame at
+    /// 100k notifications — measured in
+    /// docs/deployment/PERFORMANCE_GUIDE.md#timeline-pagination.
+    static let timelinePageSize = 200
+
+    /// One page of the timeline, newest first, starting after `cursor`.
+    ///
+    /// Pass `nil` for the first page. An empty result means the caller has
+    /// reached the oldest archived notification — there is no separate "is
+    /// there more" query, because a short page already answers it.
+    ///
+    /// Soft-deleted rows are filtered out here rather than by the caller, so a
+    /// row the user deleted can never reappear because one call site forgot the
+    /// predicate.
+    func timelinePage(after cursor: TimelineCursor? = nil,
+                      limit: Int = Archive.timelinePageSize) throws -> [ArchivedNotification]
+    {
+        do {
+            return try pool.read { db in
+                try ArchivedNotification
+                    .page(after: cursor.map { (deliveredAt: $0.deliveredAt, id: $0.id) }, limit: limit)
+                    .fetchAll(db)
+            }
+        } catch {
+            throw ArchiveError.observationFailed(ArchiveError.detail(from: error))
+        }
+    }
+
+    /// The apps referenced by the timeline, keyed by `apps.id`.
+    ///
+    /// The timeline joins app metadata onto every row (display name, mute
+    /// state), and the app table is tiny compared with the notification table —
+    /// a few hundred rows at most — so it is cheaper to fetch it whole once per
+    /// refresh than to join per page and re-decode the same app hundreds of
+    /// times.
+    func appsByID() throws -> [Int64: AppRecord] {
+        do {
+            return try pool.read { db in
+                let apps = try AppRecord.fetchAll(db)
+                return Dictionary(uniqueKeysWithValues: apps.compactMap { app in
+                    app.id.map { ($0, app) }
+                })
+            }
+        } catch {
+            throw ArchiveError.observationFailed(ArchiveError.detail(from: error))
+        }
+    }
+}
