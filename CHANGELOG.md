@@ -61,6 +61,90 @@ Planned pre-release tags on the way to 1.0.0, one per milestone (targets, not pr
 - `v0.4.0` — M3: digest, privacy controls, onboarding
 - `v1.0.0` — M4: actions, rules, foundation, release pipeline
 
+## [0.3.0] - unreleased
+
+M2 — the timeline and search. The archive M1 filled becomes something you can look at: a
+menu bar item, a popover, a full window, and a search box that understands what you type.
+
+> The tag is not cut yet, and cannot be until `v0.2.0` is: tags follow the milestones in
+> order, and `v0.2.0` is still waiting on live capture verified against a real store on
+> macOS 14, 15 and 26. Of this milestone's own exit criteria, FTS p95 at a hundred thousand
+> notifications is measured and green; open-to-first-paint is measured for everything that
+> happens in process, with signposts left in place for the `xctrace` run that covers
+> AppKit's own window work; and keyboard-only navigation is implemented and unit-tested but
+> has not been driven end to end by a human on a real desktop.
+
+### Added
+
+- **The menu bar.** `StatusItemController` — a template image per capture state, the unread
+  count on the button capped at 99+, a right-click menu for the window, pause/resume and
+  Settings, and an `NSPopover` sized once and never resized, because a popover that resizes
+  itself as rows load reads as a flicker on every open
+- **The global shortcut.** `HotKeyCenter` wraps Carbon's `RegisterEventHotKey` for ⌃⌥N —
+  nothing modern does the job for an agent app that is never frontmost. When another app
+  already owns the shortcut, registration fails quietly and the status item still works
+- **The timeline.** `TimelineView` over `TimelineStore`: days as pinned sections, compact and
+  detailed rows, the "new since you were away" divider, muted apps collapsed into a group per
+  day, four distinct empty states, and a banner for any failure on the read path — no modals
+  anywhere near it
+- **Keyset pagination.** Pages of 200 anchored to `(delivered_at, id)`, never `OFFSET`: the
+  timeline is a live table, and an offset page skips or repeats rows on every insert. Memory
+  is bounded at a thousand rows, which the subscription refetches on scroll-up
+- **Read state that means something.** A row read after a second on screen, cancelled the
+  moment it scrolls away; the unread anchor is the later of "you last had a surface open" and
+  "you last came back", persisted so a relaunch does not re-announce what you have seen
+- **The full window,** reused rather than rebuilt, with its frame restored, and remembering
+  its own view mode and grouping — the popover opens compact because glancing and reading are
+  different jobs
+- **Full-text search.** `FTSIndex` over the FTS5 index M1 built, ranked with per-column bm25
+  weights that put a title or sender match above one buried in a long body, highlighted with
+  private-use markers no notification text can contain
+- **A query language in one text field.** `QueryParser` reads `from:`, `sender:`, `thread:`,
+  `before:`/`after:`/`on:` with relative offsets, `is:`, `has:`, quoted phrases and `-`
+  exclusions. It refuses almost nothing: an unknown `key:` searches for that literal text, and
+  only an unreadable date is an error — shown under the field, never echoing what was typed
+- **Fuzzy matching** for the word you meant rather than the one you typed, bounded to five
+  thousand candidates and run only when full text came back thin
+- **Semantic search, off by default.** On-device sentence embeddings, a background indexer
+  that works in batches and resumes rather than restarting, and a Settings pane that says
+  plainly what it costs, that the model is English, and offers to delete every vector
+- **One ranking from three engines.** `HybridSearch` fuses by rank rather than score — bm25,
+  cosine and edit similarity are not comparable numbers — and a failing semantic branch costs
+  a hit its source, never the search
+- **Search as you type.** A 120 ms debounce and real cancellation, so a superseded query stops
+  reading the archive instead of racing the newer one
+- **Accessibility.** Rows are one VoiceOver element with state in the value rather than the
+  label; a redacted row says "code redacted" and never the placeholder; day and app headers
+  are headings; Reduce Motion stops the one animation; Increase Contrast turns highlight tints
+  into borders; every font is semantic, so the system text-size preference scales it
+- **Budgets with tests behind them.** A hundred-thousand-notification archive generated from a
+  fixed seed, search latency measured at p95, first-paint and memory measured for everything
+  that can be measured in process, and signposts for the rest
+
+### Changed
+
+- `SearchQuery`, `SearchHit` and `SearchError` live in `BackglanceCore` rather than in
+  `BackglanceSearch`. They are the vocabulary of a search, and the view layer has to speak it
+  to ask for one and to draw the answer, while the engine stays where the view cannot reach it
+- The timeline's live subscription moved to `BackglanceCore` as well, so `BackglanceUI` never
+  imports GRDB — the dependency direction the development guide sets out
+- The `embeddings` migration ships as `v2_embeddings`, not the `v4_embeddings` the schema
+  document sketched. Migrations apply in registration order and one can never be slipped in
+  front of a migration already applied on someone's Mac, so the number follows ship order
+
+### Fixed
+
+- Preferences are read from `UserDefaults.standard` rather than a suite named after the app's
+  own bundle identifier, which macOS refuses with "does not make sense and will not work"
+- The timeline window opens at 720 × 640 instead of collapsing to its 480 × 360 minimum, and
+  the Settings window at 460 × 260 instead of zero width — in both cases the hosting
+  controller's fitting size was driving a window that should own its own
+- A full-text search whose match was in the title of a notification with no body no longer
+  crashes: the snippet was taken from the body column, and SQLite returned NULL
+- A filtered search stays inside its latency budget. Applying the structured filters as a
+  second pass over the candidate ids cost about 60 ms at a hundred thousand notifications;
+  they now ride inside the same statement as the `MATCH`
+
 ## [0.2.0] - unreleased
 
 M1 — capture core and archive. Backglance reads the system's notification store, recognises
