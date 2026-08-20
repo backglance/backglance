@@ -154,14 +154,15 @@ public extension Archive {
                                         limit: Int) throws -> [ArchivedNotification]
     {
         do {
+            let sql = """
+            SELECT n.* FROM notifications n
+            LEFT JOIN embeddings e ON e.notification_id = n.id AND e.model = ?
+            WHERE n.is_deleted = 0 AND e.notification_id IS NULL
+            ORDER BY n.id
+            LIMIT ?
+            """
             return try pool.read { db in
-                try ArchivedNotification.fetchAll(db, sql: """
-                SELECT n.* FROM notifications n
-                LEFT JOIN embeddings e ON e.notification_id = n.id AND e.model = ?
-                WHERE n.is_deleted = 0 AND e.notification_id IS NULL
-                ORDER BY n.id
-                LIMIT ?
-                """, arguments: [model, limit])
+                try ArchivedNotification.fetchAll(db, sql: sql, arguments: [model, limit])
             }
         } catch {
             throw ArchiveError.observationFailed(ArchiveError.detail(from: error))
