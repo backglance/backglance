@@ -208,15 +208,20 @@ Keyboard: `↑`/`↓` move selection, `↩` opens the notification (see [ACTIONS
 | Token | Meaning | Becomes |
 |---|---|---|
 | `from:<app>` | app by display name, bundle id, or unique substring (`from:slack`, `from:com.apple.MobileSMS`) | SQL filter `n.app_id IN (...)`; unresolvable app → zero results plus chip "No app matches 'xyz'" |
-| `sender:<name>` | sender / contact where present (Messages, Mail, Slack DMs) | FTS column filter `sender:"name"*` |
+| `sender:<name>` | sender / contact where present (Messages, Mail, Slack DMs) | SQL filter on the `sender` column, not an FTS term — it never reaches `MATCH` |
+| `thread:<id>` | exact thread, for "the rest of this conversation" | `n.thread_id = ?` |
 | `before:<date>` | strictly before local midnight of that date | `n.delivered_at < ?` |
 | `after:<date>` | on or after local midnight of that date | `n.delivered_at >= ?` |
 | `on:<date>` | that local calendar day | `n.delivered_at >= day.start AND < day.end` |
-| date forms | `2026-08-01`, `today`, `yesterday`, `-7d`, `-2w`, `-36h` (relative to now) | resolved with `Calendar.current` |
+| date forms | `2026-08-01`, `today`, `yesterday`, `-7d`, `-2w`, `-36h` (relative to now) | resolved with `Calendar.current`; day and week offsets snap to that day's local midnight, hour offsets are exact (`-36h` is a moment, not a day) |
+| `is:unread` | not yet marked read | `n.is_read = 0` |
+| `is:read` | marked read | `n.is_read = 1` |
 | `is:missed` | arrived while away or store says not presented | `(n.away_session_id IS NOT NULL OR n.presented = 0)` |
 | `is:pinned` | pinned by user | `n.is_pinned = 1` |
 | `is:vip` | matches an enabled VIP rule | post-filter through `RulesEngine.evaluate` on hits ([RULES.md](./RULES.md)) |
 | `has:link` | has a resolved deep link | `n.deep_link IS NOT NULL` |
+| `has:attachment` | carries attachment metadata | `n.attachments_json IS NOT NULL` |
+| `redacted:yes` | body held an OTP that was redacted before storage | `n.redaction = 'otp'`; any other value (`redacted:no`) has no recognized meaning and falls back to free text |
 | `"quoted phrase"` | exact phrase in any indexed column | FTS phrase `"quoted phrase"` (internal quotes doubled) |
 | `-word` / `-"a phrase"` | must not contain | FTS `NOT "word"`; if there are no positive terms, `rowid NOT IN (SELECT rowid FROM notifications_fts WHERE notifications_fts MATCH ...)` |
 | anything else | free text | each token quoted, ANDed; the **last** free token gets a `*` prefix suffix so as-you-type works: `invoice "over"*` |
@@ -225,209 +230,66 @@ Keyboard: `↑`/`↓` move selection, `↩` opens the notification (see [ACTIONS
 Combined example: `from:slack sender:"Ayşe" after:-7d is:missed -draft invoice over` becomes
 
 ```
-apps      = ["com.tinyspeck.slackmacgap"]
-after     = 2026-08-10 00:00 local
-flags     = {missed}
-MATCH     = sender:"Ayşe"* AND ("invoice" "over"*) NOT "draft"
-freeTerms = ["invoice", "over"]        // fed to fuzzy + semantic
+appNameContains = "slack"
+sender          = "Ayşe"
+after           = 2026-08-10 00:00 local
+flags           = {missed}
+ftsMatch        = ("invoice" "over"*) NOT "draft"
+terms           = ["invoice", "over"]        // fed to fuzzy + semantic
 ```
 
 ### QueryParser Implementation
 
+`QueryParser` is a stateless `enum`, not a struct anyone constructs — there is nothing to configure, so `QueryParser.parse(_:now:calendar:)` is a static function. `now` and `calendar` are parameters rather than ambient state precisely so tests do not depend on when they run; the app calls it with its defaults.
+
+The parser never rejects free text. A filter with a value it does not recognize (`is:archived`), or a key it has never heard of (`re:invoice`), degrades to a plain search term. The single exception is a `before:`, `after:` or `on:` value that is neither a date nor a relative offset, which throws `SearchError.invalidQuery` — a message that names the key and lists the accepted forms, and never echoes what the user typed.
+
 ```swift
 // Packages/BackglanceSearch/Sources/BackglanceSearch/QueryParser.swift
-import Foundation
-
-public struct SearchQuery: Equatable, Sendable {
-    public enum Flag: String, Sendable, CaseIterable { case missed, pinned, vip, hasLink }
-
-    public var rawText: String
-    public var matchExpression: String?      // full FTS5 MATCH string, nil when nothing to match
-    public var negatedOnlyExpression: String? // used when there are negations but no positive terms
-    public var appTerms: [String]            // unresolved "from:" values; AppResolver maps to app_id
-    public var sender: String?
-    public var after: Date?
-    public var before: Date?
-    public var flags: Set<Flag>
-    public var freeTerms: [String]           // plain words for fuzzy + semantic
-    public var phrases: [String]
-
-    public var isEmpty: Bool {
-        matchExpression == nil && negatedOnlyExpression == nil && appTerms.isEmpty
-            && sender == nil && after == nil && before == nil && flags.isEmpty
-    }
-}
-
-public struct QueryParser: Sendable {
-    public struct Context: Sendable {
-        public var now: Date
-        public var calendar: Calendar
-        public init(now: Date = Date(), calendar: Calendar = .current) {
-            self.now = now
-            self.calendar = calendar
-        }
-    }
-
-    public enum ParseError: Error, Equatable, LocalizedError {
-        case badDate(key: String, value: String)
-        public var errorDescription: String? {
-            switch self {
-            case let .badDate(key, value):
-                return "Couldn't read the date in \(key):\(value). Try 2026-08-01, today, yesterday or -7d."
-            }
-        }
-    }
-
-    private struct Token { var text: String; var isPhrase: Bool; var isNegated: Bool }
-
-    public init() {}
-
-    public func parse(_ input: String, context: Context = Context()) throws -> SearchQuery {
-        var q = SearchQuery(rawText: input, matchExpression: nil, negatedOnlyExpression: nil,
-                            appTerms: [], sender: nil, after: nil, before: nil,
-                            flags: [], freeTerms: [], phrases: [])
-        var positive: [String] = []          // already FTS-quoted
-        var negative: [String] = []          // already FTS-quoted
-        var lastFreeIndex: Int? = nil        // index into `positive` that gets the prefix star
-
-        for tok in tokenize(input) {
-            if tok.isPhrase {
-                let quoted = ftsQuote(tok.text)
-                if tok.isNegated { negative.append(quoted) } else { positive.append(quoted); q.phrases.append(tok.text) }
-                continue
-            }
-            if let (key, value) = splitKeyValue(tok.text), !tok.isNegated {
-                switch key {
-                case "from":
-                    q.appTerms.append(value)
-                case "sender":
-                    q.sender = value
-                case "before":
-                    q.before = try dayStart(of: value, key: key, context: context)
-                case "after":
-                    q.after = try dayStart(of: value, key: key, context: context)
-                case "on":
-                    let start = try dayStart(of: value, key: key, context: context)
-                    q.after = start
-                    q.before = context.calendar.date(byAdding: .day, value: 1, to: start)
-                case "is":
-                    switch value.lowercased() {
-                    case "missed": q.flags.insert(.missed)
-                    case "pinned": q.flags.insert(.pinned)
-                    case "vip":    q.flags.insert(.vip)
-                    default:       appendFree(tok.text)   // "is:foo" is just text
-                    }
-                case "has":
-                    if value.lowercased() == "link" { q.flags.insert(.hasLink) } else { appendFree(tok.text) }
-                default:
-                    appendFree(tok.text)                    // unknown key → literal
-                }
-                continue
-            }
-            if tok.isNegated {
-                negative.append(ftsQuote(tok.text))
-            } else {
-                appendFree(tok.text)
-            }
-        }
-
-        func appendFree(_ text: String) {
-            positive.append(ftsQuote(text))
-            q.freeTerms.append(text)
-            lastFreeIndex = positive.count - 1
-        }
-
-        // Prefix star on the last free (non-phrase) token so results appear as you type.
-        if let i = lastFreeIndex, positive[i].count >= 2 { positive[i] += "*" }
-
-        var parts: [String] = []
-        if let s = q.sender { parts.append("sender:\(ftsQuote(s))*") }
-        if !positive.isEmpty { parts.append("(" + positive.joined(separator: " ") + ")") }
-
-        if !parts.isEmpty {
-            var expr = parts.joined(separator: " AND ")
-            for n in negative { expr += " NOT \(n)" }
-            q.matchExpression = expr
-        } else if !negative.isEmpty {
-            q.negatedOnlyExpression = negative.joined(separator: " OR ")
-        }
-        return q
-    }
-
-    // MARK: - Helpers
-
-    /// FTS5 string literal: wrap in double quotes, double any embedded quotes.
-    /// Quoting every token is what makes user input immune to FTS5 syntax errors
-    /// (bare `AND`, `(`, `:` or `*` would otherwise be interpreted).
-    func ftsQuote(_ s: String) -> String {
-        "\"" + s.replacingOccurrences(of: "\"", with: "\"\"") + "\""
-    }
-
-    private func splitKeyValue(_ s: String) -> (String, String)? {
-        guard let colon = s.firstIndex(of: ":"), colon != s.startIndex else { return nil }
-        let key = s[..<colon].lowercased()
-        let value = String(s[s.index(after: colon)...])
-        guard !value.isEmpty else { return nil }
-        return (key, value)
-    }
-
-    private func dayStart(of raw: String, key: String, context: Context) throws -> Date {
-        let cal = context.calendar
-        let value = raw.lowercased()
-        if value == "today" { return cal.startOfDay(for: context.now) }
-        if value == "yesterday" {
-            return cal.startOfDay(for: cal.date(byAdding: .day, value: -1, to: context.now)!)
-        }
-        // Relative: -7d, -2w, -36h (h keeps the exact offset; d/w snap to day start)
-        if value.hasPrefix("-"), let unit = value.last, let n = Int(value.dropFirst().dropLast()) {
-            switch unit {
-            case "d": return cal.startOfDay(for: cal.date(byAdding: .day, value: -n, to: context.now)!)
-            case "w": return cal.startOfDay(for: cal.date(byAdding: .day, value: -7 * n, to: context.now)!)
-            case "h": return cal.date(byAdding: .hour, value: -n, to: context.now)!
-            default: break
-            }
-        }
-        // Absolute ISO date
-        let f = DateFormatter()
-        f.calendar = cal
-        f.timeZone = cal.timeZone
-        f.dateFormat = "yyyy-MM-dd"
-        if let d = f.date(from: value) { return cal.startOfDay(for: d) }
-        throw ParseError.badDate(key: key, value: raw)
-    }
-
-    private func tokenize(_ s: String) -> [Token] {
-        var tokens: [Token] = []
-        var current = ""
-        var inQuotes = false
-        var negated = false
-        var startOfToken = true
-
-        func flush(asPhrase: Bool) {
-            let t = current.trimmingCharacters(in: .whitespaces)
-            if !t.isEmpty { tokens.append(Token(text: t, isPhrase: asPhrase, isNegated: negated)) }
-            current = ""; negated = false; startOfToken = true
-        }
-
-        for ch in s {
-            if ch == "\"" {
-                if inQuotes { flush(asPhrase: true); inQuotes = false }
-                else { flush(asPhrase: false); inQuotes = true; startOfToken = false }
-                continue
-            }
-            if inQuotes { current.append(ch); continue }
-            if ch.isWhitespace { flush(asPhrase: false); continue }
-            if ch == "-" && startOfToken && current.isEmpty { negated = true; startOfToken = false; continue }
-            startOfToken = false
-            current.append(ch)
-        }
-        flush(asPhrase: inQuotes)   // an unterminated quote is treated as a phrase to its end
-        return tokens
-    }
+public enum QueryParser {
+    /// - Throws: `SearchError.invalidQuery` for an unreadable `before:`/`after:`/`on:`
+    ///   value. Never for anything else.
+    public static func parse(
+        _ text: String,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) throws -> ParsedQuery
 }
 ```
 
-Two properties worth pointing out: a lone `-` (someone typing a hyphen) produces no token, and a token that *starts* with a colon (`:foo`) is free text, so `splitKeyValue` cannot produce an empty key.
+`SearchError` lives in `BackglanceCore` rather than here, alongside the `SearchQuery` and `SearchHit` types the UI passes around.
+
+The result splits cleanly in two: free text on one side, typed filters on the other. Nothing in it is raw user text waiting to be spliced into a query string.
+
+```swift
+// Packages/BackglanceSearch/Sources/BackglanceSearch/ParsedQuery.swift
+public struct ParsedQuery: Sendable, Equatable {
+    public var ftsMatch: String?          // escaped FTS5 MATCH fragment; nil when the query is filters-only
+    public var terms: [String]            // the same words unquoted, for fuzzy and semantic
+    public var bundleIDs: Set<String>     // from:/app: values shaped like a bundle id
+    public var appNameContains: String?   // from:/app: values that read as a display name
+    public var sender: String?
+    public var threadID: String?
+    public var before: Date?
+    public var after: Date?
+    public var flags: Set<Flag>
+
+    public enum Flag: Sendable, Equatable, CaseIterable {
+        case unread, read, pinned, missed, vip, hasLink, hasAttachment, redacted
+    }
+
+    public var isNegationOnly: Bool
+    public var isEmpty: Bool
+}
+```
+
+Three details matter to callers, because they are where a caller gets it wrong:
+
+- **`ftsMatch` means two different things.** With at least one positive term it is a complete match clause — `("invoice" "over"*) NOT "draft"` — bound directly as `notifications_fts MATCH ?`. With only negations (`-draft` and nothing else) FTS5 has no bare `NOT`, so `ftsMatch` carries just the excluded terms and the caller wraps it as `rowid NOT IN (SELECT rowid FROM notifications_fts WHERE notifications_fts MATCH ?)`. `isNegationOnly` is how the two are told apart.
+- **`sender:` is a structured filter, not an FTS column filter.** It binds as a contains match on the `sender` column in `HybridSearch+Filters.swift` and never reaches the `MATCH` expression.
+- **Dates resolve in three tiers** — named (`today`, `yesterday`), relative (`-7d`, `-2w`, `-36h`) and absolute (`yyyy-MM-dd`). Day and week forms snap to local midnight; hour forms are exact.
+
+The tokenizer, the per-key dispatch and the FTS quoting are deliberately not reproduced here. `QueryParser.swift` is short enough to read, and `QueryParserTests.swift` is where the grammar's edge cases are pinned down — including the two easiest to trip over: a lone `-` produces no token at all, and a token that *starts* with a colon (`:foo`) is free text, so a filter can never have an empty key.
 
 ### FTS Ranking and Highlighting
 
