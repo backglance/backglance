@@ -1,6 +1,6 @@
 # Changelog
 
-Last Updated: 2026-08-18
+Last Updated: 2026-08-20
 
 All notable changes to Backglance are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html): breaking changes (including any archive migration that is not forward-transparent) bump MAJOR, features bump MINOR, fixes bump PATCH. Pre-1.0 releases (`0.x`) make no compatibility promises, and the archive may be reset between them.
 
@@ -67,9 +67,12 @@ M1 — capture core and archive. Backglance reads the system's notification stor
 which macOS it is looking at, and keeps what it finds in its own database.
 
 > The tag is not cut yet: the milestone's exit criteria include live capture verified on
-> macOS 14, 15 and 26 from a fresh clone, which needs machines running those releases.
-> Everything else in the criteria is green — `Scripts/verify_fixture.sh` passes for all
-> three fixtures, and a 10 000-record import finishes well inside its ten-second budget.
+> macOS 14, 15 and 26 from a fresh clone, against a real store with Full Disk Access, which
+> needs machines running those releases. Everything else in the criteria is green —
+> `Scripts/verify_fixture.sh` passes for all three fixtures, a 10 000-record import finishes
+> well inside its ten-second budget, and on macOS 26 the built app has been run end to end
+> against the macOS 26 fixture: adapter resolved, backlog correctly left alone, a record
+> appended afterwards captured, indexed and persisted, with no notification content logged.
 
 ### Added
 
@@ -91,6 +94,14 @@ which macOS it is looking at, and keeps what it finds in its own database.
   a bounded batch per wake with the cursor persisted after it, the exclusion → redaction →
   enrichment → insert pipeline, first-launch import, pause with a cursor fast-forward, and
   in-place refresh for notifications the store rewrites
+- **The app runs it.** `AppDelegate` opens and migrates the archive, builds the capture engine
+  on top of it with the real enrichment service, and starts it at launch. Until now every one
+  of the pieces above existed and was tested, but nothing in the shipping app ever constructed
+  them, so no notification was ever captured outside the test suite
+- **Transient failures are retried.** Copying a live SQLite database races the process writing
+  to it, and a torn snapshot is ordinary rather than alarming. Capture now degrades only after
+  five consecutive read failures, and permission and schema failures — the ones a person can
+  act on — still surface at once
 - **Enrichment.** An on-disk app-icon cache and deep-link resolvers for Messages, Mail, Slack
   and Discord, plus a generic scan that only accepts URLs this Mac can actually open
 - **Fixtures.** `FixtureGenerator`, `Scripts/make_fixture.sh`, `Scripts/verify_fixture.sh`, a
@@ -101,6 +112,27 @@ which macOS it is looking at, and keeps what it finds in its own database.
 
 ### Fixed
 
+- Live capture on a fresh archive starts at the store's **tail** rather than at its first
+  record. Starting at the beginning meant the entire pre-install backlog was archived as if
+  it had just arrived — unasked, recorded as `source = 'live'`, and leaving the explicit
+  first-launch import with nothing left to do
+- A watcher released without `stop()` closes its file descriptors. `deinit` finished the wake
+  stream and nothing else, so it left descriptors on `db`, `db-wal` and `db2/` open and a poll
+  timer running for the lifetime of the process
+- `StoreWatcher.start()` is idempotent for system events too, as it always claimed to be:
+  re-arming replaced the file, directory and timer sources but only ever appended the wake,
+  unlock and power-state observers
+- `CaptureMetrics.ticks` counts every tick rather than only those that archived something. It
+  is the counter that distinguishes "nothing new to capture" from "the watcher stopped waking
+  us", and it could not do that while an idle Mac left it frozen
+- Resuming from a pause positions the cursor with a single-row tail query instead of walking
+  every record delivered during the pause — which pulled all of their payloads into memory
+  purely to discard them
+- `Archive.repairCounts()` exists. Two documents promised it as the repair for a drifted
+  `apps.notification_count`, and there was no such method
+- The test plan's `Fast` and `Full` configurations differ again. Both set
+  `BACKGLANCE_TEST_SCOPE` and nothing read it, so the two ran exactly the same tests; `Fast`
+  now skips the ten-thousand-record import benchmark and `Full` still runs it
 - `Scripts/bootstrap.sh` reads the Team ID from a signing certificate's `OU` field rather
   than the ten characters in its common name, which name the developer and not the team.
   With no certificate at all it now writes an ad-hoc signing configuration that still
@@ -114,6 +146,17 @@ which macOS it is looking at, and keeps what it finds in its own database.
 
 ### Security
 
+- A failed archive write no longer carries the notification into the error. GRDB spells a
+  failing statement's bound arguments into its error message when
+  `publicStatementArguments` is on, which Backglance enables in DEBUG builds so SQL is
+  readable while developing — and the notification insert binds the title, subtitle, body and
+  sender. Rendering that error with `String(describing:)` put a user's own notification text
+  into `ArchiveError.logDescription`, the property documented as safe to log publicly, which
+  the capture engine then logs. Errors are now rendered by `ArchiveError.detail(from:)`, which
+  keeps SQLite's result code and message and drops the statement and its arguments
+- The SwiftLint rules that enforce "no notification content in a log" actually match this
+  codebase. They keyed on a literal `logger.`, and every call site here uses
+  `Log.capture` / `Log.parser`, so the rules had been matching nothing at all
 - Excluded apps are checked against the store row before the payload is decoded, so their
   notifications never become objects in memory
 - Nothing that touches notification content can reach a log: `NotificationLogRef` carries an
