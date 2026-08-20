@@ -1,5 +1,6 @@
 @testable import BackglanceCapture
 import BackglanceCore
+import BackglanceTestSupport
 import Foundation
 import XCTest
 
@@ -33,6 +34,14 @@ final class ImportPerformanceTests: XCTestCase {
     }
 
     func testTenThousandRecordsImportWithinTheBudget() async throws {
+        // Ten thousand synthetic records take a few seconds to build and import, which is
+        // the one thing in this suite worth keeping out of a `Fast` run. `Full` — what CI
+        // and a pre-release check use — always runs it.
+        try XCTSkipUnless(
+            TestScope.includesSlowTests,
+            "import performance runs in the Full test configuration"
+        )
+
         let directory = try XCTUnwrap(directory)
         let storeURL = directory.appendingPathComponent("db")
         try MiniatureStore.makeFile(
