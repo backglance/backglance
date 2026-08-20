@@ -109,6 +109,13 @@ public final class TimelineStore {
     /// and the banner read it; the timeline itself renders the same either way.
     public var captureState: TimelineCaptureState = .running
 
+    /// Rows fetched for the current search results, keyed by id.
+    ///
+    /// Search hands back identifiers, not rows — ranking a hundred hits should
+    /// not decode a hundred notifications nobody scrolls to. This is where the
+    /// ones actually being drawn get hydrated.
+    public private(set) var searchItems: [Int64: TimelineItem] = [:]
+
     /// Compact or detailed rows, remembered per host.
     public var viewMode: TimelineViewMode = .compact {
         didSet {
@@ -196,6 +203,43 @@ public final class TimelineStore {
         }
         let next = min(max(index + delta, 0), items.count - 1)
         selectedID = items[next].id
+    }
+
+    /// Loads the rows behind a set of search hits.
+    ///
+    /// Off the main actor, because a hundred rows is a real decode; back on it
+    /// to publish. Ids that vanished while the results were on screen simply do
+    /// not come back, which the results list already handles by skipping them.
+    public func loadSearchItems(for ids: [Int64]) async {
+        guard !ids.isEmpty else {
+            searchItems = [:]
+            return
+        }
+        let archive = archive
+        do {
+            let rows = try await Task.detached { try archive.notifications(ids: ids) }.value
+            let apps = apps
+            searchItems = rows.compactMapValues { row in
+                TimelineItem(row: row, apps: apps, triage: triage.evaluate(row))
+            }
+        } catch {
+            loadError = Self.message(for: error)
+        }
+    }
+
+    /// Selects the first unread row, if nothing is selected yet.
+    ///
+    /// What a surface does when it opens: the point of the timeline is what
+    /// arrived while you were away, so the keyboard starts there rather than at
+    /// the top or nowhere. "If needed" because a selection the user made
+    /// themselves outlives a refresh — moving it under them would be worse than
+    /// not selecting at all.
+    public func selectFirstUnreadIfNeeded() {
+        guard selectedID == nil else {
+            return
+        }
+        let items = visibleItems
+        selectedID = items.first { !$0.notification.isRead }?.id ?? items.first?.id
     }
 
     /// Clears every app filter — what the "all filtered" empty state's button does.

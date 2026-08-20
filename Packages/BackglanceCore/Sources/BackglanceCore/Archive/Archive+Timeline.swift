@@ -158,3 +158,30 @@ public extension Archive {
         }
     }
 }
+
+// MARK: - Archive + hydration
+
+public extension Archive {
+    /// The notifications behind a set of ids, keyed by id.
+    ///
+    /// Search returns identifiers and scores; this is what turns them back into
+    /// rows, and only for the ones about to be drawn. Ids that no longer exist
+    /// — deleted while the results were on screen — are simply absent from the
+    /// result rather than an error: a stale hit is an ordinary consequence of a
+    /// live archive.
+    func notifications(ids: [Int64]) throws -> [Int64: ArchivedNotification] {
+        guard !ids.isEmpty else {
+            return [:]
+        }
+        do {
+            return try pool.read { db in
+                let rows = try ArchivedNotification.filter(ids.contains(Column("id"))).fetchAll(db)
+                return Dictionary(uniqueKeysWithValues: rows.compactMap { row in
+                    row.id.map { ($0, row) }
+                })
+            }
+        } catch {
+            throw ArchiveError.observationFailed(ArchiveError.detail(from: error))
+        }
+    }
+}

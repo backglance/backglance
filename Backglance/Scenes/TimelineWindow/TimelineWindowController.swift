@@ -31,7 +31,13 @@ final class TimelineWindowController: NSWindowController {
         window.title = String(localized: "Backglance")
         window.minSize = NSSize(width: 480, height: 360)
         window.setFrameAutosaveName("TimelineWindow")
-        let hosting = NSHostingController(rootView: TimelineView().environment(store))
+        // The window has no popover to close and no window to open, so it
+        // supplies neither verb: Esc and ⌘↩ fall through instead of pretending.
+        let hosting = NSHostingController(
+            rootView: TimelineView()
+                .environment(store)
+                .environment(\.timelineActions, TimelineActions())
+        )
         // The window's size is the window's business. Left to its default, the
         // hosting controller propagates SwiftUI's fitting size and an empty
         // timeline opens the window at its 480 × 360 minimum — measured, not

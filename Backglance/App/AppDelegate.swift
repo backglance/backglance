@@ -64,6 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// controller is deallocated stays in the menu bar and stops responding.
     private var store: TimelineStore?
     private var search: SearchService?
+    private var searchModel: SearchViewModel?
     private var settings: SettingsWindowController?
     private var statusItem: StatusItemController?
     private var hotKeys: HotKeyCenter?
@@ -151,8 +152,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let search = SearchService(archive: archive)
         search.start()
         let settings = SettingsWindowController(search: search)
+        // The field's own state: what was typed, what came back, what is still
+        // in flight. It asks `search` its questions through `SearchRunning`.
+        // Read per call rather than captured once: the toggle can change
+        // between one keystroke and the next.
+        let semanticEnabled: @Sendable () -> Bool = { [weak search] in
+            MainActor.assumeIsolated { search?.semanticEnabled ?? false }
+        }
+        let searchModel = SearchViewModel(search: search, semanticEnabled: semanticEnabled)
         let statusItem = StatusItemController(
             store: store,
+            search: searchModel,
+            searchService: search,
             menuActions: .init(
                 openWindow: { window.show() },
                 pauseForAnHour: { [weak self] in
@@ -177,6 +188,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         self.store = store
         self.search = search
+        self.searchModel = searchModel
         self.settings = settings
         self.window = window
         self.statusItem = statusItem

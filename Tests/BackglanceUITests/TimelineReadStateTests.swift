@@ -197,6 +197,51 @@ final class TimelineReadStateTests: XCTestCase {
         )
     }
 
+    // MARK: - Selection
+
+    /// A surface opens on what arrived while you were away, so the keyboard
+    /// starts at the first unread row rather than at the top or nowhere.
+    func testOpeningSelectsTheFirstUnreadRow() async throws {
+        let archive = try XCTUnwrap(archive)
+        let inserted = try seed(archive, count: 3)
+        let store = makeStore(archive: archive)
+        try await waitUntil { store.visibleItems.count == 3 }
+        let newest = try XCTUnwrap(store.visibleItems.first?.id)
+        store.open(newest)
+        try await waitUntil { store.visibleItems.first?.notification.isRead == true }
+        store.selectedID = nil
+
+        store.selectFirstUnreadIfNeeded()
+
+        XCTAssertNotEqual(store.selectedID, newest, "the row just read is not where the keyboard should land")
+        XCTAssertNotNil(store.selectedID)
+        _ = inserted
+    }
+
+    /// A selection the user made outlives a refresh: moving it under them would
+    /// be worse than not selecting at all.
+    func testAnExistingSelectionIsLeftAlone() async throws {
+        let archive = try XCTUnwrap(archive)
+        try seed(archive, count: 3)
+        let store = makeStore(archive: archive)
+        try await waitUntil { store.visibleItems.count == 3 }
+        let chosen = try XCTUnwrap(store.visibleItems.last?.id)
+        store.selectedID = chosen
+
+        store.selectFirstUnreadIfNeeded()
+
+        XCTAssertEqual(store.selectedID, chosen)
+    }
+
+    func testWithNothingToShowNothingIsSelected() throws {
+        let archive = try XCTUnwrap(archive)
+        let store = makeStore(archive: archive)
+
+        store.selectFirstUnreadIfNeeded()
+
+        XCTAssertNil(store.selectedID)
+    }
+
     // MARK: Private
 
     private var archive: Archive?

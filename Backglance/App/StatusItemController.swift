@@ -20,13 +20,30 @@ import SwiftUI
 final class StatusItemController: NSObject, NSPopoverDelegate {
     // MARK: Lifecycle
 
-    init(store: TimelineStore, menuActions: MenuActions) {
+    init(store: TimelineStore, search: SearchViewModel, searchService: SearchService, menuActions: MenuActions) {
         self.store = store
+        self.search = search
+        self.searchService = searchService
         self.menuActions = menuActions
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
-        let hosting = NSHostingController(rootView: MenuBarPopoverView().environment(store))
+        // The timeline asks its host to open the window or close the surface;
+        // only the host knows how (BackglanceUI/TimelineActions.swift).
+        let actions = TimelineActions(
+            openWindow: { [weak self] in
+                self?.popover.performClose(nil)
+                menuActions.openWindow()
+            },
+            dismiss: { [weak self] in self?.popover.performClose(nil) }
+        )
+        let hosting = NSHostingController(
+            rootView: MenuBarPopoverView()
+                .environment(store)
+                .environment(search)
+                .environment(\.searchService, searchService)
+                .environment(\.timelineActions, actions)
+        )
         // We own the size; letting the hosting view drive it makes the popover
         // resize itself as rows load, which reads as a flicker on every open.
         hosting.sizingOptions = []
@@ -46,6 +63,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             button.action = #selector(statusItemClicked(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             button.setAccessibilityLabel(String(localized: "Backglance"))
+            // Named in docs/reference/ACCESSIBILITY.md's identifier table, and
+            // what the XCUITests reach for.
+            button.setAccessibilityIdentifier("statusItem.button")
         }
         observeStore()
     }
@@ -90,6 +110,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
     private let store: TimelineStore
+    private let search: SearchViewModel
+    private let searchService: SearchService
     private let menuActions: MenuActions
 
     /// The status item's template image by asset name.

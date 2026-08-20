@@ -21,7 +21,13 @@ final class SettingsWindowController: NSWindowController {
         )
         window.title = String(localized: "Backglance Settings")
         window.setFrameAutosaveName("SettingsWindow")
-        window.contentViewController = NSHostingController(rootView: SettingsView(search: search))
+        let hosting = NSHostingController(rootView: SettingsView(search: search))
+        // The window owns its size. Left to the hosting controller, the form's
+        // fitting size came back zero-width — measured, not guessed: the
+        // autosaved frame was "0 260 0 32".
+        hosting.sizingOptions = []
+        window.contentViewController = hosting
+        window.setContentSize(NSSize(width: 460, height: 260))
         window.isReleasedWhenClosed = false
         self.init(window: window)
     }

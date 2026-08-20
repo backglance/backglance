@@ -49,10 +49,41 @@ public struct TimelineView: View {
             return .handled
         }
         .onKeyPress(.return) {
-            if let id = store.selectedID {
-                store.open(id)
+            guard let id = store.selectedID else {
+                return .ignored
             }
+            store.open(id)
             return .handled
+        }
+        // Space peeks: the selected row expands to detailed and back, without
+        // changing what the surface remembers for next time.
+        .onKeyPress(.space) {
+            store.viewMode = store.viewMode == .compact ? .detailed : .compact
+            return .handled
+        }
+        .onKeyPress(.escape) {
+            guard let dismiss = actions.dismiss else {
+                return .ignored
+            }
+            dismiss()
+            return .handled
+        }
+        .onKeyPress(.return, phases: .down) { press in
+            // ⌘↩ hands the timeline to the full window. Checked here rather
+            // than as a `keyboardShortcut` so the plain Return above keeps
+            // working when there is no window to open.
+            guard press.modifiers.contains(.command), let openWindow = actions.openWindow else {
+                return .ignored
+            }
+            openWindow()
+            return .handled
+        }
+        .focusable()
+        .focusEffectDisabled()
+        .task(id: store.sections.count) {
+            // The popover opens straight into the list with the first unread
+            // row selected, so ↓ moves rather than merely starting.
+            store.selectFirstUnreadIfNeeded()
         }
     }
 
@@ -60,6 +91,9 @@ public struct TimelineView: View {
 
     @Environment(TimelineStore.self)
     private var store
+
+    @Environment(\.timelineActions)
+    private var actions
 
     /// Which days' collapsed "Muted (n)" group is currently expanded. Keyed
     /// by `TimelineSection.Model.id` (the day), not by any one notification,
