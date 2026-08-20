@@ -12,9 +12,16 @@ let package = Package(
     products: [
         .library(name: "BackglanceTestSupport", targets: ["BackglanceTestSupport"]),
     ],
+    dependencies: [
+        // Test-only, and so is this package: the seeded archives the performance
+        // suites measure against are built through `Archive` itself, so they go
+        // through the same migrations and the same FTS triggers the app does.
+        .package(path: "../../Packages/BackglanceCore"),
+    ],
     targets: [
         .target(
             name: "BackglanceTestSupport",
+            dependencies: ["BackglanceCore"],
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency"),
             ]

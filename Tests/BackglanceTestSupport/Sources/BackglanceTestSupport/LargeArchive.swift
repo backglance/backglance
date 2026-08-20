@@ -1,5 +1,4 @@
 import BackglanceCore
-import BackglanceTestSupport
 import Foundation
 import GRDB
 
@@ -16,10 +15,10 @@ import GRDB
 /// ``SplitMix64``, and Apple's own published bundle identifiers. See
 /// docs/testing/TESTING.md and
 /// docs/deployment/PERFORMANCE_GUIDE.md#search-latency.
-enum LargeArchive {
-    // MARK: Internal
+public enum LargeArchive {
+    // MARK: Public
 
-    static let notificationCount = 100_000
+    public static let notificationCount = 100_000
 
     /// Words the queries search for, with deliberate frequencies.
     ///
@@ -30,11 +29,11 @@ enum LargeArchive {
     /// by. A term in *every* row would be a harsher test than anything the
     /// budget was written for, and a fixture that is harsher than reality
     /// measures the fixture rather than the product.
-    static let rareTerm = "invoice"
-    static let commonTerm = "update"
+    public static let rareTerm = "invoice"
+    public static let commonTerm = "update"
 
     /// The archive, built on first use and reused afterwards.
-    static func shared() throws -> Archive {
+    public static func shared() throws -> Archive {
         if let cached {
             return cached
         }

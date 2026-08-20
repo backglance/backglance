@@ -12,6 +12,8 @@ excluded:
   - .build
   - Packages/*/.build   # each package resolves its own checkouts when built with `swift build`
   - Packages/*/.swiftpm
+  - Tests/*/.build      # BackglanceTestSupport resolves BackglanceCore, and GRDB with it
+  - Tests/*/.swiftpm
   - .swiftpm
   - Pods
   - Carthage

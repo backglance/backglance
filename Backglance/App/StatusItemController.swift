@@ -1,6 +1,7 @@
 import AppKit
 import BackglanceCore
 import BackglanceUI
+import os.signpost
 import SwiftUI
 
 // MARK: - StatusItemController
@@ -91,6 +92,13 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         guard let button = statusItem.button else {
             return
         }
+        // The first-paint interval the menu bar budget is measured against.
+        // An `xctrace` run against this signpost is how the remaining slice —
+        // AppKit's own window work, which no in-process test can see — gets
+        // measured (docs/deployment/PERFORMANCE_GUIDE.md#signposts).
+        let signpostID = OSSignpostID(log: Self.signpostLog)
+        os_signpost(.begin, log: Self.signpostLog, name: "popover.open", signpostID: signpostID)
+        defer { os_signpost(.end, log: Self.signpostLog, name: "popover.open", signpostID: signpostID) }
         // Snapshot before showing: the divider the user sees has to reflect the
         // moment before they clicked, not after.
         store.surfaceWillOpen()
@@ -106,6 +114,13 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     }
 
     // MARK: Private
+
+    /// Points-of-interest, so the interval shows up in Instruments without a
+    /// custom template.
+    private static let signpostLog = OSLog(
+        subsystem: "app.backglance.Backglance",
+        category: .pointsOfInterest
+    )
 
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
