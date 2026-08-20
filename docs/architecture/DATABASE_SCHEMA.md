@@ -464,7 +464,9 @@ extension UnixDate: Comparable {
 
 ### GRDB models
 
-All models are `Codable, FetchableRecord, PersistableRecord` with an explicit `databaseTableName` and snake_case column mapping. They live in `Packages/BackglanceCore/Sources/BackglanceCore/Models/`.
+All models are `Codable, FetchableRecord, MutablePersistableRecord` with an explicit `databaseTableName` and snake_case column mapping.
+
+`MutablePersistableRecord` rather than `PersistableRecord`, because these are structs that need to learn their own autoincrement id: GRDB's `didInsert(_:)` is `mutating` on the mutable protocol and non-mutating on the other, so the pairing below only compiles this way. They live in `Packages/BackglanceCore/Sources/BackglanceCore/Models/`.
 
 ```swift
 import Foundation
@@ -492,7 +494,7 @@ public enum AppRetention: RawRepresentable, Codable, Hashable, Sendable {
     }
 }
 
-public struct AppRecord: Codable, FetchableRecord, PersistableRecord, Identifiable, Hashable, Sendable {
+public struct AppRecord: Codable, FetchableRecord, MutablePersistableRecord, Identifiable, Hashable, Sendable {
     public static let databaseTableName = "apps"
     public static let databaseColumnDecodingStrategy = DatabaseColumnDecodingStrategy.convertFromSnakeCase
     public static let databaseColumnEncodingStrategy = DatabaseColumnEncodingStrategy.convertToSnakeCase
@@ -513,7 +515,7 @@ public struct AppRecord: Codable, FetchableRecord, PersistableRecord, Identifiab
     public static let notifications = hasMany(ArchivedNotification.self)
 }
 
-public struct ArchivedNotification: Codable, FetchableRecord, PersistableRecord, Identifiable, Hashable, Sendable {
+public struct ArchivedNotification: Codable, FetchableRecord, MutablePersistableRecord, Identifiable, Hashable, Sendable {
     public static let databaseTableName = "notifications"
     public static let databaseColumnDecodingStrategy = DatabaseColumnDecodingStrategy.convertFromSnakeCase
     public static let databaseColumnEncodingStrategy = DatabaseColumnEncodingStrategy.convertToSnakeCase
@@ -550,7 +552,7 @@ public struct ArchivedNotification: Codable, FetchableRecord, PersistableRecord,
     public static let redactions = hasMany(RedactionEvent.self)
 }
 
-public struct Rule: Codable, FetchableRecord, PersistableRecord, Identifiable, Hashable, Sendable {
+public struct Rule: Codable, FetchableRecord, MutablePersistableRecord, Identifiable, Hashable, Sendable {
     public static let databaseTableName = "rules"
     public static let databaseColumnDecodingStrategy = DatabaseColumnDecodingStrategy.convertFromSnakeCase
     public static let databaseColumnEncodingStrategy = DatabaseColumnEncodingStrategy.convertToSnakeCase
@@ -573,7 +575,7 @@ public struct Rule: Codable, FetchableRecord, PersistableRecord, Identifiable, H
 
 public enum AwayReason: String, Codable, Sendable { case locked, asleep, focus, presenting, manual }
 
-public struct AwaySession: Codable, FetchableRecord, PersistableRecord, Identifiable, Hashable, Sendable {
+public struct AwaySession: Codable, FetchableRecord, MutablePersistableRecord, Identifiable, Hashable, Sendable {
     public static let databaseTableName = "away_sessions"
     public static let databaseColumnDecodingStrategy = DatabaseColumnDecodingStrategy.convertFromSnakeCase
     public static let databaseColumnEncodingStrategy = DatabaseColumnEncodingStrategy.convertToSnakeCase
@@ -589,7 +591,7 @@ public struct AwaySession: Codable, FetchableRecord, PersistableRecord, Identifi
     public static let digest = hasOne(Digest.self)
 }
 
-public struct Digest: Codable, FetchableRecord, PersistableRecord, Identifiable, Hashable, Sendable {
+public struct Digest: Codable, FetchableRecord, MutablePersistableRecord, Identifiable, Hashable, Sendable {
     public static let databaseTableName = "digests"
     public static let databaseColumnDecodingStrategy = DatabaseColumnDecodingStrategy.convertFromSnakeCase
     public static let databaseColumnEncodingStrategy = DatabaseColumnEncodingStrategy.convertToSnakeCase
@@ -608,7 +610,7 @@ public struct Digest: Codable, FetchableRecord, PersistableRecord, Identifiable,
     public static let notifications = hasMany(ArchivedNotification.self, through: items, using: DigestItem.notification)
 }
 
-public struct DigestItem: Codable, FetchableRecord, PersistableRecord, Hashable, Sendable {
+public struct DigestItem: Codable, FetchableRecord, MutablePersistableRecord, Hashable, Sendable {
     public static let databaseTableName = "digest_items"
     public static let databaseColumnDecodingStrategy = DatabaseColumnDecodingStrategy.convertFromSnakeCase
     public static let databaseColumnEncodingStrategy = DatabaseColumnEncodingStrategy.convertToSnakeCase
@@ -621,7 +623,7 @@ public struct DigestItem: Codable, FetchableRecord, PersistableRecord, Hashable,
     public static let notification = belongsTo(ArchivedNotification.self)
 }
 
-public struct RedactionEvent: Codable, FetchableRecord, PersistableRecord, Identifiable, Hashable, Sendable {
+public struct RedactionEvent: Codable, FetchableRecord, MutablePersistableRecord, Identifiable, Hashable, Sendable {
     public static let databaseTableName = "redactions"
     public static let databaseColumnDecodingStrategy = DatabaseColumnDecodingStrategy.convertFromSnakeCase
     public static let databaseColumnEncodingStrategy = DatabaseColumnEncodingStrategy.convertToSnakeCase
@@ -636,7 +638,14 @@ public struct RedactionEvent: Codable, FetchableRecord, PersistableRecord, Ident
 }
 
 /// Key/value bookkeeping for the capture pipeline (`capture_state`).
-public struct CaptureState: Codable, FetchableRecord, PersistableRecord, Hashable, Sendable {
+///
+/// ⚠️ Illustrative only — there is no `CaptureState` record type in the codebase, and
+/// none is planned. `capture_state` and `schema_meta` are two-column key/value tables
+/// with nothing to map, so `Archive+CaptureState.swift` reads and writes them with typed
+/// accessors over raw SQL (`captureStateJSON(_:as:)`, `saveCursor(_:)`, `saveAdapterID(_:)`)
+/// and the keys live in `CaptureStateKey`. Shown here because the *shape* of the table is
+/// what this document is about.
+public struct CaptureState: Codable, FetchableRecord, MutablePersistableRecord, Hashable, Sendable {
     public static let databaseTableName = "capture_state"
 
     public enum Key: String, Codable, Sendable { case cursor, fingerprint, adapterId = "adapter_id", lastImportAt = "last_import_at" }

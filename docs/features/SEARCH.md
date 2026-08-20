@@ -154,31 +154,19 @@ The GRDB migration that creates all of this:
 ```swift
 // Packages/BackglanceCore/Sources/BackglanceCore/Archive/ArchiveMigrations.swift (excerpt)
 migrator.registerMigration("v1_fts") { db in
-    try db.create(virtualTable: "notifications_fts", using: FTS5()) { t in
-        t.synchronize(withTable: "notifications")      // GRDB emits the ai/ad/au triggers
-        t.tokenizer = .unicode61(diacritics: .remove)   // remove_diacritics 2 on SQLite ≥ 3.27
-        t.column("title")
-        t.column("subtitle")
-        t.column("body")
-        t.column("sender")
-        t.prefixes = [2, 3]
-    }
-    // GRDB's tokenizer builder cannot express tokenchars, so we patch the SQL it produced.
-    // The virtual table definition is recreated with the exact canonical DDL:
-    try db.execute(sql: "DROP TABLE notifications_fts")
-    try db.execute(sql: """
-        CREATE VIRTUAL TABLE notifications_fts USING fts5(
-          title, subtitle, body, sender,
-          content='notifications', content_rowid='id',
-          tokenize = "unicode61 remove_diacritics 2 tokenchars '@.-'",
-          prefix = '2 3'
-        )
-        """)
-    try db.execute(sql: "INSERT INTO notifications_fts(notifications_fts) VALUES('rebuild')")
+    try db.execute(sql: ftsTableSQL)      // the canonical CREATE VIRTUAL TABLE, verbatim
+    try db.execute(sql: ftsTriggersSQL)   // notifications_ai / _ad / _au, written by hand
 }
 ```
 
-> ℹ️ **Info:** GRDB's `synchronize(withTable:)` writes the same three triggers shown above under the names `__notifications_fts_ai/_ad/_au`. The doc uses the shorter canonical names; the behaviour is identical. Dropping and recreating the virtual table does not drop the triggers, which is why the migration ends with a `'rebuild'`.
+> ℹ️ **Info:** The migration issues the canonical DDL directly rather than going through
+> GRDB's `create(virtualTable:using: FTS5())` builder. The builder cannot express
+> `tokenchars`, so using it would mean creating the table, dropping it and recreating it
+> with the SQL above — three statements to arrive at what one says exactly. Writing the
+> three triggers by hand instead of `synchronize(withTable:)` follows from the same
+> choice: they are named `notifications_ai/_ad/_au` rather than
+> `__notifications_fts_ai/_ad/_au`, and the `'delete'` command form above is spelled out
+> where a reader can check it against the FTS5 documentation.
 
 ### The embeddings Table
 
