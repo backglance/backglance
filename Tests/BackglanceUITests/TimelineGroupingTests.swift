@@ -125,6 +125,7 @@ final class TimelineGroupingTests: XCTestCase {
         }
         XCTAssertTrue(group.isMuted)
         XCTAssertEqual(group.count, 2)
+        XCTAssertEqual(group.name, "Muted", "the count belongs to the header's own formatting, not to the name")
     }
 
     /// VIP beats mute unconditionally, so a pinned row must not disappear into

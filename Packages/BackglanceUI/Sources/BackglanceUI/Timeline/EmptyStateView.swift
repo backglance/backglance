@@ -139,7 +139,7 @@ public struct EmptyStateView: View {
 /// would trip SwiftLint's trailing-closure rule, and a trailing closure would
 /// bind to the wrong parameter.
 private enum PreviewAction {
-    static let none: () -> Void = {}
+    static let none: @Sendable () -> Void = {}
 }
 
 #Preview("No Full Disk Access") {

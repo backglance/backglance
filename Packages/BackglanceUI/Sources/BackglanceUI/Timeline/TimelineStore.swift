@@ -258,9 +258,11 @@ public final class TimelineStore {
             if !muted.isEmpty {
                 // Collapsed by default: the header is the whole group until the
                 // user expands it, so no muted rows are emitted here.
+                // The name carries no count: `AppGroupHeader` renders name and
+                // count separately, so baking "(n)" in here would print it twice.
                 slots.append(.appHeader(.init(
                     id: "muted",
-                    name: String(localized: "Muted (\(muted.count))"),
+                    name: String(localized: "Muted"),
                     count: muted.count,
                     isMuted: true
                 )))
