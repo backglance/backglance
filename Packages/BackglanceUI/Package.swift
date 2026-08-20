@@ -28,7 +28,7 @@ let package = Package(
         ),
         .testTarget(
             name: "BackglanceUITests",
-            dependencies: ["BackglanceUI", "BackglanceTestSupport"],
+            dependencies: ["BackglanceUI", "BackglanceCore", "BackglanceTestSupport"],
             path: "Tests/BackglanceUITests"
         ),
     ]
