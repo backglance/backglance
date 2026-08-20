@@ -121,7 +121,7 @@ There is no `triage` column anywhere, and there will not be one. Triage is deriv
 
 > ℹ️ **Status:** `kind = 'regex'` is **planned for v1.x**. The column, the model case, the compile path, and the safety bounds are specified now so a rules file imported from a future version fails *visibly* rather than silently doing nothing. In v1.0 a `regex` rule produces a `RuleCompileError` and shows a warning badge in the list.
 
-`HighlightColor` is a `String`-backed enum over those five tokens, each resolving to an asset-catalog colour with light, dark and increased-contrast variants (`Color("Highlight/\(rawValue)", bundle: .module)`); the contrast of `Color.primary` over each tint is asserted by a unit test ([ACCESSIBILITY.md](../reference/ACCESSIBILITY.md)).
+`HighlightColor` is a `String`-backed enum over those five tokens. Each one resolves to a system colour, not an asset-catalog entry: `amber` → `.orange`, `red` → `.red`, `green` → `.green`, `blue` → `.blue`, `purple` → `.purple`, in the `swiftUIColor` property of `Packages/BackglanceUI/Sources/BackglanceUI/Timeline/HighlightColor+SwiftUI.swift`. `BackglanceUI` ships no resource bundle — see the dependency-direction note in `AppIconView.swift` for why the package stays free of one — so there is no catalog for a `bundle: .module` lookup to resolve against, and a system colour already carries the light, dark and increased-contrast variants a hand-rolled catalog would otherwise have to reproduce one entry at a time. The contrast of `Color.primary` over each tint is owed a unit test ([ACCESSIBILITY.md](../reference/ACCESSIBILITY.md)); that test is not written yet, and the swap to system colours does not excuse it.
 
 ## Matching Semantics
 
