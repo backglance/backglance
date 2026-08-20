@@ -177,6 +177,41 @@ final class StoreWatcherTests: XCTestCase {
         await assertNoWake(from: watcher, within: 0.8)
     }
 
+    /// A watcher that is released without `stop()` has to let go of its file descriptors.
+    ///
+    /// `deinit` used to finish the wake stream and nothing else, so every watcher that
+    /// went out of scope un-stopped left `O_EVTONLY` descriptors on `db`, `db-wal` and
+    /// `db2/` open, plus a repeating poll timer, for the lifetime of the process. Nothing
+    /// misbehaved visibly — the event handlers hold `self` weakly, so they simply stopped
+    /// doing anything — which is exactly why it needs a test that looks at the descriptors
+    /// rather than at the behaviour.
+    func testAWatcherReleasedWithoutStoppingClosesItsDescriptors() async throws {
+        // One warm-up round first: the very first watcher pays one-time costs (queue
+        // creation, dyld) that would otherwise read as a leak.
+        do {
+            let warmUp = StoreWatcher(location: storeURL, debounce: 0.1, pollInterval: 30)
+            warmUp.start()
+            try await settle()
+        }
+        try await settle()
+
+        let before = Self.openDescriptorCount()
+        for _ in 0 ..< 5 {
+            let leaked = StoreWatcher(location: storeURL, debounce: 0.1, pollInterval: 30)
+            leaked.start()
+            try await settle()
+            // Deliberately no stop(): the point is that dropping the last reference is
+            // enough. `start()`'s queue block retains the watcher until it has run, which
+            // the settle above waits for, so the release here really is the last one.
+        }
+        try await settle()
+        let after = Self.openDescriptorCount()
+
+        // Five watchers × three descriptors is fifteen; a small allowance absorbs
+        // unrelated churn without letting a real leak through.
+        XCTAssertLessThanOrEqual(after, before + 3, "open descriptors went from \(before) to \(after)")
+    }
+
     /// A store recreated under the watcher — `usernoted` checkpointing, or a fresh
     /// account getting its first notification — must not leave capture watching a dead
     /// inode for the rest of the session.
@@ -208,6 +243,18 @@ final class StoreWatcherTests: XCTestCase {
 
     private var walURL: URL {
         root.appendingPathComponent("db-wal")
+    }
+
+    /// How many file descriptors this process currently holds open.
+    ///
+    /// `fcntl(_:F_GETFD)` succeeds for an open descriptor and fails with `EBADF` for a
+    /// closed one, which is the cheapest reliable way to count them on Darwin.
+    private static func openDescriptorCount() -> Int {
+        var count = 0
+        for descriptor in 0 ..< Int32(getdtablesize()) where fcntl(descriptor, F_GETFD) != -1 {
+            count += 1
+        }
+        return count
     }
 
     /// A watcher with test-sized timings, retained so teardown can stop it.

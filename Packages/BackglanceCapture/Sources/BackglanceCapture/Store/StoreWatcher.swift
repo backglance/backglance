@@ -79,6 +79,15 @@ public final class StoreWatcher: @unchecked Sendable {
     }
 
     deinit {
+        // Deliberately *not* dispatched onto `queue`. Every block scheduled there captures
+        // `self` strongly, so deinit cannot run while one is pending or executing, and by
+        // definition no other reference is left to race with — direct access is safe here
+        // and dispatching would instead resurrect `self` inside the block.
+        //
+        // Without this, a watcher released without `stop()` left its `O_EVTONLY`
+        // descriptors on `db`/`db-wal`/`db2/` open, its poll timer running, and its three
+        // system observers registered for the lifetime of the process.
+        teardown()
         continuation.finish()
     }
 
@@ -105,36 +114,7 @@ public final class StoreWatcher: @unchecked Sendable {
 
     /// Tears every trigger down. The stream stays open, so `start()` can follow.
     public func stop() {
-        queue.async { [self] in
-            for source in fileSources {
-                source.cancel()
-            }
-            fileSources.removeAll()
-            directorySource?.cancel()
-            directorySource = nil
-            pollTimer?.cancel()
-            pollTimer = nil
-            pending?.cancel()
-            pending = nil
-            pendingSince = nil
-
-            let workspace = NSWorkspace.shared.notificationCenter
-            for observer in workspaceObservers {
-                workspace.removeObserver(observer)
-            }
-            workspaceObservers.removeAll()
-
-            for observer in defaultObservers {
-                NotificationCenter.default.removeObserver(observer)
-            }
-            defaultObservers.removeAll()
-
-            let distributed = DistributedNotificationCenter.default()
-            for observer in distributedObservers {
-                distributed.removeObserver(observer)
-            }
-            distributedObservers.removeAll()
-        }
+        queue.async { [self] in teardown() }
     }
 
     /// Asks for a tick now, skipping the debounce.
@@ -288,7 +268,54 @@ public final class StoreWatcher: @unchecked Sendable {
         pollTimer = timer
     }
 
+    /// Cancels every source and removes every observer. Leaves the stream open.
+    ///
+    /// Must be called on ``queue``, or from `deinit` — see the note there.
+    private func teardown() {
+        for source in fileSources {
+            source.cancel()
+        }
+        fileSources.removeAll()
+        directorySource?.cancel()
+        directorySource = nil
+        pollTimer?.cancel()
+        pollTimer = nil
+        pending?.cancel()
+        pending = nil
+        pendingSince = nil
+        removeSystemObservers()
+    }
+
+    /// Unregisters the wake, unlock and power-state observers.
+    ///
+    /// Split out because ``armSystemEvents()`` needs it too: unlike the three `arm*`
+    /// helpers that replace their source, adding an observer only ever appends, so
+    /// re-arming without this leaves the previous registration in place and every unlock
+    /// schedules two wakes.
+    private func removeSystemObservers() {
+        let workspace = NSWorkspace.shared.notificationCenter
+        for observer in workspaceObservers {
+            workspace.removeObserver(observer)
+        }
+        workspaceObservers.removeAll()
+
+        for observer in defaultObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        defaultObservers.removeAll()
+
+        let distributed = DistributedNotificationCenter.default()
+        for observer in distributedObservers {
+            distributed.removeObserver(observer)
+        }
+        distributedObservers.removeAll()
+    }
+
     private func armSystemEvents() {
+        // Idempotent like its three siblings: `start()` promises that arming twice
+        // replaces the triggers rather than doubling them, and observers only append.
+        removeSystemObservers()
+
         let workspace = NSWorkspace.shared.notificationCenter
         workspaceObservers.append(workspace.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: nil
