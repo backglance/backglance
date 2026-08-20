@@ -1,4 +1,5 @@
 import Foundation
+import GRDB
 
 // MARK: - ArchiveError
 
@@ -107,6 +108,38 @@ public enum ArchiveError: Error, Sendable {
         case .unavailable:
             "Backglance is busy, try again in a moment."
         }
+    }
+}
+
+// MARK: - Content-free underlying details
+
+public extension ArchiveError {
+    /// Renders an arbitrary thrown error into the `underlying:` string these cases
+    /// carry, without letting notification content in.
+    ///
+    /// > 🔒 This exists because `String(describing:)` on a GRDB `DatabaseError` includes
+    /// > the statement's *bound arguments* whenever `Configuration.publicStatementArguments`
+    /// > is on — which ``Archive/makeConfiguration(inMemory:)`` enables in DEBUG builds so
+    /// > that SQL is readable while developing. A failing insert binds the notification's
+    /// > title, body and sender, so the convenient rendering is exactly the one that would
+    /// > put a user's notification text into ``logDescription`` — the property documented
+    /// > as safe for `os_log` with `privacy: .public`. A guarantee that holds only in
+    /// > Release is not a guarantee.
+    ///
+    /// So the pieces are picked out by hand instead: SQLite's result code and its own
+    /// message ("UNIQUE constraint failed: notifications.uuid", "database or disk is
+    /// full") name columns and conditions, never values. `sql` and `arguments` are
+    /// dropped — the statement is ours and adds nothing a result code does not.
+    static func detail(from error: Error) -> String {
+        guard let database = error as? DatabaseError else {
+            // Not a database failure — the type name is all that can be said safely about
+            // an error this module has never seen.
+            return String(describing: type(of: error))
+        }
+        guard let message = database.message else {
+            return "sqlite \(database.extendedResultCode.rawValue)"
+        }
+        return "sqlite \(database.extendedResultCode.rawValue): \(message)"
     }
 }
 

@@ -21,6 +21,44 @@ public extension Archive {
         }
     }
 
+    /// Recomputes every app's denormalized `notification_count` from the rows it owns.
+    ///
+    /// `apps.notification_count` is maintained incrementally by the insert and prune
+    /// paths because Settings reads it per app and a `COUNT(*)` per row would be a table
+    /// scan each time. Incremental counters drift — an interrupted prune, a restore of an
+    /// older archive file, a bug — and a count that disagrees with the timeline is the
+    /// kind of thing a user notices and cannot explain.
+    ///
+    /// This is the documented repair for that (docs/architecture/DATABASE_SCHEMA.md).
+    /// Deliberately manual rather than run on every launch: drift is not expected, and a
+    /// full recount on a large archive is not something to do behind the user's back.
+    /// Soft-deleted rows are excluded, matching what the insert path counts.
+    ///
+    /// - Returns: how many app rows had a count that was wrong.
+    @discardableResult
+    func repairCounts() throws -> Int {
+        try pool.write { db in
+            try db.execute(
+                sql: """
+                UPDATE apps
+                   SET notification_count = (
+                         SELECT COUNT(*)
+                           FROM notifications
+                          WHERE notifications.app_id = apps.id
+                            AND notifications.is_deleted = 0
+                       )
+                 WHERE notification_count <> (
+                         SELECT COUNT(*)
+                           FROM notifications
+                          WHERE notifications.app_id = apps.id
+                            AND notifications.is_deleted = 0
+                       )
+                """
+            )
+            return db.changesCount
+        }
+    }
+
     // MARK: - Notifications
 
     /// Archives one notification, together with its redaction audit row, and updates
@@ -58,9 +96,12 @@ public extension Archive {
             } catch let error as DatabaseError where Self.isUniquenessViolation(error) {
                 throw ArchiveError.duplicate
             } catch {
+                // 🔒 `ArchiveError.detail(from:)`, never `String(describing:)`: this
+                // statement binds the notification's title, subtitle, body and sender, and
+                // in a DEBUG build GRDB spells bound arguments out in the error it throws.
                 throw ArchiveError.insertFailed(
                     uuid: UUID(uuidString: notification.uuid) ?? UUID(),
-                    underlying: String(describing: error)
+                    underlying: ArchiveError.detail(from: error)
                 )
             }
 

@@ -47,7 +47,7 @@ public final class Archive: Sendable {
         do {
             queue = try DatabaseQueue(configuration: Self.makeConfiguration(inMemory: true))
         } catch {
-            throw ArchiveError.openFailed(path: ":memory:", underlying: String(describing: error))
+            throw ArchiveError.openFailed(path: ":memory:", underlying: ArchiveError.detail(from: error))
         }
         try Self.migrate(queue)
         self.init(writer: queue)
@@ -79,7 +79,7 @@ public final class Archive: Sendable {
         do {
             return try Archive.open()
         } catch {
-            let description = (error as? ArchiveError)?.logDescription ?? String(describing: error)
+            let description = (error as? ArchiveError)?.logDescription ?? ArchiveError.detail(from: error)
             fatalError("Archive cannot open: \(description)")
         }
     }()
@@ -164,7 +164,7 @@ public final class Archive: Sendable {
             // mode it supports, which is why WAL is not in the PRAGMA set above.
             return try DatabasePool(path: path, configuration: makeConfiguration(inMemory: false))
         } catch {
-            throw ArchiveError.openFailed(path: path, underlying: String(describing: error))
+            throw ArchiveError.openFailed(path: path, underlying: ArchiveError.detail(from: error))
         }
     }
 
@@ -182,7 +182,7 @@ public final class Archive: Sendable {
         } catch {
             let applied = (try? writer.read { db in try migrator.appliedIdentifiers(db) }) ?? []
             let failed = migrator.migrations.first { !applied.contains($0) } ?? "unknown"
-            throw ArchiveError.migrationFailed(name: failed, underlying: String(describing: error))
+            throw ArchiveError.migrationFailed(name: failed, underlying: ArchiveError.detail(from: error))
         }
     }
 }

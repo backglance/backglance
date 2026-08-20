@@ -133,12 +133,12 @@ public extension Archive {
                     )
                 }
             } catch {
-                messages.append("fts integrity-check failed: \(error)")
+                messages.append("fts integrity-check failed: \(ArchiveError.detail(from: error))")
             }
 
             return ArchiveHealth(ok: messages.isEmpty, messages: messages)
         } catch {
-            throw ArchiveError.integrityCheckFailed(String(describing: error))
+            throw ArchiveError.integrityCheckFailed(ArchiveError.detail(from: error))
         }
     }
 }

@@ -208,6 +208,82 @@ final class ArchiveInsertTests: XCTestCase {
         XCTAssertEqual(hits, 1)
     }
 
+    // MARK: - repairCounts
+
+    /// The happy path has nothing to do, and has to say so rather than rewriting every
+    /// row: a repair that always reports work done is a repair nobody can trust.
+    func testRepairCountsLeavesCorrectCountsAlone() throws {
+        let archive = try XCTUnwrap(archive)
+        let appID = try XCTUnwrap(archive.upsertApp(bundleID: "com.example.chat", now: now).id)
+        try archive.insert(makeNotification(appID: appID, uuid: uuidA))
+        try archive.insert(makeNotification(appID: appID, uuid: uuidB))
+
+        let repaired = try archive.repairCounts()
+
+        XCTAssertEqual(repaired, 0)
+        let count = try archive.pool.read { db in
+            try Int.fetchOne(db, sql: "SELECT notification_count FROM apps WHERE id = ?", arguments: [appID])
+        }
+        XCTAssertEqual(count, 2)
+    }
+
+    /// Drift is the whole reason the method exists, so it is induced directly: the
+    /// counter is denormalized, and an interrupted prune or a restored archive file can
+    /// leave it disagreeing with the rows it counts.
+    func testRepairCountsRecomputesADriftedCount() throws {
+        let archive = try XCTUnwrap(archive)
+        let appID = try XCTUnwrap(archive.upsertApp(bundleID: "com.example.chat", now: now).id)
+        try archive.insert(makeNotification(appID: appID, uuid: uuidA))
+        try archive.insert(makeNotification(appID: appID, uuid: uuidB))
+        try archive.pool.write { db in
+            try db.execute(sql: "UPDATE apps SET notification_count = 47 WHERE id = ?", arguments: [appID])
+        }
+
+        let repaired = try archive.repairCounts()
+
+        XCTAssertEqual(repaired, 1)
+        let count = try archive.pool.read { db in
+            try Int.fetchOne(db, sql: "SELECT notification_count FROM apps WHERE id = ?", arguments: [appID])
+        }
+        XCTAssertEqual(count, 2)
+    }
+
+    /// Soft-deleted rows are not in the timeline, so they are not in the count either —
+    /// the repair has to agree with what the insert path counts.
+    func testRepairCountsExcludesSoftDeletedRows() throws {
+        let archive = try XCTUnwrap(archive)
+        let appID = try XCTUnwrap(archive.upsertApp(bundleID: "com.example.chat", now: now).id)
+        try archive.insert(makeNotification(appID: appID, uuid: uuidA))
+        try archive.insert(makeNotification(appID: appID, uuid: uuidB))
+        try archive.pool.write { db in
+            try db.execute(sql: "UPDATE notifications SET is_deleted = 1 WHERE uuid = ?", arguments: [self.uuidB])
+        }
+
+        try archive.repairCounts()
+
+        let count = try archive.pool.read { db in
+            try Int.fetchOne(db, sql: "SELECT notification_count FROM apps WHERE id = ?", arguments: [appID])
+        }
+        XCTAssertEqual(count, 1)
+    }
+
+    /// An app whose notifications have all been pruned keeps its row — it carries the
+    /// user's per-app settings — and its count has to fall to zero rather than stick.
+    func testRepairCountsZeroesAnAppWithNoNotificationsLeft() throws {
+        let archive = try XCTUnwrap(archive)
+        let appID = try XCTUnwrap(archive.upsertApp(bundleID: "com.example.chat", now: now).id)
+        try archive.pool.write { db in
+            try db.execute(sql: "UPDATE apps SET notification_count = 12 WHERE id = ?", arguments: [appID])
+        }
+
+        try archive.repairCounts()
+
+        let count = try archive.pool.read { db in
+            try Int.fetchOne(db, sql: "SELECT notification_count FROM apps WHERE id = ?", arguments: [appID])
+        }
+        XCTAssertEqual(count, 0)
+    }
+
     // MARK: Private
 
     private let now = Date(timeIntervalSince1970: 1_755_421_200)
