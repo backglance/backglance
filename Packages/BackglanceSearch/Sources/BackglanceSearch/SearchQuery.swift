@@ -70,8 +70,6 @@ public struct SearchHit: Sendable, Equatable, Identifiable {
         case fuzzy
     }
 
-    public var id: Int64 { notificationID }
-
     public let notificationID: Int64
 
     /// 0…1, weighted and normalized across the branches that matched.
@@ -83,6 +81,10 @@ public struct SearchHit: Sendable, Equatable, Identifiable {
     public let snippet: String?
 
     public let sources: Set<Source>
+
+    public var id: Int64 {
+        notificationID
+    }
 }
 
 // MARK: - SearchError
