@@ -104,4 +104,22 @@ public struct ParsedQuery: Sendable, Equatable {
     public var after: Date?
 
     public var flags: Set<Flag>
+
+    /// Whether ``ftsMatch`` is the *inner* expression of a negation-only query
+    /// (`-draft` and nothing else).
+    ///
+    /// FTS5 has no unary `NOT`, so this shape cannot be bound as `MATCH`
+    /// directly; the caller inverts it with
+    /// `id NOT IN (SELECT rowid FROM notifications_fts WHERE … MATCH ?)`.
+    /// Exposed as a question rather than left to each call site to infer from
+    /// the absence of terms, because getting it wrong turns "everything except
+    /// drafts" into "only drafts".
+    public var isNegationOnly: Bool {
+        ftsMatch != nil && terms.isEmpty
+    }
+
+    /// Whether the query says nothing at all — no text, no filters.
+    public var isEmpty: Bool {
+        self == ParsedQuery()
+    }
 }

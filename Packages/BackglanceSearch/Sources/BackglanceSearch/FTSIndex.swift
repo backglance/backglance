@@ -70,6 +70,12 @@ public struct FTSIndex: Sendable {
     ///     filter.
     ///   - limit: the most rows to return, applied in SQL so a broad query never
     ///     pulls more than this out of the database.
+    ///
+    /// The snippet is taken from column `-1` — FTS5's "whichever column matched
+    /// best" — rather than from the body: a notification with a title match and
+    /// no body at all is completely ordinary, and asking for a body snippet
+    /// there returns SQL NULL. `coalesce` covers the rest, because a missing
+    /// snippet is a row with no highlight, never a failed search.
     /// - Throws: ``SearchError/indexUnavailable`` if `notifications_fts` does not
     ///   exist (only reachable mid-migration); rethrows any other database error.
     public func search(match: String, appIDs: [Int64] = [], limit: Int = 200) throws -> [FTSHit] {
@@ -77,7 +83,7 @@ public struct FTSIndex: Sendable {
             var sql = """
             SELECT n.id AS id,
                    bm25(notifications_fts, 3.0, 1.5, 1.0, 2.0) AS score,
-                   snippet(notifications_fts, 2, char(57344), char(57345), '…', 12) AS snippet
+                   coalesce(snippet(notifications_fts, -1, char(57344), char(57345), '…', 12), '') AS snippet
             FROM notifications_fts
             JOIN notifications n ON n.id = notifications_fts.rowid
             WHERE notifications_fts MATCH ?
