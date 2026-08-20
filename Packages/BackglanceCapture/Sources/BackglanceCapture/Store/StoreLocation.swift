@@ -32,6 +32,27 @@ public enum StoreLocation {
         )
     }
 
+    /// Where the store *would* be, whether or not anything is there yet.
+    ///
+    /// ``current()`` throws when the store's directory is missing, which is the right
+    /// answer for a reader: there is nothing to read. A watcher needs the opposite. On a
+    /// fresh account, `usernoted` has not created its database yet, and the whole point
+    /// of arming a watcher there is to notice the moment it does — a watcher that refused
+    /// to arm would leave capture waiting for a relaunch. ``StoreWatcher`` already treats
+    /// a file it cannot open as expected rather than exceptional (it logs an errno and
+    /// keeps its poll timer running), so it takes this path and does not need it to exist.
+    ///
+    /// Honours `BACKGLANCE_STORE_PATH` on the same DEBUG-only terms as ``current()``, and
+    /// deliberately does *not* fall back to the real store when the override names a file
+    /// that is not there: a debug build pointed at a fixture must never quietly end up
+    /// watching the developer's own notifications instead.
+    public static func expected() -> URL {
+        expected(
+            environment: ProcessInfo.processInfo.environment,
+            homeDirectory: FileManager.default.homeDirectoryForCurrentUser
+        )
+    }
+
     // MARK: Internal
 
     /// The store's path relative to the user's home directory.
@@ -48,6 +69,23 @@ public enum StoreLocation {
             false
         #endif
     }()
+
+    /// ``expected()``'s logic, as an internal seam for the same reasons as ``resolve``.
+    static func expected(
+        environment: [String: String],
+        homeDirectory: URL,
+        honoursOverride: Bool = honoursStorePathOverride
+    ) -> URL {
+        if
+            honoursOverride,
+            let override = environment["BACKGLANCE_STORE_PATH"],
+            !override.isEmpty,
+            (override as NSString).isAbsolutePath
+        {
+            return URL(fileURLWithPath: override)
+        }
+        return homeDirectory.appendingPathComponent(relativePath)
+    }
 
     /// Resolution logic, as an internal seam so tests can exercise both the override and
     /// the default branch — and both build configurations — without mutating the real
