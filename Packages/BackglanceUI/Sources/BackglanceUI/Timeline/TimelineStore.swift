@@ -84,19 +84,19 @@ public final class TimelineStore {
     public static let defaultsSuite = "app.backglance.Backglance"
 
     /// Days, newest first, each already flattened into draw-order slots.
-    public private(set) var sections: [TimelineSection.Model] = []
+    public internal(set) var sections: [TimelineSection.Model] = []
 
     /// Unread, unmuted, delivered since the anchor — capped by the archive at
     /// ``BackglanceCore/Archive/unreadBadgeCap``, which the status item renders
     /// as "99+".
-    public private(set) var unreadBadgeCount = 0
+    public internal(set) var unreadBadgeCount = 0
 
     /// A one-sentence, content-free explanation of a failed read, for the banner.
     /// `nil` when the timeline is healthy.
-    public private(set) var loadError: String?
+    public internal(set) var loadError: String?
 
     /// Whether ``loadNextPage()`` has anything left to fetch.
-    public private(set) var hasMorePages = true
+    public internal(set) var hasMorePages = true
 
     /// Compact or detailed rows, remembered per host.
     public var viewMode: TimelineViewMode = .compact {
@@ -172,123 +172,11 @@ public final class TimelineStore {
         sections.flatMap(\.items)
     }
 
-    /// Snapshots the unread anchor just before a surface opens.
-    ///
-    /// Opening the timeline *is* "the user looked", but the divider they see
-    /// has to reflect the moment before they clicked — so the anchor is
-    /// resolved and frozen here, and only advanced when the surface closes.
-    /// The anchor is the later of the two things that count as looking: the
-    /// last time a surface was open, and the end of the last away session.
-    public func surfaceWillOpen() {
-        let sessionEnd = try? archive.lastAwaySessionEnd()
-        if let sessionEnd, sessionEnd > unreadAnchor {
-            unreadAnchor = sessionEnd
-        }
-        regroup()
-    }
-
-    /// Advances the anchor after a surface closes: everything up to now has
-    /// been seen, so the badge resets and the next open starts a new divider.
-    public func surfaceDidClose() {
-        let now = Date()
-        defaults.set(now.timeIntervalSince1970, forKey: Self.lastSeenKey)
-        unreadAnchor = UnixDate(now)
-        unreadBadgeCount = 0
-        cancelVisibilityTimers()
-        // The badge query is defined by the anchor, so a moved anchor needs a
-        // new subscription rather than a recount of the old one.
-        startObserving()
-    }
-
-    /// Starts the "seen for a second" timer for a row that scrolled into view.
-    ///
-    /// A second is the threshold because anything shorter marks rows read that
-    /// merely flew past under a flick scroll — the one failure mode that would
-    /// make the badge untrustworthy.
-    public func rowBecameVisible(_ id: Int64) {
-        guard visibilityTimers[id] == nil else {
-            return
-        }
-        visibilityTimers[id] = Task { [archive] in
-            try? await Task.sleep(for: .seconds(1))
-            guard !Task.isCancelled else {
-                return
-            }
-            // A read flag that fails to persist is not worth a banner: the row
-            // is still on screen, and the next pass tries again.
-            _ = try? archive.markRead(id)
-        }
-    }
-
-    /// Cancels that timer when the row scrolls away unseen.
-    public func rowBecameHidden(_ id: Int64) {
-        visibilityTimers.removeValue(forKey: id)?.cancel()
-    }
-
-    /// Opening a row reads it, immediately — no timer, no ambiguity.
-    public func open(_ id: Int64) {
-        selectedID = id
-        _ = try? archive.markRead(id)
-    }
-
-    /// Marks everything in the archive read. One statement; the subscription
-    /// echoes it back to every open surface.
-    public func markAllRead() {
-        do {
-            _ = try archive.markAllRead()
-        } catch {
-            loadError = Self.message(for: error)
-        }
-    }
-
     /// Re-subscribes after a read failure. The rows already on screen stay put
     /// while it retries: a stale timeline with a banner beats a blank one.
     public func retry() {
         loadError = nil
         startObserving()
-    }
-
-    /// Appends the next page. Called by the scroll sentinel, and safe to call
-    /// again while one is in flight — the second call returns immediately rather
-    /// than fetching the same page twice.
-    public func loadNextPage() async {
-        guard hasMorePages, !isLoadingPage else {
-            return
-        }
-        isLoadingPage = true
-        defer { isLoadingPage = false }
-
-        guard let after = cursor ?? rows.last.flatMap(TimelineCursor.init(row:)) else {
-            hasMorePages = false
-            return
-        }
-
-        do {
-            // Bound outside the detached task: reading them inside would be a
-            // hop back to the main actor for every page.
-            let archive = archive
-            let limit = Self.pageSize
-            let page = try await Task.detached {
-                try archive.timelinePage(after: after, limit: limit)
-            }.value
-
-            guard !page.isEmpty else {
-                hasMorePages = false
-                return
-            }
-            let known = Set(rows.compactMap(\.id))
-            rows.append(contentsOf: page.filter { row in row.id.map { !known.contains($0) } ?? false })
-            cursor = page.last.flatMap(TimelineCursor.init(row:))
-            hasMorePages = page.count == Self.pageSize
-            if rows.count > Self.maxRows {
-                // Drop from the head, not the tail: the user is reading the
-                // bottom of the list, and the subscription can refetch the top.
-                rows.removeFirst(rows.count - Self.maxRows)
-            }
-            regroup()
-        } catch {
-            loadError = Self.message(for: error)
-        }
     }
 
     // MARK: Internal
@@ -308,89 +196,6 @@ public final class TimelineStore {
     /// Rows per page, and the ceiling on rows held in memory (~1 MB).
     static let pageSize = Archive.timelinePageSize
     static let maxRows = 1_000
-
-    /// Turns rows into days: the pure half of the store, so grouping, pinning,
-    /// muting and divider placement are all testable without an archive.
-    ///
-    /// - Parameters:
-    ///   - items: rows for display, newest first.
-    ///   - groupByApp: whether to emit an app header per run of rows in a day.
-    ///   - anchor: the moment the user last looked; the divider goes before the
-    ///     first row at or older than it.
-    ///   - calendar: decides where days begin.
-    static func buildSections(
-        items: [TimelineItem],
-        groupByApp: Bool,
-        anchor: UnixDate,
-        calendar: Calendar,
-        now: Date = .now
-    ) -> [TimelineSection.Model] {
-        let byDay = Dictionary(grouping: items) { item in
-            calendar.startOfDay(for: item.notification.deliveredAt.date)
-        }
-
-        return byDay.keys.sorted(by: >).map { day in
-            let dayItems = byDay[day] ?? []
-            // Pinned first — the user's own pin, then a VIP rule's — and stable
-            // (newest-first) within each group.
-            let pinned = dayItems.filter(\.isPinned)
-            let unpinned = dayItems.filter { !$0.isPinned }
-            let muted = unpinned.filter(\.triage.muted)
-            let normal = pinned + unpinned.filter { !$0.triage.muted }
-
-            var slots: [TimelineSection.Slot] = []
-            var dividerPlaced = false
-
-            // The divider only earns its place between something new and
-            // something old: if the whole day is new, or none of it is, it would
-            // sit at an edge and mean nothing.
-            let hasNewer = normal.contains { $0.notification.deliveredAt > anchor }
-            let hasOlder = normal.contains { $0.notification.deliveredAt <= anchor }
-
-            func emit(_ item: TimelineItem) {
-                if !dividerPlaced, hasNewer, hasOlder, item.notification.deliveredAt <= anchor {
-                    slots.append(.divider)
-                    dividerPlaced = true
-                }
-                slots.append(.row(item))
-            }
-
-            if groupByApp {
-                let groups = Dictionary(grouping: normal, by: \.appName).sorted { $0.key < $1.key }
-                for (name, groupItems) in groups {
-                    slots.append(.appHeader(.init(
-                        id: groupItems.first?.bundleID ?? name,
-                        name: name,
-                        count: groupItems.count,
-                        bundleID: groupItems.first?.bundleID
-                    )))
-                    groupItems.forEach(emit)
-                }
-            } else {
-                normal.forEach(emit)
-            }
-
-            if !muted.isEmpty {
-                // Collapsed by default: the header is the whole group until the
-                // user expands it, so no muted rows are emitted here.
-                // The name carries no count: `AppGroupHeader` renders name and
-                // count separately, so baking "(n)" in here would print it twice.
-                slots.append(.appHeader(.init(
-                    id: "muted",
-                    name: String(localized: "Muted"),
-                    count: muted.count,
-                    isMuted: true
-                )))
-            }
-
-            return TimelineSection.Model(
-                id: day,
-                title: DayTitle.string(for: day, calendar: calendar, now: now),
-                slots: slots,
-                mutedCount: muted.count
-            )
-        }
-    }
 
     /// The newest page from the subscription replaces the head of `rows`; pages
     /// the user already scrolled to are kept.
@@ -421,73 +226,50 @@ public final class TimelineStore {
         }
     }
 
-    /// Rebuilds ``sections`` from the rows in memory. Pure, synchronous and
-    /// bounded by ``maxRows``, so it runs on the main actor without jank.
-    func regroup() {
-        var visible = rows.filter { !$0.isDeleted }
-        if !appFilter.isEmpty {
-            visible = visible.filter { row in
-                apps[row.appId].map { appFilter.contains($0.bundleId) } ?? false
-            }
-        }
+    // MARK: Internal
 
-        let items = visible.compactMap { row in
-            TimelineItem(
-                row: row,
-                apps: apps,
-                triage: triage.evaluate(row),
-                isSelected: row.id == selectedID
-            )
-        }
+    // The store's own state. Internal rather than private because the store is
+    // split across `TimelineStore+Grouping`, `+Pagination` and `+ReadState` —
+    // one type, four files, so that each file is about one thing.
 
-        sections = Self.buildSections(
-            items: items,
-            groupByApp: groupByApp,
-            anchor: unreadAnchor,
-            calendar: calendar
-        )
-    }
+    let archive: Archive
+    let triage: any TriageEvaluating
+    let host: Host
+    let defaults: UserDefaults
+    let calendar: Calendar
 
-    // MARK: Private
-
-    private let archive: Archive
-    private let triage: any TriageEvaluating
-    private let host: Host
-    private let defaults: UserDefaults
-    private let calendar: Calendar
-
-    private var rows: [ArchivedNotification] = []
-    private var apps: [Int64: AppRecord] = [:]
-    private var cursor: TimelineCursor?
-    private var unreadAnchor: UnixDate
+    var rows: [ArchivedNotification] = []
+    var apps: [Int64: AppRecord] = [:]
+    var cursor: TimelineCursor?
+    var unreadAnchor: UnixDate
 
     /// One live timer per visible row. Held so scrolling a row back off screen
     /// before it has been seen for a second cancels it — a row that flew past
     /// under the user's scroll was not read.
-    @ObservationIgnored private var visibilityTimers: [Int64: Task<Void, Never>] = [:]
+    @ObservationIgnored var visibilityTimers: [Int64: Task<Void, Never>] = [:]
     /// Only ever assigned on the main actor, and `@ObservationIgnored` because a
     /// view has no business redrawing when the subscription is replaced. The
     /// isolation opt-out is what lets `deinit` — which is not main-actor
     /// isolated — cancel it.
     @ObservationIgnored nonisolated(unsafe) private var observation: Task<Void, Never>?
-    @ObservationIgnored private var isLoadingPage = false
+    @ObservationIgnored var isLoadingPage = false
 
     /// A failed archive read is a banner, never a crash and never a modal — the
     /// timeline's job is to render *something* for every combination of archive
     /// health, capture status and permissions.
-    private static func message(for error: Error) -> String {
+    static func message(for error: Error) -> String {
         (error as? ArchiveError)?.userMessage
             ?? ArchiveError.observationFailed(String(describing: type(of: error))).userMessage
     }
 
-    private func cancelVisibilityTimers() {
+    func cancelVisibilityTimers() {
         for timer in visibilityTimers.values {
             timer.cancel()
         }
         visibilityTimers.removeAll()
     }
 
-    private func startObserving() {
+    func startObserving() {
         observation?.cancel()
         let stream = archive.timelineSnapshots(unreadSince: unreadAnchor, pageSize: Self.pageSize)
         observation = Task { [weak self] in
