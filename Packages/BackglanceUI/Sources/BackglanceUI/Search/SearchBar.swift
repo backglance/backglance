@@ -107,6 +107,8 @@ public struct SearchBar: View {
                 .onSubmit {
                     Task { await model.searchNow() }
                 }
+                // docs/reference/ACCESSIBILITY.md#identifiers-for-ui-tests.
+                .accessibilityIdentifier("timeline.searchField")
 
             if showsSpinner {
                 ProgressView()

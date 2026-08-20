@@ -49,6 +49,18 @@ extension HybridSearch {
         return (sql, arguments)
     }
 
+    /// The structured predicates alone, as a fragment to graft onto another
+    /// statement's `WHERE`.
+    ///
+    /// Used by the full-text path so a filtered search stays one query. The
+    /// fragment assumes the notifications table is aliased `n`.
+    static func filterFragment(_ parsed: ParsedQuery) -> (sql: String, arguments: StatementArguments) {
+        var sql = ""
+        var arguments = StatementArguments()
+        appendCommonFilters(to: &sql, arguments: &arguments, parsed: parsed, appIDs: [], prefix: "n.")
+        return (sql, arguments)
+    }
+
     /// Titles and senders to fuzz against: recent, filtered, and bounded.
     ///
     /// Bounded at ``Limits/fuzzyCandidates`` because edit distance over the

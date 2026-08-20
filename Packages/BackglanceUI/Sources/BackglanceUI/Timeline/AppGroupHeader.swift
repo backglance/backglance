@@ -34,6 +34,27 @@ public struct AppGroupHeader: View {
     public var onToggle: (() -> Void)?
 
     public var body: some View {
+        content
+    }
+
+    // MARK: Private
+
+    /// Reduce Motion turns the chevron's rotation into a plain state change —
+    /// docs/reference/ACCESSIBILITY.md#reduced-motion: the disclosure still
+    /// ends up pointing the right way, it just gets there without the
+    /// animated turn.
+    @Environment(\.accessibilityReduceMotion)
+    private var reduceMotion
+
+    private var accessibilityLabel: String {
+        String(localized: "\(group.name), \(group.count) notifications")
+    }
+
+    private var expandedStateText: String {
+        isExpanded ? String(localized: "Expanded") : String(localized: "Collapsed")
+    }
+
+    private var content: some View {
         HStack(spacing: 8) {
             AppIconView(bundleID: group.bundleID)
                 .frame(width: 16, height: 16)
@@ -51,7 +72,7 @@ public struct AppGroupHeader: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                    .animation(.default, value: isExpanded)
+                    .animation(reduceMotion ? nil : .default, value: isExpanded)
             }
         }
         .padding(.vertical, 4)
@@ -65,18 +86,16 @@ public struct AppGroupHeader: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityAddTraits(group.isMuted ? .isButton : [])
+        // An ordinary group is a subheader — the rotor's Headings stop, one
+        // level below the day (docs/reference/ACCESSIBILITY.md#day-headers-and-grouping).
+        // The muted group is a disclosure instead, so it takes `.isButton`
+        // the same way `DisclosureGroup`'s built-in trigger would.
+        .accessibilityAddTraits(group.isMuted ? .isButton : .isHeader)
         .accessibilityValue(group.isMuted ? expandedStateText : "")
-    }
-
-    // MARK: Private
-
-    private var accessibilityLabel: String {
-        String(localized: "\(group.name), \(group.count) notifications")
-    }
-
-    private var expandedStateText: String {
-        isExpanded ? String(localized: "Expanded") : String(localized: "Collapsed")
+        // Only the muted group is a stable, testable identity — an ordinary
+        // app header's id is per-day and per-app, which XCUITest has no
+        // stable way to address (docs/reference/ACCESSIBILITY.md#identifiers-for-ui-tests).
+        .accessibilityIdentifier(group.isMuted ? "timeline.mutedGroup" : "")
     }
 }
 

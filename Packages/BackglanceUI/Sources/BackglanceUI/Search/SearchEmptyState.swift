@@ -42,8 +42,11 @@ public struct SearchEmptyState: View {
 
     public var body: some View {
         VStack(spacing: 8) {
+            // `.largeTitle`, not a fixed point size, so the system text-size
+            // preference scales the symbol along with everything else on the
+            // screen (docs/reference/ACCESSIBILITY.md#text-size).
             Image(systemName: symbolName)
-                .font(.system(size: 32))
+                .font(.largeTitle)
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
 

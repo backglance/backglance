@@ -95,7 +95,57 @@ public struct NotificationRow: View {
             onOpen?(item.id)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilitySummary)
+        .accessibilityLabel(Self.accessibilityLabelParts(for: item).joined(separator: ", "))
+        .accessibilityValue(Self.accessibilityValueText(for: item))
+        .accessibilityHint(Text("Press Return to open in \(item.appName)."))
+        .accessibilityIdentifier("timeline.row.\(item.notification.uuid)")
+    }
+
+    // MARK: Internal
+
+    /// The label's parts, in swipe order: app, title, body, time —
+    /// docs/reference/ACCESSIBILITY.md#timeline-rows. State is deliberately
+    /// absent here; it lives in ``accessibilityValueText(for:)`` so VoiceOver
+    /// announces a change ("pinned") without re-reading the whole row.
+    ///
+    /// A redacted body never reaches this array — the placeholder that
+    /// `OTPRedactor` already wrote into `body` before insert is not spoken
+    /// either; "code redacted" is said in its place, so a screen reader user
+    /// never has to parse a bracketed placeholder to learn what happened.
+    /// `internal` (not `private`) so ``AccessibilityTests`` can assert on the
+    /// composition directly, without instantiating a view.
+    static func accessibilityLabelParts(for item: TimelineItem) -> [String] {
+        var parts = [item.appName]
+        if let title = item.notification.title {
+            parts.append(title)
+        }
+        if item.notification.redaction == .otp {
+            parts.append(String(
+                localized: "code redacted",
+                comment: "VoiceOver: the OTP digits were redacted before this notification was ever archived"
+            ))
+        } else if let body = item.notification.body {
+            parts.append(body)
+        }
+        parts.append(item.notification.deliveredAt.date.formatted(.dateTime.hour().minute()))
+        return parts
+    }
+
+    /// "Unread, pinned" — state as a *value*, so a change is announced
+    /// without re-reading the whole row (docs/reference/ACCESSIBILITY.md#timeline-rows).
+    /// "Read" when there is nothing else to say, so the value is never empty.
+    static func accessibilityValueText(for item: TimelineItem) -> String {
+        var states: [String] = []
+        if !item.notification.isRead {
+            states.append(String(localized: "unread"))
+        }
+        if item.isPinned {
+            states.append(String(localized: "pinned"))
+        }
+        if item.notification.redaction == .otp {
+            states.append(String(localized: "redacted"))
+        }
+        return states.isEmpty ? String(localized: "read") : states.joined(separator: ", ")
     }
 
     // MARK: Private
@@ -108,6 +158,16 @@ public struct NotificationRow: View {
     /// second public attachment type. No properties are declared because
     /// none are read; `JSONDecoder` ignores the real payload's extra keys.
     private struct AttachmentStub: Decodable {}
+
+    /// Increase Contrast turns the highlight tint from a fill into a border —
+    /// docs/reference/ACCESSIBILITY.md#contrast: a translucent fill sitting
+    /// behind `Color.primary` text can still read below 4.5:1 once the
+    /// system pushes contrast up, where a stroke of the same hue never
+    /// touches the text at all. Selection keeps its fill in both cases — it
+    /// is `Color.accentColor`, not a Rules token, and already carries its
+    /// own contrast-safe variants.
+    @Environment(\.colorSchemeContrast)
+    private var contrast
 
     /// Falls back title → body → a localized placeholder, so a row with only
     /// a body (or, from an import, neither) still shows something instead of
@@ -128,29 +188,16 @@ public struct NotificationRow: View {
         return Label("\(metas.count)", systemImage: "paperclip")
     }
 
-    /// One combined element per docs/features/TIMELINE.md#accessibility:
-    /// "Slack, unread, Deploy finished, 14:32". Built from the raw fields
-    /// (not `displayTitle`'s fallback chain) so VoiceOver never reads a body
-    /// twice — once as the announced "title" and again as the detailed body.
-    private var accessibilitySummary: String {
-        var parts = [item.appName]
-        if !item.notification.isRead {
-            parts.append(String(localized: "unread"))
-        }
-        if let title = item.notification.title {
-            parts.append(title)
-        }
-        if mode == .detailed, let body = item.notification.body {
-            parts.append(body)
-        }
-        return parts.joined(separator: ", ")
-    }
-
     @ViewBuilder private var rowBackground: some View {
         if item.isSelected {
             RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.18))
         } else if let color = item.triage.highlight {
-            RoundedRectangle(cornerRadius: 6).fill(color.swiftUIColor.opacity(0.12))
+            if contrast == .increased {
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(color.swiftUIColor, lineWidth: 2)
+            } else {
+                RoundedRectangle(cornerRadius: 6).fill(color.swiftUIColor.opacity(0.12))
+            }
         }
     }
 }

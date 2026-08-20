@@ -189,21 +189,13 @@ public actor HybridSearch {
     /// filters-only walk that stands in for it.
     nonisolated private func ftsCandidates(_ parsed: ParsedQuery, appIDs: [Int64], limit: Int) throws -> [FTSHit] {
         if let match = parsed.ftsMatch, !parsed.isNegationOnly {
-            let hits = try fts.search(match: match, appIDs: appIDs, limit: limit)
-            // The structured filters are not expressible inside MATCH, so they
-            // are applied to the candidate set afterwards.
-            return try filtered(hits, parsed: parsed)
+            // The structured filters ride along inside the same statement. A
+            // second pass over the candidate ids cost ~60 ms at a hundred
+            // thousand notifications — enough on its own to miss the budget.
+            let filter = parsed.hasStructuredFilters ? Self.filterFragment(parsed) : nil
+            return try fts.search(match: match, appIDs: appIDs, filter: filter, limit: limit)
         }
         return try filterOnly(parsed, appIDs: appIDs, limit: limit)
-    }
-
-    /// Keeps only the FTS candidates that also satisfy the structured filters.
-    nonisolated private func filtered(_ hits: [FTSHit], parsed: ParsedQuery) throws -> [FTSHit] {
-        guard parsed.hasStructuredFilters else {
-            return hits
-        }
-        let allowed = try matchingIDs(parsed, appIDs: [], restrictedTo: hits.map(\.notificationID))
-        return hits.filter { allowed.contains($0.notificationID) }
     }
 
     /// A query with filters but no searchable text: `from:slack is:missed`,
@@ -219,21 +211,6 @@ public actor HybridSearch {
             }
         } catch let error as SearchError {
             throw error
-        } catch {
-            throw ArchiveError.observationFailed(ArchiveError.detail(from: error))
-        }
-    }
-
-    nonisolated private func matchingIDs(
-        _ parsed: ParsedQuery,
-        appIDs: [Int64],
-        restrictedTo ids: [Int64]?
-    ) throws -> Set<Int64> {
-        let (sql, arguments) = Self.filterSQL(parsed, appIDs: appIDs, restrictedTo: ids, limit: nil)
-        do {
-            return try archive.pool.read { db in
-                try Set(Int64.fetchAll(db, sql: sql, arguments: arguments))
-            }
         } catch {
             throw ArchiveError.observationFailed(ArchiveError.detail(from: error))
         }

@@ -78,7 +78,19 @@ public struct FTSIndex: Sendable {
     /// snippet is a row with no highlight, never a failed search.
     /// - Throws: ``SearchError/indexUnavailable`` if `notifications_fts` does not
     ///   exist (only reachable mid-migration); rethrows any other database error.
-    public func search(match: String, appIDs: [Int64] = [], limit: Int = 200) throws -> [FTSHit] {
+    ///
+    /// `filter` is an extra `WHERE` fragment — the structured half of a query,
+    /// built by `HybridSearch+Filters` — applied *inside* this statement rather
+    /// than to its results. That is a measured decision, not a tidiness one:
+    /// filtering afterwards means a second query over the candidate ids, and at
+    /// a hundred thousand notifications that second pass cost ~60 ms, enough on
+    /// its own to miss the hybrid budget.
+    public func search(
+        match: String,
+        appIDs: [Int64] = [],
+        filter: (sql: String, arguments: StatementArguments)? = nil,
+        limit: Int = 200
+    ) throws -> [FTSHit] {
         try withIndex { db in
             var sql = """
             SELECT n.id AS id,
@@ -94,6 +106,11 @@ public struct FTSIndex: Sendable {
             if !appIDs.isEmpty {
                 sql += " AND n.app_id IN (" + appIDs.map { _ in "?" }.joined(separator: ",") + ")"
                 arguments += StatementArguments(appIDs)
+            }
+
+            if let filter, !filter.sql.isEmpty {
+                sql += filter.sql
+                arguments += filter.arguments
             }
 
             sql += " ORDER BY score LIMIT ?"
