@@ -7,12 +7,12 @@ import SwiftUI
 /// One notification, compact or detailed — docs/features/TIMELINE.md#notificationrow.
 ///
 /// A pure value renderer: it is handed an item, a mode and an optional
-/// `onOpen` closure, and draws exactly that. Unlike the sample in TIMELINE.md
-/// it does not reach into `@Environment(TimelineStore.self)` — that would
-/// make the row untestable and unpreviewable without a live store, and the
-/// store's `open(_:)` (mark read + deep link, see ACTIONS.md) is just as easy
-/// to wire from the caller through a closure. Row actions (`RowContextMenu`
-/// in the sample) are a later milestone and are deliberately absent here.
+/// `onOpen` closure, and draws exactly that. It deliberately does not reach
+/// into `@Environment(TimelineStore.self)` — that would make the row
+/// untestable and unpreviewable without a live store, and the store's
+/// `open(_:)` (mark read + deep link, see ACTIONS.md) is just as easy to wire
+/// from the caller through a closure. Row actions are a later milestone and
+/// are deliberately absent here.
 public struct NotificationRow: View {
     // MARK: Lifecycle
 

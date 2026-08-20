@@ -54,25 +54,31 @@ What both show:
 ## Architecture
 
 ```
-                       Archive (GRDB DatabasePool, WAL)
-                                    │
-              ┌─────────────────────┴──────────────────────┐
-              │ ValueObservation                            │ timelinePage(after:limit:)
-              │ (newest page + unread count, main queue)    │ (older pages, on demand)
-              ▼                                             ▼
-   ┌────────────────────────── TimelineStore (@MainActor @Observable) ─────────────────────────┐
-   │ rows: [ArchivedNotification]      cursor: TimelineCursor?     loadError: String?          │
-   │ filter (app chips, muted)         viewMode (.compact/.detailed)                            │
-   │ unreadAnchor: UnixDate            triage cache (RulesEngine over visible rows)             │
-   │ sections: [TimelineSection.Model] ← grouping by day (user calendar) and by app             │
-   └───────┬───────────────────────────────┬───────────────────────────────────┬───────────────┘
-           │                               │                                   │
-           ▼                               ▼                                   ▼
-   MenuBarPopoverView              TimelineWindow (NSWindow,           NSStatusItem badge
-   (NSPopover ◀ NSHosting-         frame restored, ⌘↩)                 (unread count, muted
-    Controller, 380×520)                                                excluded)
-           └───────────────┬───────────────┘
-                           ▼
+   ┌──── BackglanceCore ───────────────────────────────────────────────────────────┐
+   │ Archive (GRDB DatabasePool, WAL)                                              │
+   │      │                                                                        │
+   │      ├── ValueObservation, tracked live                                       │
+   │      │   → timelineSnapshots(unreadSince:pageSize:)                           │
+   │      │     newest page + app dict + unread count, one consistent read         │
+   │      │                                                                        │
+   │      └── timelinePage(after:limit:) — one keyset page, fetched on demand      │
+   └──────┬────────────────────────────────────────────────┬───────────────────────┘
+          │ AsyncThrowingStream<TimelineSnapshot, Error>   │ [ArchivedNotification]
+          ▼                                                ▼
+   ┌──── TimelineStore — BackglanceUI, @MainActor @Observable, never imports GRDB ─┐
+   │ rows: [ArchivedNotification]        cursor: TimelineCursor?                   │
+   │ appFilter: Set<String>              viewMode (.compact / .detailed)           │
+   │ unreadAnchor: UnixDate              loadError: String?                        │
+   │ triage: any TriageEvaluating (evaluated per visible row)                      │
+   │ sections: [TimelineSection.Model] ← grouped by day (user calendar) and by app │
+   └───────┬───────────────────────────┬──────────────────────┬────────────────────┘
+           │                           │                      │
+           ▼                           ▼                      ▼
+           MenuBarPopoverView          TimelineWindow         NSStatusItem badge
+           (NSPopover ◀ NSHosting-     (NSWindow, frame       (unread count,
+            Controller, 380×520)        restored, ⌘↩)         muted excluded)
+           └─────────────┬─────────────┘
+                         ▼
                      TimelineView
                        ├── UnreadDivider          "new since you were away"
                        ├── TimelineSection        day header + optional AppGroupHeader groups
@@ -166,14 +172,14 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         if popover.isShown {
             popover.performClose(nil)
         } else if let button = statusItem.button {
-            store.popoverWillOpen()                              // advances the unread anchor *after* snapshotting it
+            store.surfaceWillOpen()                              // snapshots the unread anchor before the surface shows
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
         }
     }
 
     func popoverDidClose(_ notification: Notification) {
-        store.popoverDidClose()                                  // persists timeline.lastSeenAt
+        store.surfaceDidClose()                                  // persists timeline.lastSeenAt
     }
 
     // MARK: Badge
@@ -257,7 +263,8 @@ public struct TimelineView: View {
                                 case .appHeader(let group):
                                     AppGroupHeader(group: group)
                                 case .row(let item):
-                                    NotificationRow(item: item, mode: store.viewMode)
+                                    NotificationRow(item: item, mode: store.viewMode,
+                                                    onOpen: { store.open($0) })   // the row never reaches for the store itself
                                         .id(item.id)                       // stable Int64 archive id
                                         .focused($focusedRowID, equals: item.id)
                                         .onAppear { store.rowBecameVisible(item.id) }   // read-state timer
@@ -316,34 +323,54 @@ import BackglanceCore
 
 public enum TimelineViewMode: String, CaseIterable, Sendable { case compact, detailed }
 
-/// A display item: the archived row plus its computed triage and cached icon.
+/// One row, ready to render: the archived notification plus the two things the
+/// view would otherwise have to look up for itself.
 public struct TimelineItem: Identifiable, Equatable, Sendable {
     public let id: Int64
     public let notification: ArchivedNotification
     public let appName: String
+    public let bundleID: String?
     public let triage: Triage
     public var isSelected: Bool
+    public var isPinned: Bool { notification.isPinned || triage.pinned }
 }
 
+/// A pure value renderer: handed an item, a mode and an optional `onOpen`
+/// closure, it draws exactly that. It does not reach into
+/// `@Environment(TimelineStore.self)` itself — that would make the row
+/// untestable and unpreviewable without a live store, and the store's
+/// `open(_:)` (mark read + deep link, see ACTIONS.md) is just as easy to wire
+/// from the caller through the closure.
 public struct NotificationRow: View {
-    let item: TimelineItem
-    let mode: TimelineViewMode
-    @Environment(TimelineStore.self) private var store
+    public init(item: TimelineItem, mode: TimelineViewMode, onOpen: ((Int64) -> Void)? = nil) {
+        self.item = item
+        self.mode = mode
+        self.onOpen = onOpen
+    }
+
+    public let item: TimelineItem
+    public let mode: TimelineViewMode
+
+    /// Fired on tap with the row's archive id. `nil` leaves the row inert,
+    /// which is how a preview renders one without wiring interaction.
+    public let onOpen: ((Int64) -> Void)?
+
+    @Environment(\.colorSchemeContrast) private var contrast
 
     public var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            AppIconView(bundleID: item.notification.appId)          // NSCache-backed, never NSWorkspace on the row
+            AppIconView(bundleID: item.bundleID)                    // NSCache-backed, never NSWorkspace on the row
                 .frame(width: 20, height: 20)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    if item.triage.pinned { Image(systemName: "pin.fill").imageScale(.small) }
+                    if item.isPinned { Image(systemName: "pin.fill").imageScale(.small) }
                     Text(item.appName).font(.caption).foregroundStyle(.secondary)
                     Spacer(minLength: 4)
                     Text(item.notification.deliveredAt.date, format: .dateTime.hour().minute())
                         .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                 }
-                Text(item.notification.title ?? item.notification.body ?? String(localized: "(no text)"))
+                Text(displayTitle)                                  // falls back title → body → "(no text)"
                     .font(.body.weight(item.notification.isRead ? .regular : .semibold))
                     .lineLimit(1)                                   // compact: never measure body text
 
@@ -369,39 +396,57 @@ public struct NotificationRow: View {
         .padding(.horizontal, 10)
         .background(rowBackground)
         .contentShape(Rectangle())
-        .onTapGesture { store.open(item.id) }                       // marks read + deep link (ACTIONS.md)
-        .contextMenu { RowContextMenu(item: item) }                 // copy, pin, delete, rules…
+        .onTapGesture { onOpen?(item.id) }                          // the caller wires mark-read + deep link
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilitySummary)
+        .accessibilityLabel(Self.accessibilityLabelParts(for: item).joined(separator: ", "))
+        .accessibilityValue(Self.accessibilityValueText(for: item))
     }
+
+    /// Falls back title → body → a localized placeholder, so a row with only a
+    /// body (or, from an import, neither) still shows something instead of
+    /// going blank.
+    private var displayTitle: String {
+        item.notification.title ?? item.notification.body ?? String(localized: "(no text)")
+    }
+
+    /// A JSON element from `attachmentsJson` we care about only for its count;
+    /// no properties are declared because none are read, and `JSONDecoder`
+    /// ignores the real payload's extra keys.
+    private struct AttachmentStub: Decodable {}
 
     /// "2 attachments" chip — metadata only; the archive never stores attachment bytes.
     private var attachmentsChip: Label<Text, Image>? {
         guard let json = item.notification.attachmentsJson,
-              let metas = try? JSONDecoder().decode([AttachmentMeta].self, from: Data(json.utf8)),
+              let metas = try? JSONDecoder().decode([AttachmentStub].self, from: Data(json.utf8)),
               !metas.isEmpty else { return nil }
         return Label("\(metas.count)", systemImage: "paperclip")
     }
 
+    /// Increase Contrast turns the highlight tint from a fill into a border: a
+    /// translucent fill behind `Color.primary` text can still read below
+    /// 4.5:1 once the system pushes contrast up, where a stroke of the same
+    /// hue never touches the text at all.
     @ViewBuilder private var rowBackground: some View {
         if item.isSelected {
             RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.18))
         } else if let color = item.triage.highlight {
-            RoundedRectangle(cornerRadius: 6).fill(color.swiftUIColor.opacity(0.12))
+            if contrast == .increased {
+                RoundedRectangle(cornerRadius: 6).strokeBorder(color.swiftUIColor, lineWidth: 2)
+            } else {
+                RoundedRectangle(cornerRadius: 6).fill(color.swiftUIColor.opacity(0.12))
+            }
         }
     }
 
-    private var accessibilitySummary: String {
-        var parts = [item.appName]
-        if !item.notification.isRead { parts.append(String(localized: "unread")) }
-        if let t = item.notification.title { parts.append(t) }
-        if mode == .detailed, let b = item.notification.body { parts.append(b) }
-        return parts.joined(separator: ", ")
-    }
+    // `accessibilityLabelParts(for:)` and `accessibilityValueText(for:)` are
+    // internal static helpers defined alongside this view; omitted from this
+    // excerpt, they compose "app, title, body, time" for the label and
+    // "unread, pinned, redacted" for the value, and are what keep a
+    // redacted body's placeholder from ever being read aloud verbatim.
 }
 ```
 
-Compact rows never render the body, so SwiftUI never measures multi-line text on the popover's hot path. An OTP-redacted notification renders like any other — the body simply reads `[code redacted]`.
+Compact rows never render the body, so SwiftUI never measures multi-line text on the popover's hot path. Row actions (a context menu — copy, pin, delete, rules) are a later milestone and are deliberately absent from `NotificationRow` for now.
 
 ### UnreadDivider
 
@@ -596,38 +641,48 @@ public final class TimelineStore {
 Pages of 200, never `OFFSET`; the key is the pair `(delivered_at, id)` because bursts share a second. `Archive.timelinePage(after:limit:)` is defined in `BackglanceCore` and measured at < 2 ms per page at 100k notifications ([../deployment/PERFORMANCE_GUIDE.md](../deployment/PERFORMANCE_GUIDE.md)).
 
 ```swift
-// TimelineStore, continued
-extension TimelineStore {
-    /// Appends the next page when the scroll sentinel appears. Errors banner; they never crash.
-    public func loadNextPage() async {
+// Packages/BackglanceUI/Sources/BackglanceUI/Timeline/TimelineStore+Pagination.swift
+public extension TimelineStore {
+    /// Appends the next page. Called by the scroll sentinel, and safe to call
+    /// again while one is in flight — the second call returns immediately
+    /// rather than fetching the same page twice.
+    func loadNextPage() async {
         guard hasMorePages, !isLoadingPage else { return }
         isLoadingPage = true
         defer { isLoadingPage = false }
 
-        // Continue from the oldest row we hold (covers the first, observation-fed page too).
-        let after = cursor ?? rows.last.map {
-            TimelineCursor(deliveredAt: $0.deliveredAt.date.timeIntervalSince1970, id: $0.id ?? 0)
+        // The cursor that points at the oldest row already held — covers the
+        // first, observation-fed page too, via `TimelineCursor(row:)`.
+        guard let after = cursor ?? rows.last.flatMap(TimelineCursor.init(row:)) else {
+            hasMorePages = false
+            return
         }
+
         do {
-            let page = try await Task.detached { [archive] in       // pool.read off the main actor
-                try archive.timelinePage(after: after, limit: Self.pageSize)
+            // Bound outside the detached task: reading them inside would be a
+            // hop back to the main actor for every page.
+            let archive = archive
+            let limit = Self.pageSize
+            let page = try await Task.detached {
+                try archive.timelinePage(after: after, limit: limit)
             }.value
+
             guard !page.isEmpty else {
                 hasMorePages = false
                 return
             }
             let known = Set(rows.compactMap(\.id))
-            rows.append(contentsOf: page.filter { $0.id.map { !known.contains($0) } ?? true })
-            cursor = page.last.map {
-                TimelineCursor(deliveredAt: $0.deliveredAt.date.timeIntervalSince1970, id: $0.id ?? 0)
-            }
+            rows.append(contentsOf: page.filter { row in row.id.map { !known.contains($0) } ?? false })
+            cursor = page.last.flatMap(TimelineCursor.init(row:))
             hasMorePages = page.count == Self.pageSize
-            if rows.count > Self.maxRows {                          // drop from the top; scroll-up refetches via observation
+            if rows.count > Self.maxRows {
+                // Drop from the head, not the tail: the user is reading the
+                // bottom of the list, and the subscription can refetch the top.
                 rows.removeFirst(rows.count - Self.maxRows)
             }
             regroup()
         } catch {
-            loadError = ArchiveError.observationFailed(String(describing: error)).userMessage
+            loadError = Self.message(for: error)
         }
     }
 }
@@ -638,65 +693,107 @@ extension TimelineStore {
 Grouping is pure and synchronous over the in-memory rows (≤ 1,000), so it runs on the main actor without jank. Day boundaries use the *user's current* calendar and time zone at render time.
 
 ```swift
-// TimelineStore, continued
+// Packages/BackglanceUI/Sources/BackglanceUI/Timeline/TimelineStore+Grouping.swift
 extension TimelineStore {
-    private func regroup() {
-        var filtered = rows.filter { !($0.isDeleted) }
-        if !appFilter.isEmpty {
-            filtered = filtered.filter { appFilter.contains(bundleID(for: $0.appId)) }
+    /// Turns rows into days: the pure half of the store, so grouping, pinning,
+    /// muting and divider placement are all testable without an archive.
+    static func buildSections(
+        items: [TimelineItem],
+        groupByApp: Bool,
+        anchor: UnixDate,
+        calendar: Calendar,
+        now: Date = .now
+    ) -> [TimelineSection.Model] {
+        let byDay = Dictionary(grouping: items) { item in
+            calendar.startOfDay(for: item.notification.deliveredAt.date)
         }
-        let triaged = filtered.map { row in
-            TimelineItem(id: row.id ?? 0, notification: row,
-                         appName: displayName(for: row.appId),
-                         triage: rules.evaluate(row),               // cached per (rowID, rulesVersion)
-                         isSelected: row.id == selectedID)
-        }
-        sections = Self.buildSections(items: triaged, groupByApp: groupByApp,
-                                      mutedBundleIDs: mutedBundleIDs(),
-                                      anchor: unreadAnchor, calendar: calendar)
-    }
 
-    static func buildSections(items: [TimelineItem], groupByApp: Bool,
-                              mutedBundleIDs: Set<String>, anchor: UnixDate,
-                              calendar: Calendar) -> [TimelineSection.Model] {
-        // 1. Day buckets, newest day first; items inside stay newest-first.
-        let byDay = Dictionary(grouping: items) {
-            calendar.startOfDay(for: $0.notification.deliveredAt.date)
-        }
         return byDay.keys.sorted(by: >).map { day in
-            var dayItems = byDay[day]!
-            // 2. Pinned VIP first within the day, stable otherwise.
-            let pinned = dayItems.filter { $0.triage.pinned || $0.notification.isPinned }
-            dayItems = pinned + dayItems.filter { !($0.triage.pinned || $0.notification.isPinned) }
-            // 3. Muted collapse into one trailing "Muted (n)" group.
-            let muted = dayItems.filter { $0.triage.muted }
-            let normal = dayItems.filter { !$0.triage.muted }
-            // 4. Slots: divider before the first item at/below the anchor, app headers if enabled.
+            let dayItems = byDay[day] ?? []
+            // Pinned first — the user's own pin, then a VIP rule's — and
+            // stable (newest-first) within each group.
+            let pinned = dayItems.filter(\.isPinned)
+            let unpinned = dayItems.filter { !$0.isPinned }
+            let muted = unpinned.filter(\.triage.muted)
+            let normal = pinned + unpinned.filter { !$0.triage.muted }
+
             var slots: [TimelineSection.Slot] = []
             var dividerPlaced = false
+
+            // The divider only earns its place between something new and
+            // something old: if the whole day is new, or none of it is, it
+            // would sit at an edge and mean nothing.
+            let hasNewer = normal.contains { $0.notification.deliveredAt > anchor }
+            let hasOlder = normal.contains { $0.notification.deliveredAt <= anchor }
+
             func emit(_ item: TimelineItem) {
-                if !dividerPlaced, item.notification.deliveredAt <= anchor,
-                   normal.first.map({ $0.notification.deliveredAt > anchor }) == true {
+                if !dividerPlaced, hasNewer, hasOlder, item.notification.deliveredAt <= anchor {
                     slots.append(.divider)
                     dividerPlaced = true
                 }
                 slots.append(.row(item))
             }
+
             if groupByApp {
-                for group in Dictionary(grouping: normal, by: \.appName).sorted(by: { $0.key < $1.key }) {
-                    slots.append(.appHeader(.init(name: group.key, count: group.value.count, isMuted: false)))
-                    group.value.forEach(emit)
+                let groups = Dictionary(grouping: normal, by: \.appName).sorted { $0.key < $1.key }
+                for (name, groupItems) in groups {
+                    slots.append(.appHeader(.init(
+                        id: groupItems.first?.bundleID ?? name,
+                        name: name,
+                        count: groupItems.count,
+                        bundleID: groupItems.first?.bundleID
+                    )))
+                    groupItems.forEach(emit)
                 }
             } else {
                 normal.forEach(emit)
             }
+
             if !muted.isEmpty {
-                slots.append(.appHeader(.init(name: String(localized: "Muted (\(muted.count))"),
-                                              count: muted.count, isMuted: true)))
-                // Muted rows render only when the group is expanded; collapsed by default.
+                // Collapsed by default: the header is the whole group until
+                // the user expands it, so no muted rows are emitted here.
+                slots.append(.appHeader(.init(
+                    id: "muted",
+                    name: String(localized: "Muted"),
+                    count: muted.count,
+                    isMuted: true
+                )))
             }
-            return TimelineSection.Model(id: day, title: DayTitle.string(for: day, calendar: calendar), slots: slots)
+
+            return TimelineSection.Model(
+                id: day,
+                title: DayTitle.string(for: day, calendar: calendar, now: now),
+                slots: slots,
+                mutedItems: muted
+            )
         }
+    }
+
+    /// Rebuilds `sections` from the rows in memory. Pure, synchronous and
+    /// bounded by `maxRows`, so it runs on the main actor without jank.
+    func regroup() {
+        var visible = rows.filter { !$0.isDeleted }
+        if !appFilter.isEmpty {
+            visible = visible.filter { row in
+                apps[row.appId].map { appFilter.contains($0.bundleId) } ?? false
+            }
+        }
+
+        let items = visible.compactMap { row in
+            TimelineItem(
+                row: row,
+                apps: apps,
+                triage: triage.evaluate(row),
+                isSelected: row.id == selectedID
+            )
+        }
+
+        sections = Self.buildSections(
+            items: items,
+            groupByApp: groupByApp,
+            anchor: unreadAnchor,
+            calendar: calendar
+        )
     }
 }
 ```
@@ -719,28 +816,68 @@ Rules never change what macOS delivers — visual triage only ([RULES.md](./RULE
 | Row opened (↩, click) | `is_read = 1` immediately |
 | "Mark all read" | one `UPDATE notifications SET is_read = 1 WHERE is_read = 0 AND is_deleted = 0` |
 | Thread update with changed text | capture resets `is_read = 0` ([CAPTURE.md](./CAPTURE.md#dedupe-and-thread-updates)) |
-| Popover closes | anchor advances; badge resets to 0 |
+| Popover or window closes | anchor advances (`surfaceDidClose()`); badge resets to 0 |
 
 The badge counts `is_read = 0 AND is_muted = 0 AND delivered_at > anchor`, capped at "99+". Marking read is a plain archive write; the observation echoes it back to every open surface, so the popover and the window can never disagree.
 
 ```swift
-// TimelineStore, continued — visibility-based read state
-extension TimelineStore {
-    public func rowBecameVisible(_ id: Int64) {
+// Packages/BackglanceUI/Sources/BackglanceUI/Timeline/TimelineStore+ReadState.swift
+public extension TimelineStore {
+    /// Snapshots the unread anchor just before a surface opens. The anchor is
+    /// the later of the two things that count as looking: the last time a
+    /// surface was open, and the end of the last away session.
+    func surfaceWillOpen() {
+        let sessionEnd = try? archive.lastAwaySessionEnd()
+        if let sessionEnd, sessionEnd > unreadAnchor {
+            unreadAnchor = sessionEnd
+        }
+        regroup()
+    }
+
+    /// Advances the anchor after a surface closes: everything up to now has
+    /// been seen, so the badge resets and the next open starts a new divider.
+    func surfaceDidClose() {
+        let now = Date()
+        defaults.set(now.timeIntervalSince1970, forKey: Self.lastSeenKey)
+        unreadAnchor = UnixDate(now)
+        unreadBadgeCount = 0
+        cancelVisibilityTimers()
+        // The badge query is defined by the anchor, so a moved anchor needs a
+        // new subscription rather than a recount of the old one.
+        startObserving()
+    }
+
+    /// Starts the "seen for a second" timer for a row that scrolled into view.
+    func rowBecameVisible(_ id: Int64) {
         guard visibilityTimers[id] == nil else { return }
         visibilityTimers[id] = Task { [archive] in
             try? await Task.sleep(for: .seconds(1))
             guard !Task.isCancelled else { return }
-            do {
-                try archive.markRead(id)                            // no-op if already read
-            } catch {
-                // A failed read-flag write is not worth a banner; retried next visibility.
-            }
+            // A read flag that fails to persist is not worth a banner: the
+            // row is still on screen, and the next pass tries again.
+            _ = try? archive.markRead(id)
         }
     }
 
-    public func rowBecameHidden(_ id: Int64) {
+    /// Cancels that timer when the row scrolls away unseen.
+    func rowBecameHidden(_ id: Int64) {
         visibilityTimers.removeValue(forKey: id)?.cancel()
+    }
+
+    /// Opening a row reads it, immediately — no timer, no ambiguity.
+    func open(_ id: Int64) {
+        selectedID = id
+        _ = try? archive.markRead(id)
+    }
+
+    /// Marks everything in the archive read. One statement; the subscription
+    /// echoes it back to every open surface.
+    func markAllRead() {
+        do {
+            _ = try archive.markAllRead()
+        } catch {
+            loadError = Self.message(for: error)
+        }
     }
 }
 ```
@@ -831,7 +968,7 @@ Other edge cases:
 | `TimelineGroupingTests` | `BackglanceCoreTests` / `BackglanceUITests` (pure logic) | Day bucketing across midnight, DST transitions, and time zone changes (fixed `Calendar` with explicit `TimeZone`); pinned-first ordering; muted collapse counts; divider position for: anchor mid-page, anchor before everything (no divider), anchor after everything |
 | `DayTitleTests` | same | "Today"/"Yesterday"/weekday/full-date thresholds with a frozen `now`, in `en`, `tr`, `de` and an RTL locale |
 | `TimelinePaginationTests` | `BackglanceCoreTests` | Keyset pages of 200 over a 10k-row in-memory archive: no gaps, no duplicates across page joins, burst rows sharing one `delivered_at` split correctly by `id`; empty page flips `hasMorePages` |
-| `TimelineStoreTests` | `BackglanceUITests` (logic) | `mergeFirstPage` keeps paginated tail; 1,000-row cap; badge excludes muted and read; `popoverWillOpen` snapshots before advancing; read-state timer cancels on disappear |
+| `TimelineStoreTests` | `BackglanceUITests` (logic) | `mergeFirstPage` keeps paginated tail; 1,000-row cap; badge excludes muted and read; `surfaceWillOpen` snapshots before `surfaceDidClose` advances the anchor; read-state timer cancels on disappear |
 | `TimelineKeyboardUITests` | `BackglanceUITests` (XCUITest) | ↑↓ selection skips headers and divider; ↩ marks read; ⌫ deletes and moves selection; ⌘C copies redacted text as redacted; Esc order (clear search → close); ⌘↩ opens the window |
 | `EmptyStateUITests` | XCUITest | Each of the four kinds renders its exact copy under injected `CaptureStatus` + archive contents |
 
@@ -842,30 +979,26 @@ import XCTest
 @testable import BackglanceCore
 
 final class TimelineGroupingTests: XCTestCase {
-    func testDividerLandsAtFirstRowAfterAnchor() throws {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "Europe/Istanbul")!
-        let anchor = UnixDate(Date(timeIntervalSince1970: 1_755_400_000))
+    /// Wraps `TimelineStore.buildSections` with the defaults these tests don't vary.
+    private func sections(_ items: [TimelineItem], anchor: UnixDate) -> [TimelineSection.Model] {
+        TimelineStore.buildSections(items: items, groupByApp: false, anchor: anchor, calendar: .current)
+    }
+
+    func testDividerLandsAtTheFirstRowOlderThanTheAnchor() {
+        let anchor = UnixDate(Stubs.epoch)
         let items = TimelineFixtures.items(around: anchor, newer: 3, older: 2)   // seeded, synthetic text
 
-        let sections = TimelineStore.buildSections(items: items, groupByApp: false,
-                                                   mutedBundleIDs: [], anchor: anchor,
-                                                   calendar: calendar)
+        let slots = sections(items, anchor: anchor).flatMap(\.slots)
 
-        let slots = sections.flatMap(\.slots)
-        let dividerIndex = try XCTUnwrap(slots.firstIndex(of: .divider))
-        // Three newer rows above the divider, two older below.
-        XCTAssertEqual(dividerIndex, 3)
+        XCTAssertEqual(slots.firstIndex(of: .divider), 3, "three new rows belong above the divider")
         XCTAssertEqual(slots.filter { $0 == .divider }.count, 1, "never more than one divider")
     }
 
     func testNoDividerWhenNothingIsNew() {
-        let anchor = UnixDate.now
+        let anchor = UnixDate(Stubs.epoch)
         let items = TimelineFixtures.items(around: anchor, newer: 0, older: 5)
-        let sections = TimelineStore.buildSections(items: items, groupByApp: false,
-                                                   mutedBundleIDs: [], anchor: anchor,
-                                                   calendar: .current)
-        XCTAssertFalse(sections.flatMap(\.slots).contains(.divider))
+
+        XCTAssertFalse(sections(items, anchor: anchor).flatMap(\.slots).contains(.divider))
     }
 }
 ```
