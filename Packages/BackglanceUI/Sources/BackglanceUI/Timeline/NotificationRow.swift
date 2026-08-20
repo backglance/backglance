@@ -196,7 +196,7 @@ public struct NotificationRow: View {
                 RoundedRectangle(cornerRadius: 6)
                     .strokeBorder(color.swiftUIColor, lineWidth: 2)
             } else {
-                RoundedRectangle(cornerRadius: 6).fill(color.swiftUIColor.opacity(0.12))
+                RoundedRectangle(cornerRadius: 6).fill(color.swiftUIColor.opacity(HighlightColor.tintOpacity))
             }
         }
     }
