@@ -58,6 +58,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         var openWindow: () -> Void
         var pauseForAnHour: () -> Void
         var resume: () -> Void
+        var openSettings: () -> Void
     }
 
     /// Shows the popover, or hides it if it is already up. Bound to the status
@@ -182,9 +183,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         } else {
             menu.addItem(item(String(localized: "Pause Capture for 1 Hour"), #selector(pauseCapture)))
         }
-        // "Settings…" belongs here (docs/features/TIMELINE.md#statusitemcontroller)
-        // and joins the menu with the settings scene itself. A menu item that
-        // opens nothing is worse than one that is not there yet.
+        menu.addItem(item(String(localized: "Settings…"), #selector(openSettings), key: ","))
         menu.addItem(.separator())
         menu.addItem(withTitle: String(localized: "Quit Backglance"),
                      action: #selector(NSApplication.terminate(_:)),
@@ -211,5 +210,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     @objc
     private func resumeCapture() {
         menuActions.resume()
+    }
+
+    @objc
+    private func openSettings() {
+        menuActions.openSettings()
     }
 }

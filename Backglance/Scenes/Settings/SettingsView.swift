@@ -1,0 +1,71 @@
+import BackglanceUI
+import SwiftUI
+
+// MARK: - SettingsView
+
+/// Settings, as far as Phase 2 has settings.
+///
+/// One pane today — Search — because semantic indexing is the first thing the
+/// app does that needs the user's permission in the plain sense: it reads every
+/// notification they have ever received and writes a vector for each one. That
+/// deserves a switch, an honest description of what it costs, and a way to undo
+/// it. Capture, privacy and rules panes arrive with their milestones.
+struct SettingsView: View {
+    // MARK: Internal
+
+    @Bindable var search: SearchService
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle(String(localized: "Semantic search"), isOn: $search.semanticEnabled)
+                    .disabled(!search.isSemanticAvailable)
+
+                Text(explanation)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let progress = search.indexProgress {
+                    SemanticIndexProgress(done: progress.done, total: progress.total)
+                }
+
+                Button(String(localized: "Delete embeddings")) {
+                    search.deleteEmbeddings()
+                }
+                .disabled(search.indexProgress == nil && !search.semanticEnabled)
+            } header: {
+                Text(String(localized: "Search"))
+            }
+        }
+        .formStyle(.grouped)
+        .frame(width: 460)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    // MARK: Private
+
+    /// The honest version, not the marketing one: what it does, what it costs,
+    /// and what it cannot do (docs/features/SEARCH.md#what-semantic-search-cannot-do).
+    private var explanation: String {
+        guard search.isSemanticAvailable else {
+            return String(localized: """
+            The on-device English sentence model isn't available on this Mac. \
+            Semantic search is off; full-text search still works.
+            """)
+        }
+        return String(localized: """
+        Finds notifications by meaning as well as by wording — "the message about the invoice" \
+        rather than the exact words. Everything is computed on this Mac and stored in your archive, \
+        about 2 KB per notification. The model is English, so other languages fall back to \
+        full-text search.
+        """)
+    }
+}
+
+// MARK: - Preview
+
+#Preview {
+    Text(verbatim: "Settings")
+        .frame(width: 460, height: 200)
+}

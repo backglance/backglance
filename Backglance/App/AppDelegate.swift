@@ -63,6 +63,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The interface, retained for the same reason: a status item whose
     /// controller is deallocated stays in the menu bar and stops responding.
     private var store: TimelineStore?
+    private var search: SearchService?
+    private var settings: SettingsWindowController?
     private var statusItem: StatusItemController?
     private var hotKeys: HotKeyCenter?
     private var window: TimelineWindowController?
@@ -144,6 +146,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let store = TimelineStore(archive: archive, host: .popover)
         let window = TimelineWindowController(store: store)
+        // Search owns the semantic model and the background indexer, both of
+        // which stay asleep until the user turns the setting on.
+        let search = SearchService(archive: archive)
+        search.start()
+        let settings = SettingsWindowController(search: search)
         let statusItem = StatusItemController(
             store: store,
             menuActions: .init(
@@ -159,7 +166,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         return
                     }
                     Task { await engine.resume() }
-                }
+                },
+                openSettings: { settings.show() }
             )
         )
         // Registration fails when another app already owns ⌃⌥N. That is a note
@@ -168,6 +176,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotKeys.register()
 
         self.store = store
+        self.search = search
+        self.settings = settings
         self.window = window
         self.statusItem = statusItem
         self.hotKeys = hotKeys
