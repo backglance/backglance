@@ -77,6 +77,16 @@ public enum PreviewData {
             isMuted: true,
             bundleID: nil
         )
+        let mutedItems = (0 ..< 3).map { index in
+            item(
+                id: Int64(900 + index),
+                appName: "Calendar",
+                bundleID: "com.apple.iCal",
+                title: "Fixture reminder \(String(format: "%06d", 900 + index))",
+                minutesAgo: 1_500 + index * 5,
+                isRead: true
+            )
+        }
         let yesterdaySlots: [TimelineSection.Slot] = [
             .row(items[2]),
             .row(items[3]),
@@ -89,7 +99,7 @@ public enum PreviewData {
                 id: yesterday,
                 title: DayTitle.string(for: yesterday, now: Date()),
                 slots: yesterdaySlots,
-                mutedCount: 3
+                mutedItems: mutedItems
             ),
         ]
     }

@@ -16,11 +16,11 @@ public enum TimelineSection {
     public struct Model: Identifiable, Equatable, Sendable {
         // MARK: Lifecycle
 
-        public init(id: Date, title: String, slots: [Slot], mutedCount: Int = 0) {
+        public init(id: Date, title: String, slots: [Slot], mutedItems: [TimelineItem] = []) {
             self.id = id
             self.title = title
             self.slots = slots
-            self.mutedCount = mutedCount
+            self.mutedItems = mutedItems
         }
 
         // MARK: Public
@@ -35,9 +35,17 @@ public enum TimelineSection {
         /// `LazyVStack` instantiates only what is on screen.
         public let slots: [Slot]
 
-        /// How many rows this day hides behind its collapsed "Muted (n)" group.
-        /// Zero when the day has no muted rows.
-        public let mutedCount: Int
+        /// The rows this day hides behind its collapsed "Muted (n)" group.
+        ///
+        /// Carried rather than dropped: muting is presentation, and a group the
+        /// user expands has to have something to show. They stay out of
+        /// ``slots`` so the collapsed case — the common one — costs nothing.
+        public let mutedItems: [TimelineItem]
+
+        /// How many rows the muted group holds. Zero when the day has none.
+        public var mutedCount: Int {
+            mutedItems.count
+        }
 
         /// The rows in this day, skipping headers and the divider — what ↑/↓
         /// selection moves through.

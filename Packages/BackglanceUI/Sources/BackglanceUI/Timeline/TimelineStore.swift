@@ -32,7 +32,7 @@ public final class TimelineStore {
         archive: Archive,
         triage: any TriageEvaluating = NoTriage(),
         host: Host = .popover,
-        defaults: UserDefaults = UserDefaults(suiteName: TimelineStore.defaultsSuite) ?? .standard,
+        defaults: UserDefaults = .standard,
         calendar: Calendar = .current
     ) {
         self.archive = archive
@@ -68,6 +68,8 @@ public final class TimelineStore {
         case popover
         case window
 
+        // MARK: Internal
+
         /// What each host opens as before the user has said otherwise: the
         /// popover glances, so it starts compact; the window is where things
         /// are actually read.
@@ -79,8 +81,13 @@ public final class TimelineStore {
         }
     }
 
-    /// Where the per-host preferences and the unread anchor live. A named
-    /// suite rather than `.standard` so a test can hand the store its own.
+    /// The bundle identifier the preferences are filed under.
+    ///
+    /// Kept as documentation rather than used as a suite name: `.standard`
+    /// *is* this suite for the app that owns the identifier, and asking
+    /// `UserDefaults(suiteName:)` for your own bundle id returns nothing and
+    /// logs "does not make sense and will not work" — which is exactly what it
+    /// did before this was `.standard`. Tests pass their own throwaway suite.
     public static let defaultsSuite = "app.backglance.Backglance"
 
     /// Days, newest first, each already flattened into draw-order slots.
@@ -98,6 +105,10 @@ public final class TimelineStore {
     /// Whether ``loadNextPage()`` has anything left to fetch.
     public internal(set) var hasMorePages = true
 
+    /// What capture is doing, pushed in by the app shell. Only the empty state
+    /// and the banner read it; the timeline itself renders the same either way.
+    public var captureState: TimelineCaptureState = .running
+
     /// Compact or detailed rows, remembered per host.
     public var viewMode: TimelineViewMode = .compact {
         didSet {
@@ -107,10 +118,6 @@ public final class TimelineStore {
             defaults.set(viewMode.rawValue, forKey: Self.viewModeKey(host))
         }
     }
-
-    /// What capture is doing, pushed in by the app shell. Only the empty state
-    /// and the banner read it; the timeline itself renders the same either way.
-    public var captureState: TimelineCaptureState = .running
 
     /// The keyboard selection.
     public var selectedID: Int64? {
@@ -172,6 +179,30 @@ public final class TimelineStore {
         sections.flatMap(\.items)
     }
 
+    /// Moves the keyboard selection by `delta` rows, skipping headers and the
+    /// divider — they are not places a selection can rest.
+    ///
+    /// Selection stops at both ends rather than wrapping: a list that jumps
+    /// from the oldest notification to the newest on one extra key press hides
+    /// the fact that you reached the end.
+    public func moveSelection(_ delta: Int) {
+        let items = visibleItems
+        guard !items.isEmpty else {
+            return
+        }
+        guard let current = selectedID, let index = items.firstIndex(where: { $0.id == current }) else {
+            selectedID = delta >= 0 ? items.first?.id : items.last?.id
+            return
+        }
+        let next = min(max(index + delta, 0), items.count - 1)
+        selectedID = items[next].id
+    }
+
+    /// Clears every app filter — what the "all filtered" empty state's button does.
+    public func clearFilters() {
+        appFilter = []
+    }
+
     /// Re-subscribes after a read failure. The rows already on screen stay put
     /// while it retries: a stale timeline with a banner beats a blank one.
     public func retry() {
@@ -185,6 +216,31 @@ public final class TimelineStore {
     /// either one counts as having looked.
     static let lastSeenKey = "timeline.lastSeenAt"
 
+    /// Rows per page, and the ceiling on rows held in memory (~1 MB).
+    static let pageSize = Archive.timelinePageSize
+    static let maxRows = 1_000
+
+    // The store's own state. Internal rather than private because the store is
+    // split across `TimelineStore+Grouping`, `+Pagination` and `+ReadState` —
+    // one type, four files, so that each file is about one thing.
+
+    let archive: Archive
+    let triage: any TriageEvaluating
+    let host: Host
+    let defaults: UserDefaults
+    let calendar: Calendar
+
+    var rows: [ArchivedNotification] = []
+    var apps: [Int64: AppRecord] = [:]
+    var cursor: TimelineCursor?
+    var unreadAnchor: UnixDate
+
+    /// One live timer per visible row. Held so scrolling a row back off screen
+    /// before it has been seen for a second cancels it — a row that flew past
+    /// under the user's scroll was not read.
+    @ObservationIgnored var visibilityTimers: [Int64: Task<Void, Never>] = [:]
+    @ObservationIgnored var isLoadingPage = false
+
     static func viewModeKey(_ host: Host) -> String {
         "timeline.viewMode.\(host.rawValue)"
     }
@@ -193,9 +249,13 @@ public final class TimelineStore {
         "timeline.groupByApp.\(host.rawValue)"
     }
 
-    /// Rows per page, and the ceiling on rows held in memory (~1 MB).
-    static let pageSize = Archive.timelinePageSize
-    static let maxRows = 1_000
+    /// A failed archive read is a banner, never a crash and never a modal — the
+    /// timeline's job is to render *something* for every combination of archive
+    /// health, capture status and permissions.
+    static func message(for error: Error) -> String {
+        (error as? ArchiveError)?.userMessage
+            ?? ArchiveError.observationFailed(String(describing: type(of: error))).userMessage
+    }
 
     /// The newest page from the subscription replaces the head of `rows`; pages
     /// the user already scrolled to are kept.
@@ -226,42 +286,6 @@ public final class TimelineStore {
         }
     }
 
-    // MARK: Internal
-
-    // The store's own state. Internal rather than private because the store is
-    // split across `TimelineStore+Grouping`, `+Pagination` and `+ReadState` —
-    // one type, four files, so that each file is about one thing.
-
-    let archive: Archive
-    let triage: any TriageEvaluating
-    let host: Host
-    let defaults: UserDefaults
-    let calendar: Calendar
-
-    var rows: [ArchivedNotification] = []
-    var apps: [Int64: AppRecord] = [:]
-    var cursor: TimelineCursor?
-    var unreadAnchor: UnixDate
-
-    /// One live timer per visible row. Held so scrolling a row back off screen
-    /// before it has been seen for a second cancels it — a row that flew past
-    /// under the user's scroll was not read.
-    @ObservationIgnored var visibilityTimers: [Int64: Task<Void, Never>] = [:]
-    /// Only ever assigned on the main actor, and `@ObservationIgnored` because a
-    /// view has no business redrawing when the subscription is replaced. The
-    /// isolation opt-out is what lets `deinit` — which is not main-actor
-    /// isolated — cancel it.
-    @ObservationIgnored nonisolated(unsafe) private var observation: Task<Void, Never>?
-    @ObservationIgnored var isLoadingPage = false
-
-    /// A failed archive read is a banner, never a crash and never a modal — the
-    /// timeline's job is to render *something* for every combination of archive
-    /// health, capture status and permissions.
-    static func message(for error: Error) -> String {
-        (error as? ArchiveError)?.userMessage
-            ?? ArchiveError.observationFailed(String(describing: type(of: error))).userMessage
-    }
-
     func cancelVisibilityTimers() {
         for timer in visibilityTimers.values {
             timer.cancel()
@@ -289,4 +313,12 @@ public final class TimelineStore {
             }
         }
     }
+
+    // MARK: Private
+
+    /// Only ever assigned on the main actor, and `@ObservationIgnored` because a
+    /// view has no business redrawing when the subscription is replaced. The
+    /// isolation opt-out is what lets `deinit` — which is not main-actor
+    /// isolated — cancel it.
+    @ObservationIgnored nonisolated(unsafe) private var observation: Task<Void, Never>?
 }

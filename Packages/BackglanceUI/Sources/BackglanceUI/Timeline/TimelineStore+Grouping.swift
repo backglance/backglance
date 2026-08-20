@@ -87,7 +87,7 @@ extension TimelineStore {
                 id: day,
                 title: DayTitle.string(for: day, calendar: calendar, now: now),
                 slots: slots,
-                mutedCount: muted.count
+                mutedItems: muted
             )
         }
     }
