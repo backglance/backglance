@@ -1,6 +1,7 @@
 import AppKit
 import BackglanceCapture
 import BackglanceCore
+import BackglanceUI
 import os
 
 /// Application delegate for the Backglance agent app.
@@ -8,9 +9,9 @@ import os
 /// Backglance has no Dock icon and no windows at launch: `LSUIElement` in `Info.plist`
 /// makes it an agent, and everything the user sees hangs off the status item.
 ///
-/// The delegate is where the pieces that cannot live in a package get wired together.
-/// Today that is the archive and the capture engine; the status item, the ⌃⌥N hotkey, the
-/// `backglance://` handler and the Sparkle controller join them in later milestones
+/// The delegate is where the pieces that cannot live in a package get wired together: the
+/// archive, the capture engine, the timeline store, the status item and the ⌃⌥N hotkey.
+/// The `backglance://` handler and the Sparkle controller join them in later milestones
 /// (docs/architecture/ARCHITECTURE.md#app-shell-backglance-target).
 ///
 /// The order below is the one the architecture requires and is not interchangeable: the
@@ -29,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         logger.notice("Backglance launched as an agent app")
 
         startCapture()
+        startInterface()
     }
 
     func applicationWillTerminate(_: Notification) {
@@ -57,6 +59,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var archive: Archive?
     private var watcher: StoreWatcher?
     private var engine: CaptureEngine?
+
+    /// The interface, retained for the same reason: a status item whose
+    /// controller is deallocated stays in the menu bar and stops responding.
+    private var store: TimelineStore?
+    private var statusItem: StatusItemController?
+    private var hotKeys: HotKeyCenter?
+    private var window: TimelineWindowController?
+    private var statusMirror: Task<Void, Never>?
+
+    private static func timelineState(for status: CaptureStatus) -> TimelineCaptureState {
+        switch status {
+        case .running:
+            .running
+
+        case let .paused(until):
+            .paused(until: until)
+
+        case .degraded(.noFullDiskAccess):
+            .noFullDiskAccess
+
+        case let .degraded(reason):
+            .degraded(message: reason.userMessage)
+
+        case .stopped:
+            .stopped
+        }
+    }
 
     /// Opens the archive, builds the capture engine on top of it, and starts watching.
     ///
@@ -100,5 +129,69 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // agrees to, with its own progress UI, in the onboarding milestone
         // (docs/features/CAPTURE.md#first-launch-import).
         Task { await engine.start() }
+    }
+
+    /// Builds the timeline and everything that shows it.
+    ///
+    /// Without an archive there is nothing to show, so the interface is simply
+    /// not built — the alternative, a status item whose popover explains that
+    /// the database could not be opened, is a window's worth of apology that
+    /// onboarding will do properly (docs/features/PERMISSIONS_PRIVACY.md).
+    private func startInterface() {
+        guard let archive else {
+            return
+        }
+
+        let store = TimelineStore(archive: archive, host: .popover)
+        let window = TimelineWindowController(store: store)
+        let statusItem = StatusItemController(
+            store: store,
+            menuActions: .init(
+                openWindow: { window.show() },
+                pauseForAnHour: { [weak self] in
+                    guard let engine = self?.engine else {
+                        return
+                    }
+                    Task { await engine.pause(until: Date().addingTimeInterval(3_600)) }
+                },
+                resume: { [weak self] in
+                    guard let engine = self?.engine else {
+                        return
+                    }
+                    Task { await engine.resume() }
+                }
+            )
+        )
+        // Registration fails when another app already owns ⌃⌥N. That is a note
+        // in Settings, not a failure to launch: the status item still works.
+        let hotKeys = HotKeyCenter { [weak statusItem] in statusItem?.togglePopover() }
+        hotKeys.register()
+
+        self.store = store
+        self.window = window
+        self.statusItem = statusItem
+        self.hotKeys = hotKeys
+        mirrorCaptureStatus(into: store)
+    }
+
+    /// Pushes the engine's status into the store as the UI's own value type.
+    ///
+    /// The UI never imports `BackglanceCapture`
+    /// (docs/getting-started/DEVELOPMENT_GUIDE.md#dependency-direction), so the
+    /// translation happens here, in the one place that already knows both
+    /// sides. It is a small enum-to-enum map rather than a shared type because
+    /// the views need far less than the engine publishes: enough to pick an
+    /// icon, an empty state and one sentence.
+    private func mirrorCaptureStatus(into store: TimelineStore) {
+        guard let engine else {
+            return
+        }
+        statusMirror?.cancel()
+        let stream = engine.statusStream
+        statusMirror = Task { @MainActor in
+            for await status in stream {
+                store.captureState = Self.timelineState(for: status)
+            }
+        }
     }
 }
