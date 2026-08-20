@@ -102,7 +102,8 @@ The unread anchor is not a table of its own: it is `max(last popover open, last 
 | `StatusItemController` | `Backglance/App/StatusItemController.swift` | `NSStatusItem`, badge, popover toggle, right-click menu |
 | `MenuBarPopoverView` | `Backglance/Scenes/MenuBarPopover/MenuBarPopoverView.swift` | Popover chrome: toolbar + `TimelineView` + footer |
 | `TimelineView` | `Packages/BackglanceUI/Sources/BackglanceUI/Timeline/TimelineView.swift` | Scroll view, sections, empty states, keyboard focus |
-| `TimelineSection` | `…/Timeline/TimelineSection.swift` | Day header ("Today / Yesterday / Monday, 11 Aug") + rows, optional app sub-groups |
+| `TimelineSection` | `…/Timeline/TimelineSection.swift` | Value-type namespace for a day's shape: `Model` (header title + `slots`), `Slot` (divider / app header / row), `AppGroup`. Built by `TimelineStore`, not a view |
+| `TimelineSectionSlots` | `…/Timeline/TimelineView.swift` (private) | The view that walks one day's `slots` — divider, app headers, rows — plus its muted rows when expanded |
 | `AppGroupHeader` | `…/Timeline/AppGroupHeader.swift` | App icon + name + count when by-app grouping is on; collapse chevron for muted group |
 | `NotificationRow` | `…/Timeline/NotificationRow.swift` | One notification, compact or detailed |
 | `UnreadDivider` | `…/Timeline/UnreadDivider.swift` | "new since you were away" marker |
@@ -470,134 +471,125 @@ Selection is `TimelineStore.selectedID: Int64?`; the view scrolls it visible via
 
 ```swift
 // Packages/BackglanceUI/Sources/BackglanceUI/Timeline/TimelineStore.swift
-import Foundation
-import GRDB
-import Observation
 import BackglanceCore
+import Foundation
+import Observation
 
-@MainActor @Observable
+@MainActor
+@Observable
 public final class TimelineStore {
-    // Display state
-    public private(set) var sections: [TimelineSection.Model] = []
-    public private(set) var unreadBadgeCount = 0
-    public private(set) var loadError: String?
-    public private(set) var hasMorePages = true
+    public enum Host: String, Sendable { case popover, window }
+
+    // Display state, published to both hosts.
+    public internal(set) var sections: [TimelineSection.Model] = []
+    public internal(set) var unreadBadgeCount = 0
+    public internal(set) var loadError: String?          // a one-sentence, content-free banner; nil when healthy
+    public internal(set) var hasMorePages = true
     public var selectedID: Int64?
-    public var viewMode: TimelineViewMode {
-        didSet { defaults.set(viewMode.rawValue, forKey: "timeline.viewMode.\(host.rawValue)") }
+    public var viewMode: TimelineViewMode = .compact {
+        didSet { defaults.set(viewMode.rawValue, forKey: Self.viewModeKey(host)) }
     }
-    public var groupByApp: Bool {
-        didSet { defaults.set(groupByApp, forKey: "timeline.groupByApp.\(host.rawValue)"); regroup() }
+    public var groupByApp = false {
+        didSet { defaults.set(groupByApp, forKey: Self.groupByAppKey(host)); regroup() }
     }
     public var appFilter: Set<String> = [] { didSet { regroup() } }
 
-    public enum Host: String { case popover, window }
-
-    // Dependencies
-    private let archive: Archive
-    private let rules: RulesEngine
-    private let host: Host
-    private let defaults: UserDefaults
-    private let calendar: Calendar
-
-    // Internals
-    private var rows: [ArchivedNotification] = []          // ≤ 1,000, newest first
-    private var cursor: TimelineCursor?
-    private var unreadAnchor: UnixDate
-    private var observation: Task<Void, Never>?
-    private var visibilityTimers: [Int64: Task<Void, Never>] = [:]
-    private var isLoadingPage = false
-    private static let pageSize = 200
-    private static let maxRows = 1_000
-
-    public init(archive: Archive, rules: RulesEngine, host: Host = .popover,
-                defaults: UserDefaults = UserDefaults(suiteName: "app.backglance.Backglance") ?? .standard,
-                calendar: Calendar = .current) {
+    public init(
+        archive: Archive,
+        triage: any TriageEvaluating = NoTriage(),
+        host: Host = .popover,
+        defaults: UserDefaults = .standard,
+        calendar: Calendar = .current
+    ) {
         self.archive = archive
-        self.rules = rules
+        self.triage = triage
         self.host = host
         self.defaults = defaults
         self.calendar = calendar
-        self.viewMode = TimelineViewMode(rawValue: defaults.string(forKey: "timeline.viewMode.\(host.rawValue)") ?? "") ?? .compact
-        self.groupByApp = defaults.bool(forKey: "timeline.groupByApp.\(host.rawValue)")
-        self.unreadAnchor = UnixDate(Date(timeIntervalSince1970: defaults.double(forKey: "timeline.lastSeenAt")))
+        unreadAnchor = UnixDate(Date(timeIntervalSince1970: defaults.double(forKey: Self.lastSeenKey)))
+        viewMode = defaults.string(forKey: Self.viewModeKey(host)).flatMap(TimelineViewMode.init(rawValue:)) ?? host.defaultViewMode
+        groupByApp = defaults.bool(forKey: Self.groupByAppKey(host))
         startObserving()
     }
 
-    // MARK: Live first page + badge
+    // Dependencies and internal state. `rows` is capped at `maxRows` (≤ 1,000,
+    // ~1 MB); `cursor` is where `loadNextPage()` (below) resumes.
+    let archive: Archive
+    let triage: any TriageEvaluating
+    let host: Host
+    let defaults: UserDefaults
+    let calendar: Calendar
+    var rows: [ArchivedNotification] = []
+    var apps: [Int64: AppRecord] = [:]
+    var cursor: TimelineCursor?
+    var unreadAnchor: UnixDate
+    static let pageSize = Archive.timelinePageSize
+    static let maxRows = 1_000
+    @ObservationIgnored nonisolated(unsafe) private var observation: Task<Void, Never>?
 
-    private func startObserving() {
+    // MARK: Live subscription
+
+    /// Subscribes to ``BackglanceCore/Archive/timelineSnapshots(unreadSince:pageSize:)``.
+    /// The `ValueObservation` itself lives in `BackglanceCore` — this package
+    /// never imports GRDB — and hands back one `TimelineSnapshot` per change:
+    /// the newest page, the app dictionary, and the unread count, all read as
+    /// one consistent transaction.
+    ///
+    /// Every emitted snapshot replaces the newest page (`mergeFirstPage`,
+    /// splicing rather than reloading, so older pages fetched via
+    /// `loadNextPage()` survive), refreshes the badge, and clears any previous
+    /// `loadError`. A thrown error ends the stream and surfaces as `loadError`
+    /// — a banner, never a crash.
+    func startObserving() {
         observation?.cancel()
-        observation = Task {
-            let stream = ValueObservation
-                .tracking { db -> (page: [ArchivedNotification], unread: Int) in
-                    let page = try ArchivedNotification.recent(limit: Self.pageSize).fetchAll(db)
-                    // Badge: unread, not muted, delivered since the anchor. Muted apps never count.
-                    let unread = try Int.fetchOne(db, sql: """
-                        SELECT COUNT(*) FROM notifications n
-                        JOIN apps a ON a.id = n.app_id
-                        WHERE n.is_deleted = 0 AND n.is_read = 0 AND a.is_muted = 0
-                          AND n.delivered_at > ?
-                        """, arguments: [self.unreadAnchor.date.timeIntervalSince1970]) ?? 0
-                    return (page, unread)
-                }
-                .values(in: archive.pool)
+        let stream = archive.timelineSnapshots(unreadSince: unreadAnchor, pageSize: Self.pageSize)
+        observation = Task { [weak self] in
             do {
-                for try await (page, unread) in stream {
-                    mergeFirstPage(page)
-                    unreadBadgeCount = min(unread, 100)            // display renders 100 as "99+"
+                for try await snapshot in stream {
+                    guard let self, !Task.isCancelled else { return }
+                    apps = snapshot.apps
+                    mergeFirstPage(snapshot.rows)
+                    unreadBadgeCount = snapshot.unreadCount
                     loadError = nil
+                    regroup()
                 }
             } catch {
-                // Archive read failure: banner, never crash. Rows already loaded stay visible.
-                loadError = ArchiveError.observationFailed(String(describing: error)).userMessage
+                self?.loadError = Self.message(for: error)
             }
         }
     }
 
+    /// Re-subscribes after a read failure. Rows already on screen stay put.
     public func retry() {
         loadError = nil
         startObserving()
     }
 
-    /// The live observation replaces the newest page; older, paginated rows are kept.
-    private func mergeFirstPage(_ page: [ArchivedNotification]) {
-        guard let oldestNew = page.last else {
+    /// Splices the subscription's newest page onto whatever older, paginated
+    /// rows are already held: everything at or newer than the new page's
+    /// oldest row is replaced, everything older survives.
+    func mergeFirstPage(_ page: [ArchivedNotification]) {
+        guard let oldestNew = page.last, let oldestKey = TimelineCursor(row: oldestNew) else {
             rows = []
             cursor = nil
             hasMorePages = false
-            regroup()
             return
         }
         let older = rows.drop { row in
-            (row.deliveredAt, row.id ?? 0) >= (oldestNew.deliveredAt, oldestNew.id ?? 0)
+            guard let key = TimelineCursor(row: row) else { return true }
+            return (key.deliveredAt, key.id) >= (oldestKey.deliveredAt, oldestKey.id)
         }
         rows = page + Array(older)
-        if rows.count > Self.maxRows {                              // bounded memory
+        if rows.count > Self.maxRows {
             rows.removeLast(rows.count - Self.maxRows)
-            cursor = rows.last.map { TimelineCursor(deliveredAt: $0.deliveredAt.date.timeIntervalSince1970, id: $0.id ?? 0) }
+            cursor = rows.last.flatMap(TimelineCursor.init(row:))
             hasMorePages = true
         }
-        regroup()
-    }
-
-    // MARK: Unread anchor
-
-    /// Called by StatusItemController before showing the popover: snapshot, then advance.
-    public func popoverWillOpen() {
-        let sessionEnd = (try? archive.lastAwaySessionEnd()) ?? nil
-        let anchor = max(unreadAnchor, sessionEnd ?? unreadAnchor)  // later of the two
-        unreadAnchor = anchor
-        regroup()                                                   // divider position uses the snapshot
-    }
-
-    public func popoverDidClose() {
-        defaults.set(Date().timeIntervalSince1970, forKey: "timeline.lastSeenAt")
-        unreadAnchor = .now
-        unreadBadgeCount = 0
     }
 }
 ```
+
+`loadNextPage()` — how the store pages *older* rows in past this first, live-fed page — is defined in `TimelineStore+Pagination.swift`; see [Keyset pagination](#keyset-pagination) below.
 
 ### Keyset pagination
 
