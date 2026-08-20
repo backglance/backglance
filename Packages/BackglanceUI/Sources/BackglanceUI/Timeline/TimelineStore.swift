@@ -43,6 +43,11 @@ public final class TimelineStore {
         // A fresh install has no "last seen", which makes every archived
         // notification new — correct, and the same thing the first import means.
         unreadAnchor = UnixDate(Date(timeIntervalSince1970: defaults.double(forKey: Self.lastSeenKey)))
+        // The hosts remember separately, and they start from different places:
+        // the popover is for glancing, the window is for reading.
+        viewMode = defaults.string(forKey: Self.viewModeKey(host))
+            .flatMap(TimelineViewMode.init(rawValue:)) ?? host.defaultViewMode
+        groupByApp = defaults.bool(forKey: Self.groupByAppKey(host))
         startObserving()
     }
 
@@ -56,10 +61,22 @@ public final class TimelineStore {
     // MARK: Public
 
     /// Which surface this store is driving. The two hosts remember their view
-    /// mode and grouping separately.
+    /// mode and grouping separately — glancing and reading are different jobs,
+    /// and a setting that followed the user between them would be wrong in one
+    /// of the two every time.
     public enum Host: String, Sendable {
         case popover
         case window
+
+        /// What each host opens as before the user has said otherwise: the
+        /// popover glances, so it starts compact; the window is where things
+        /// are actually read.
+        var defaultViewMode: TimelineViewMode {
+            switch self {
+            case .popover: .compact
+            case .window: .detailed
+            }
+        }
     }
 
     /// Where the per-host preferences and the unread anchor live. A named
@@ -81,8 +98,15 @@ public final class TimelineStore {
     /// Whether ``loadNextPage()`` has anything left to fetch.
     public private(set) var hasMorePages = true
 
-    /// Compact or detailed rows. Persisted per host in Phase 2.3's view-mode task.
-    public var viewMode: TimelineViewMode = .compact
+    /// Compact or detailed rows, remembered per host.
+    public var viewMode: TimelineViewMode = .compact {
+        didSet {
+            guard oldValue != viewMode else {
+                return
+            }
+            defaults.set(viewMode.rawValue, forKey: Self.viewModeKey(host))
+        }
+    }
 
     /// What capture is doing, pushed in by the app shell. Only the empty state
     /// and the banner read it; the timeline itself renders the same either way.
@@ -98,12 +122,13 @@ public final class TimelineStore {
         }
     }
 
-    /// Whether days are sub-grouped by app.
+    /// Whether days are sub-grouped by app, remembered per host.
     public var groupByApp = false {
         didSet {
             guard oldValue != groupByApp else {
                 return
             }
+            defaults.set(groupByApp, forKey: Self.groupByAppKey(host))
             regroup()
         }
     }
@@ -271,6 +296,14 @@ public final class TimelineStore {
     /// When a surface was last open. Shared by both hosts on purpose: opening
     /// either one counts as having looked.
     static let lastSeenKey = "timeline.lastSeenAt"
+
+    static func viewModeKey(_ host: Host) -> String {
+        "timeline.viewMode.\(host.rawValue)"
+    }
+
+    static func groupByAppKey(_ host: Host) -> String {
+        "timeline.groupByApp.\(host.rawValue)"
+    }
 
     /// Rows per page, and the ceiling on rows held in memory (~1 MB).
     static let pageSize = Archive.timelinePageSize

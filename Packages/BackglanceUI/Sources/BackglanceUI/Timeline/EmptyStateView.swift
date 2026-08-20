@@ -133,7 +133,7 @@ public struct EmptyStateView: View {
     }
 }
 
-// MARK: - Previews
+// MARK: - PreviewAction
 
 /// A no-op the previews can pass by name. A closure literal at the call site
 /// would trip SwiftLint's trailing-closure rule, and a trailing closure would

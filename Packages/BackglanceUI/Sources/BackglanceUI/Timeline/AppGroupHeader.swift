@@ -58,7 +58,9 @@ public struct AppGroupHeader: View {
         .padding(.horizontal, 10)
         .contentShape(Rectangle())
         .onTapGesture {
-            guard group.isMuted else { return }
+            guard group.isMuted else {
+                return
+            }
             onToggle?()
         }
         .accessibilityElement(children: .ignore)

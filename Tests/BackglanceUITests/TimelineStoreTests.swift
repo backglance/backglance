@@ -266,6 +266,67 @@ final class TimelineStoreTests: XCTestCase {
         XCTAssertEqual(store.unreadBadgeCount, 2, "looking at the timeline does not itself clear the badge")
     }
 
+    // MARK: - Per-host preferences
+
+    /// Glancing and reading are different jobs, so the two surfaces open
+    /// differently until the user says otherwise.
+    func testEachHostStartsInTheModeItsJobCallsFor() throws {
+        let archive = try XCTUnwrap(archive)
+        let defaults = try XCTUnwrap(makeDefaults())
+
+        XCTAssertEqual(TimelineStore(archive: archive, host: .popover, defaults: defaults).viewMode, .compact)
+        XCTAssertEqual(TimelineStore(archive: archive, host: .window, defaults: defaults).viewMode, .detailed)
+    }
+
+    func testTheViewModeIsRememberedPerHost() throws {
+        let archive = try XCTUnwrap(archive)
+        let defaults = try XCTUnwrap(makeDefaults())
+
+        let popover = TimelineStore(archive: archive, host: .popover, defaults: defaults)
+        popover.viewMode = .detailed
+
+        XCTAssertEqual(TimelineStore(archive: archive, host: .popover, defaults: defaults).viewMode, .detailed)
+        XCTAssertEqual(
+            TimelineStore(archive: archive, host: .window, defaults: defaults).viewMode,
+            .detailed,
+            "the window's own default, untouched by the popover's change"
+        )
+
+        let window = TimelineStore(archive: archive, host: .window, defaults: defaults)
+        window.viewMode = .compact
+
+        XCTAssertEqual(
+            TimelineStore(archive: archive, host: .popover, defaults: defaults).viewMode,
+            .detailed,
+            "the popover keeps what it was set to"
+        )
+    }
+
+    func testGroupingIsRememberedPerHostAndRegroupsImmediately() async throws {
+        let archive = try XCTUnwrap(archive)
+        try seed(archive, count: 2)
+        try seed(archive, count: 1, startingAt: 50, bundleID: Stubs.BundleID.mail)
+        let defaults = try XCTUnwrap(makeDefaults())
+        let store = makeStore(archive: archive, defaults: defaults)
+        try await waitUntil { store.visibleItems.count == 3 }
+
+        store.groupByApp = true
+
+        let headers = store.sections.flatMap(\.slots).filter { slot in
+            if case .appHeader = slot {
+                true
+            } else {
+                false
+            }
+        }
+        XCTAssertEqual(headers.count, 2, "one header per app, without waiting for the next snapshot")
+        XCTAssertTrue(TimelineStore(archive: archive, defaults: defaults).groupByApp)
+        XCTAssertFalse(
+            TimelineStore(archive: archive, host: .window, defaults: defaults).groupByApp,
+            "the window groups the way the window was left"
+        )
+    }
+
     // MARK: - Empty states
 
     /// "Nothing here" means something different depending on why, and each
