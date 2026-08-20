@@ -1,3 +1,4 @@
+import BackglanceCore
 @testable import BackglanceSearch
 import Foundation
 import XCTest

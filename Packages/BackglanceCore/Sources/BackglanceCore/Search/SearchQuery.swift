@@ -1,4 +1,3 @@
-import BackglanceCore
 import Foundation
 
 // MARK: - SearchQuery
@@ -9,6 +8,12 @@ import Foundation
 /// because a row of dropdowns for the same thing is slower to use and harder to
 /// remember. `QueryParser` is what turns it into filters and terms; nothing
 /// downstream re-reads ``text``.
+///
+/// These three types live in `BackglanceCore` rather than in `BackglanceSearch`
+/// on purpose: they are the *vocabulary* of a search, and the view layer has to
+/// speak it to ask for one and to draw the answer. The engine that does the
+/// searching stays in `BackglanceSearch`, which the UI never imports
+/// (docs/getting-started/DEVELOPMENT_GUIDE.md#dependency-direction).
 ///
 /// See docs/features/SEARCH.md#queryparser-grammar.
 public struct SearchQuery: Sendable, Equatable {

@@ -1,3 +1,4 @@
+import BackglanceCore
 import Foundation
 
 // MARK: - QueryParser
