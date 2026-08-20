@@ -169,16 +169,26 @@ custom_rules:
     match_kinds:
       - identifier
 
-  # Backglance privacy invariant: notification content must never reach a log.
-  # See docs/operations/MONITORING_LOGGING.md.
+  # Backglance privacy invariant #1: notification content must never reach a log.
+  # These are the canonical rules from docs/operations/MONITORING_LOGGING.md.
+  #
+  # The alternation has to lead with `Log\.<category>` because that is how this codebase
+  # actually logs — `Log.capture.error(…)`, `Log.parser.debug(…)`. An earlier version of
+  # this rule keyed on the literal `logger.`, which no call site uses, so it matched
+  # nothing at all and the invariant went unenforced. If you narrow these, check the
+  # change against a real call site before trusting it.
   no_notification_content_in_logs:
     name: "No Notification Content in Logs"
-    regex: "logger\\.(debug|info|notice|warning|error|fault|critical|log)\\([^)]*\\.(title|subtitle|body|sender|deepLink|threadID)\\b"
+    included: ".*\\.swift"
+    excluded: ".*Tests.*"
+    regex: '(Log\.(capture|adapter|parser|archive|search|digest|rules|ui|updater)|logger|Logger\()[^\n]*\.(body|title|subtitle|sender|threadID|thread_id|deepLink|deep_link|userInfo|plistData)\b'
     message: "Notification content must never be logged. Log a NotificationLogRef (id, bundleID, length) instead."
     severity: error
 
   no_string_describing_notification:
     name: "No String(describing:) on Notifications"
-    regex: "String\\(describing:\\s*[a-zA-Z_][a-zA-Z0-9_]*(Notification|notification)\\b"
+    included: ".*\\.swift"
+    excluded: ".*Tests.*"
+    regex: 'String\((describing|reflecting):\s*(parsed|notification|archived|raw|record)\b'
     message: "Interpolating a whole notification into a string risks leaking content into logs."
     severity: error
