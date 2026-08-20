@@ -52,6 +52,32 @@ public enum CaptureError: Error, Sendable {
 
     // MARK: Public
 
+    /// Whether this failure is worth retrying before telling the user anything.
+    ///
+    /// Copying a live SQLite database races the process writing it: `usernoted`
+    /// checkpointing mid-copy yields a torn snapshot that opens as `SQLITE_CORRUPT` or
+    /// `SQLITE_NOTADB`, and the copy itself can fail on a busy file. Both are ordinary
+    /// and both fix themselves on the next tick — the poll guarantees one within 15
+    /// seconds — so degrading on the first one would put "Backglance couldn't read the
+    /// system's notification database" in front of a user whose Mac is working fine.
+    ///
+    /// Permission and schema failures are the opposite: they are standing conditions
+    /// that will not resolve by waiting, and the user can act on them. Those degrade at
+    /// once. See docs/features/CAPTURE.md#edge-cases-and-error-handling.
+    public var isTransient: Bool {
+        switch self {
+        case .snapshotFailed,
+             .readFailed:
+            true
+
+        case .fullDiskAccessDenied,
+             .storeNotFound,
+             .degraded,
+             .parseFailed:
+            false
+        }
+    }
+
     /// The state the engine moves into. Content-free by construction.
     public var degradedReason: DegradedReason {
         switch self {

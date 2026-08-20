@@ -213,6 +213,36 @@ class FixtureStoreTests: XCTestCase {
         }
     }
 
+    /// ``StoreAdapter/tailCursor(in:)`` has to land in exactly the place a full read
+    /// does, on every supported macOS. It is the position a fresh archive starts live
+    /// capture from and the one a resume fast-forwards to, so a tail that disagreed with
+    /// the walked cursor would either re-archive a backlog or skip real notifications —
+    /// and it reaches that position with one row read instead of every row, which is what
+    /// keeps the payloads out of memory.
+    func testEveryFixtureTailCursorMatchesAFullWalk() throws {
+        try forEachFixture { fixture in
+            var walked = StoreCursor.start
+            while true {
+                let batch = try fixture.queue.read { db in try fixture.adapter.records(after: walked, in: db) }
+                guard let last = batch.last else {
+                    break
+                }
+                walked = fixture.adapter.cursor(for: last)
+            }
+
+            let tail = try fixture.queue.read { db in try fixture.adapter.tailCursor(in: db) }
+
+            XCTAssertEqual(tail.lastRecID, walked.lastRecID, fixture.name)
+            XCTAssertEqual(tail.lastRecID, fixture.expected.cursor.lastRecID, fixture.name)
+            XCTAssertEqual(
+                tail.lastDeliveredDate?.timeIntervalSince1970 ?? 0,
+                fixture.expected.cursor.lastDeliveredDate,
+                accuracy: 0.001,
+                fixture.name
+            )
+        }
+    }
+
     /// 🔒 A fixture is committed to a public repository. Its manifest has to say what it is
     /// before anyone reads a line of it.
     func testEveryFixtureDeclaresItselfSynthetic() throws {

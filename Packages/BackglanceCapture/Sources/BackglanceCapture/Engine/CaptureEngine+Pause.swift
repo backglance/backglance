@@ -62,9 +62,15 @@ public extension CaptureEngine {
 extension CaptureEngine {
     /// Moves the cursor to the store's last record without reading any of them.
     ///
-    /// Done with the adapter's own batched read rather than a `MAX(rec_id)` query,
-    /// because `rec_id` is the adapter's column to know about: a future store that
-    /// numbers its rows differently changes one adapter, not this method.
+    /// > 🔒 Literally without reading them: ``StoreAdapter/tailCursor(in:)`` selects one
+    /// > row's `rec_id` and delivery date and never touches `record.data`. Walking
+    /// > `records(after:)` to find the end would have pulled every payload the user
+    /// > received during the pause into memory purely to throw it away — the exact
+    /// > content the pause exists to not look at.
+    ///
+    /// Asking the *adapter* rather than issuing a `MAX(rec_id)` here keeps `rec_id` the
+    /// adapter's column to know about: a future store that numbers its rows differently
+    /// changes one adapter, not this method.
     func fastForwardCursor() throws {
         guard let adapter = currentAdapter else {
             return
@@ -73,15 +79,13 @@ extension CaptureEngine {
         let snapshot = try StoreSnapshot.take(of: storeURL())
         defer { snapshot.discard() }
 
-        var tail = currentCursor
-        while true {
-            let batch = try snapshot.read { db in
-                try adapter.records(after: tail, in: db)
-            }
-            guard let last = batch.last else {
-                break
-            }
-            tail = adapter.cursor(for: last)
+        let tail = try snapshot.read { db in try adapter.tailCursor(in: db) }
+
+        // A store that shrank while we were paused (a reset) leaves the tail behind the
+        // cursor. Fast-forwarding to it would be a rewind, and the next tick's reset
+        // detection handles that case properly, so leave the cursor where it is.
+        guard tail.lastRecID >= currentCursor.lastRecID else {
+            return
         }
 
         setCursor(tail)

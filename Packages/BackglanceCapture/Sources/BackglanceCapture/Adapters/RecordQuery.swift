@@ -106,6 +106,30 @@ enum RecordQuery {
         try Int64.fetchOne(db, sql: "SELECT MAX(rec_id) FROM record") ?? 0
     }
 
+    /// A cursor positioned at the newest record the store currently holds.
+    ///
+    /// > 🔒 Reads `rec_id` and `delivered_date` for one row and stops. `record.data` is
+    /// > never selected, so positioning the cursor never brings notification content into
+    /// > the process — which is the whole point of using this instead of walking batches.
+    ///
+    /// `ORDER BY rec_id DESC LIMIT 1` rather than `MAX(rec_id)` because the delivery date
+    /// has to come from the same row as the id, and the join to `app` is deliberately
+    /// absent: an unjoinable tail row still moved the store forward, and starting *after*
+    /// it is the correct position regardless of whether it would have been archivable.
+    static func tailCursor(in db: Database) throws -> StoreCursor {
+        guard let row = try Row.fetchOne(
+            db,
+            sql: "SELECT rec_id, delivered_date FROM record ORDER BY rec_id DESC LIMIT 1"
+        ) else {
+            return .start
+        }
+        let delivered: Double? = row["delivered_date"]
+        return StoreCursor(
+            lastRecID: row["rec_id"],
+            lastDeliveredDate: delivered.map { Date(timeIntervalSinceReferenceDate: $0) }
+        )
+    }
+
     // MARK: Private
 
     /// A row of the join, or `nil` if it is not usable as a record.

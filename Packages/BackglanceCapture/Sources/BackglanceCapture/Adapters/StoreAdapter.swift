@@ -75,6 +75,18 @@ public protocol StoreAdapter: Sendable {
     /// cursor came from (see ``StoreCursor/isStale(givenTailRecID:)``).
     func tailRecID(in db: Database) throws -> Int64
 
+    /// A cursor positioned at the newest record the store currently holds, or
+    /// ``StoreCursor/start`` if it holds nothing.
+    ///
+    /// This is where live capture begins on a fresh archive: everything already in the
+    /// store predates the install, so it belongs to the explicit import step, not to the
+    /// live stream (docs/features/CAPTURE.md#first-launch-import). It is also how
+    /// ``CaptureEngine`` skips past what arrived during a pause.
+    ///
+    /// > 🔒 Positions the cursor without reading `record.data`, so neither of those uses
+    /// > brings notification content into memory.
+    func tailCursor(in db: Database) throws -> StoreCursor
+
     /// The cursor to persist once `record` has been archived.
     ///
     /// The adapter owns this because it owns which store column the cursor's `rec_id`
@@ -91,6 +103,12 @@ public extension StoreAdapter {
     /// rows differently overrides this.
     func tailRecID(in db: Database) throws -> Int64 {
         try RecordQuery.tailRecID(in: db)
+    }
+
+    /// As with ``tailRecID(in:)``: the shared reader knows where the newest row is, so an
+    /// adapter only overrides this if its store orders rows differently.
+    func tailCursor(in db: Database) throws -> StoreCursor {
+        try RecordQuery.tailCursor(in: db)
     }
 }
 

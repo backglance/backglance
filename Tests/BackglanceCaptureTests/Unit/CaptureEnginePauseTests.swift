@@ -67,6 +67,7 @@ final class CaptureEnginePauseTests: XCTestCase {
         let archive = try XCTUnwrap(archive)
         let storeURL = try XCTUnwrap(storeURL)
         try MiniatureStore.makeFile(at: storeURL, rows: [MiniatureStore.notification(recID: 1)])
+        try archive.captureFromTheStartOfTheStore()
         await engine.start()
         await engine.pause()
 
@@ -88,6 +89,7 @@ final class CaptureEnginePauseTests: XCTestCase {
         let archive = try XCTUnwrap(archive)
         let storeURL = try XCTUnwrap(storeURL)
         try MiniatureStore.makeFile(at: storeURL, rows: [MiniatureStore.notification(recID: 1)])
+        try archive.captureFromTheStartOfTheStore()
         await engine.start()
         await engine.tick(reason: .manual)
         await engine.pause()

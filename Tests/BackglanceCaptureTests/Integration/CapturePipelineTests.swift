@@ -42,6 +42,8 @@ final class CapturePipelineTests: XCTestCase {
         let archive = try Archive(inMemory: true)
         let engine = try makeEngine(archive: archive)
 
+        try archive.captureFromTheStartOfTheStore()
+
         await engine.start()
         await engine.tick(reason: .manual)
 
@@ -67,6 +69,8 @@ final class CapturePipelineTests: XCTestCase {
         self.watcher = watcher
         let engine = CaptureEngine(archive: archive, watcher: watcher) { storeURL }
 
+        try archive.captureFromTheStartOfTheStore()
+
         await engine.start()
         watcher.poke()
 
@@ -83,6 +87,8 @@ final class CapturePipelineTests: XCTestCase {
         try Self.makeStore(at: storeURL, count: 5)
         let archive = try Archive(inMemory: true)
         let engine = try makeEngine(archive: archive)
+
+        try archive.captureFromTheStartOfTheStore()
 
         await engine.start()
         await engine.tick(reason: .manual)
@@ -101,6 +107,7 @@ final class CapturePipelineTests: XCTestCase {
         try Self.makeStore(at: storeURL, count: 4)
         let archive = try Archive(inMemory: true)
         let first = try makeEngine(archive: archive)
+        try archive.captureFromTheStartOfTheStore()
         await first.start()
         await first.tick(reason: .manual)
         await first.stop()
@@ -126,6 +133,7 @@ final class CapturePipelineTests: XCTestCase {
         try Self.makeStore(at: storeURL, count: 6)
         let archive = try Archive(inMemory: true)
         let engine = try makeEngine(archive: archive)
+        try archive.captureFromTheStartOfTheStore()
         await engine.start()
 
         let summary = try await engine.importExisting()
@@ -149,6 +157,8 @@ final class CapturePipelineTests: XCTestCase {
         ])
         let archive = try Archive(inMemory: true)
         let engine = try makeEngine(archive: archive)
+
+        try archive.captureFromTheStartOfTheStore()
 
         await engine.start()
         await engine.tick(reason: .manual)

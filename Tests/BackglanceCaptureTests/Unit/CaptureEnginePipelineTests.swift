@@ -41,6 +41,8 @@ final class CaptureEnginePipelineTests: XCTestCase {
         ])
         let engine = try makeEngine()
 
+        try archive.captureFromTheStartOfTheStore()
+
         await engine.start()
         await engine.tick(reason: .manual)
 
@@ -67,6 +69,8 @@ final class CaptureEnginePipelineTests: XCTestCase {
         try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: [row])
         let engine = try makeEngine()
 
+        try archive.captureFromTheStartOfTheStore()
+
         await engine.start()
         await engine.tick(reason: .manual)
 
@@ -90,6 +94,8 @@ final class CaptureEnginePipelineTests: XCTestCase {
         ])
         let engine = try makeEngine()
 
+        try archive.captureFromTheStartOfTheStore()
+
         await engine.start()
         await engine.tick(reason: .manual)
 
@@ -108,6 +114,7 @@ final class CaptureEnginePipelineTests: XCTestCase {
             MiniatureStore.notification(recID: 2),
         ])
         let engine = try makeEngine()
+        try archive.captureFromTheStartOfTheStore()
         await engine.start()
         await engine.tick(reason: .manual)
 
@@ -131,6 +138,8 @@ final class CaptureEnginePipelineTests: XCTestCase {
         rewritten.uuidBlob = uuid
         try MiniatureStore.makeFile(at: storeURL, rows: [first, rewritten])
         let engine = try makeEngine()
+
+        try archive.captureFromTheStartOfTheStore()
 
         await engine.start()
         await engine.tick(reason: .manual)
@@ -158,6 +167,8 @@ final class CaptureEnginePipelineTests: XCTestCase {
         let exclusions = DenyList(["com.example.passwords"])
         let engine = try makeEngine(exclusions: exclusions)
 
+        try archive.captureFromTheStartOfTheStore()
+
         await engine.start()
         await engine.tick(reason: .manual)
 
@@ -179,6 +190,8 @@ final class CaptureEnginePipelineTests: XCTestCase {
         ])
         let engine = try makeEngine(exclusions: DenyList(["com.example.passwords"]))
 
+        try archive.captureFromTheStartOfTheStore()
+
         await engine.start()
         await engine.tick(reason: .manual)
 
@@ -197,6 +210,8 @@ final class CaptureEnginePipelineTests: XCTestCase {
         ])
         let engine = try makeEngine(redactor: StubRedactor())
 
+        try archive.captureFromTheStartOfTheStore()
+
         await engine.start()
         await engine.tick(reason: .manual)
 
@@ -214,6 +229,8 @@ final class CaptureEnginePipelineTests: XCTestCase {
         try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: [MiniatureStore.notification(recID: 1)])
         let engine = try makeEngine(enrichment: StubEnricher())
 
+        try archive.captureFromTheStartOfTheStore()
+
         await engine.start()
         await engine.tick(reason: .manual)
 
@@ -229,6 +246,8 @@ final class CaptureEnginePipelineTests: XCTestCase {
             MiniatureStore.notification(recID: 2, bundleID: "com.example.chat"),
         ])
         let engine = try makeEngine()
+
+        try archive.captureFromTheStartOfTheStore()
 
         await engine.start()
         await engine.tick(reason: .manual)

@@ -1014,7 +1014,10 @@ public actor CaptureEngine {
             cursor = saved
         } else {
             // Fresh archive: live capture starts at the tail. Import is a separate, explicit step.
-            cursor = try snapshot.read { db in try (adapter as? StoreTailProviding)?.tail(in: db) } ?? .start
+            // `tailCursor(in:)` is a StoreAdapter requirement with a shared default in
+            // RecordQuery; it reads one row's rec_id and delivery date and never touches
+            // record.data, so positioning the cursor brings no content into memory.
+            cursor = try snapshot.read { db in try adapter.tailCursor(in: db) }
             try archive.saveCursor(cursor)
         }
         consecutiveTransientFailures = 0

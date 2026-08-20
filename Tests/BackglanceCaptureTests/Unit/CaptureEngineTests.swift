@@ -138,35 +138,13 @@ final class CaptureEngineTests: XCTestCase {
         try XCTAssertEqual(archive.loadFingerprint(), fingerprint)
     }
 
-    /// Resumable state. A cursor from a previous run is where the next tick starts.
-    func testBootstrapResumesFromThePersistedCursor() async throws {
-        let engine = try XCTUnwrap(engine)
-        let archive = try XCTUnwrap(archive)
-        try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: MiniatureStore.rows(3))
-        try archive.saveCursor(StoreCursor(lastRecID: 2, lastDeliveredDate: MiniatureStore.delivered))
-
-        await engine.start()
-
-        let cursor = await engine.currentCursor
-        XCTAssertEqual(cursor.lastRecID, 2)
-    }
-
-    func testAFirstLaunchStartsFromTheBeginningOfTheStore() async throws {
-        let engine = try XCTUnwrap(engine)
-        try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: MiniatureStore.rows(1))
-
-        await engine.start()
-
-        let cursor = await engine.currentCursor
-        XCTAssertEqual(cursor, .start)
-    }
-
     // MARK: - Ticks
 
     func testAWakeReadsEverythingNewAndPersistsHowFarItGot() async throws {
         let engine = try XCTUnwrap(engine)
         let archive = try XCTUnwrap(archive)
         try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: MiniatureStore.rows(4))
+        try XCTUnwrap(archive).captureFromTheStartOfTheStore()
         await engine.start()
 
         await engine.tick(reason: .manual)
@@ -183,6 +161,7 @@ final class CaptureEngineTests: XCTestCase {
     func testAWakeWithNothingNewLeavesTheCursorAlone() async throws {
         let engine = try XCTUnwrap(engine)
         try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: MiniatureStore.rows(2))
+        try XCTUnwrap(archive).captureFromTheStartOfTheStore()
         await engine.start()
         await engine.tick(reason: .poll)
 
@@ -198,6 +177,7 @@ final class CaptureEngineTests: XCTestCase {
         let engine = try XCTUnwrap(engine)
         let storeURL = try XCTUnwrap(storeURL)
         try MiniatureStore.makeFile(at: storeURL, rows: MiniatureStore.rows(2))
+        try XCTUnwrap(archive).captureFromTheStartOfTheStore()
         await engine.start()
         await engine.tick(reason: .poll)
 
@@ -245,6 +225,7 @@ final class CaptureEngineTests: XCTestCase {
     func testAStoppedEngineIgnoresAWake() async throws {
         let engine = try XCTUnwrap(engine)
         try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: MiniatureStore.rows(3))
+        try XCTUnwrap(archive).captureFromTheStartOfTheStore()
         await engine.start()
         await engine.stop()
 
@@ -272,6 +253,7 @@ final class CaptureEngineTests: XCTestCase {
             MiniatureStore.notification(recID: 3),
         ])
 
+        try XCTUnwrap(archive).captureFromTheStartOfTheStore()
         await engine.start()
         await engine.tick(reason: .manual)
 
@@ -290,6 +272,7 @@ final class CaptureEngineTests: XCTestCase {
         try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: [
             MiniatureStore.notification(recID: 1, bundleID: "com.example.chat", title: "Ada", body: "Landing at six"),
         ])
+        try XCTUnwrap(archive).captureFromTheStartOfTheStore()
         await engine.start()
         await engine.tick(reason: .manual)
 

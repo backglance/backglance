@@ -38,7 +38,10 @@ public actor CaptureEngine {
         exclusions: any AppExclusionList = AllowAllApps(),
         redactor: any NotificationRedactor = NoRedaction(),
         enrichment: any NotificationEnricher = NoEnrichment(),
-        storeLocation: @escaping @Sendable () throws -> URL = StoreLocation.current
+        // Wrapped rather than passed as `StoreLocation.current`: referencing a static func
+        // as a value produces a non-`@Sendable` function, which `-strict-concurrency`
+        // rightly complains about crossing into an actor.
+        storeLocation: @escaping @Sendable () throws -> URL = { try StoreLocation.current() }
     ) {
         self.archive = archive
         self.watcher = watcher
@@ -78,7 +81,7 @@ public actor CaptureEngine {
 
     /// What capture has done, as numbers. Content-free by construction, which is what
     /// lets Settings show it and the diagnostics export carry it.
-    public private(set) var metrics = CaptureMetrics()
+    public internal(set) var metrics = CaptureMetrics()
 
     /// How many store records the engine has read since it was created.
     public var recordsRead: Int {
@@ -134,6 +137,10 @@ public actor CaptureEngine {
     // MARK: Internal
 
     let archive: Archive
+
+    /// How many transient read failures have happened in a row, reset by any tick that
+    /// reads the store successfully. See ``handleTickFailure(_:)``.
+    var consecutiveTransientFailures = 0
 
     /// The adapter reads go through, or `nil` while degraded.
     var currentAdapter: (any StoreAdapter)? {
@@ -224,22 +231,31 @@ public actor CaptureEngine {
 
         do {
             let batch = try readBatch(with: adapter)
-            guard !batch.isEmpty else {
-                return
-            }
 
+            // Counted before the empty check: a tick that found nothing still *ran*, and
+            // the whole diagnostic value of `ticks` is telling "the watcher is waking us
+            // and there is simply no news" apart from "the watcher stopped waking us".
+            // Those look identical if only non-empty batches count.
             var tally = CaptureMetrics.Tally()
             for raw in batch {
                 await tally.record(archiveOne(raw, source: .live))
                 cursor = adapter.cursor(for: raw)
             }
-            try archive.saveCursor(cursor)
+            if !batch.isEmpty {
+                try archive.saveCursor(cursor)
+            }
             metrics.add(tally)
 
-            let reached = cursor.lastRecID
-            Log.capture.debug("tick \(reason.rawValue): \(tally.summary), through rec \(reached)")
+            // A tick that got all the way here read the store successfully, so whatever
+            // torn copies preceded it were the transient blips they looked like.
+            consecutiveTransientFailures = 0
+
+            if !batch.isEmpty {
+                let reached = cursor.lastRecID
+                Log.capture.debug("tick \(reason.rawValue): \(tally.summary), through rec \(reached)")
+            }
         } catch let error as CaptureError {
-            transition(to: .degraded(error.degradedReason))
+            handleTickFailure(error)
         } catch {
             transition(to: .degraded(.readError("\(type(of: error))")))
         }
@@ -437,9 +453,26 @@ public actor CaptureEngine {
         adapterID = selected.adapterID
         try archive.saveAdapterID(selected.adapterID)
 
-        // A cursor from a previous run is resumable state. Its absence means a first
-        // launch, and `.start` is where an import begins.
-        cursor = try archive.loadCursor() ?? .start
+        if let saved = try archive.loadCursor() {
+            // A cursor from a previous run is resumable state: carry on where it stopped.
+            cursor = saved
+        } else {
+            // Fresh archive: live capture starts at the *tail*. Everything already in the
+            // store predates the install, and backfilling it belongs to `importExisting()`
+            // — an explicit step the user consents to, recorded with `source = 'import'`
+            // and `last_import_at`. Starting at `.start` here would archive that whole
+            // backlog as if it had just arrived, unasked, and leave the import with
+            // nothing left to do (docs/features/CAPTURE.md#first-launch-import).
+            //
+            // Persisted immediately so the position survives a crash before the first
+            // batch. Note the distinction ``Archive/clearCursor()`` documents: a *saved*
+            // `.start` means "read from the beginning", the row's absence means "never
+            // read anything". That is why a fresh archive writes a real position here.
+            cursor = try snapshot.read { db in try selected.tailCursor(in: db) }
+            try archive.saveCursor(cursor)
+            Log.capture.notice("fresh archive: live capture starts at rec \(cursor.lastRecID)")
+        }
+        consecutiveTransientFailures = 0
         transition(to: .running)
     }
 }
