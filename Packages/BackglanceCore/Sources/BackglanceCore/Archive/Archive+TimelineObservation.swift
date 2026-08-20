@@ -105,14 +105,14 @@ extension Archive {
     /// walking the whole index to produce a number the UI immediately clamps.
     static func unreadBadgeCount(_ db: Database, since anchor: UnixDate) throws -> Int {
         let sql = """
-            SELECT COUNT(*) FROM (
-              SELECT 1 FROM notifications n
-              JOIN apps a ON a.id = n.app_id
-              WHERE n.is_deleted = 0 AND n.is_read = 0 AND a.is_muted = 0
-                AND n.delivered_at > ?
-              LIMIT \(unreadBadgeCap)
-            )
-            """
+        SELECT COUNT(*) FROM (
+          SELECT 1 FROM notifications n
+          JOIN apps a ON a.id = n.app_id
+          WHERE n.is_deleted = 0 AND n.is_read = 0 AND a.is_muted = 0
+            AND n.delivered_at > ?
+          LIMIT \(unreadBadgeCap)
+        )
+        """
         return try Int.fetchOne(db, sql: sql, arguments: [anchor.date.timeIntervalSince1970]) ?? 0
     }
 }

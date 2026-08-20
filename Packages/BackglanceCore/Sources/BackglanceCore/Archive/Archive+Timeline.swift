@@ -93,3 +93,68 @@ public extension Archive {
         }
     }
 }
+
+// MARK: - Archive + timeline writes
+
+public extension Archive {
+    /// Marks one notification read. A no-op if it already was.
+    ///
+    /// Called from the visibility timer, so it runs far more often than it
+    /// changes anything: the `is_read = 0` predicate keeps the repeats from
+    /// touching a page, which matters because every write here wakes the
+    /// timeline's observation.
+    ///
+    /// - Returns: whether the row changed.
+    @discardableResult
+    func markRead(_ id: Int64) throws -> Bool {
+        do {
+            return try pool.write { db in
+                try db.execute(
+                    sql: "UPDATE notifications SET is_read = 1 WHERE id = ? AND is_read = 0",
+                    arguments: [id]
+                )
+                return db.changesCount > 0
+            }
+        } catch {
+            throw ArchiveError.observationFailed(ArchiveError.detail(from: error))
+        }
+    }
+
+    /// Marks every visible notification read, in one statement.
+    ///
+    /// Deleted rows are left alone: "mark all read" is about the timeline in
+    /// front of the user, and a soft-deleted row is not in it.
+    ///
+    /// - Returns: how many rows changed.
+    @discardableResult
+    func markAllRead() throws -> Int {
+        do {
+            return try pool.write { db in
+                try db.execute(sql: "UPDATE notifications SET is_read = 1 WHERE is_read = 0 AND is_deleted = 0")
+                return db.changesCount
+            }
+        } catch {
+            throw ArchiveError.observationFailed(ArchiveError.detail(from: error))
+        }
+    }
+
+    /// When the most recent finished away session ended.
+    ///
+    /// Half of the unread anchor: the timeline treats the later of "you last
+    /// opened the popover" and "you last came back" as the moment you looked.
+    /// An away session that is still open has no end yet and is skipped — the
+    /// user has not come back.
+    func lastAwaySessionEnd() throws -> UnixDate? {
+        do {
+            return try pool.read { db in
+                try AwaySession
+                    .filter(Column("ended_at") != nil)
+                    .order(Column("ended_at").desc)
+                    .fetchOne(db)?
+                    .endedAt
+            }
+        } catch {
+            throw ArchiveError.observationFailed(ArchiveError.detail(from: error))
+        }
+    }
+}

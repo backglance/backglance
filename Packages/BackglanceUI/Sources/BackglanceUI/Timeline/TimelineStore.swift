@@ -32,12 +32,17 @@ public final class TimelineStore {
         archive: Archive,
         triage: any TriageEvaluating = NoTriage(),
         host: Host = .popover,
+        defaults: UserDefaults = UserDefaults(suiteName: TimelineStore.defaultsSuite) ?? .standard,
         calendar: Calendar = .current
     ) {
         self.archive = archive
         self.triage = triage
         self.host = host
+        self.defaults = defaults
         self.calendar = calendar
+        // A fresh install has no "last seen", which makes every archived
+        // notification new — correct, and the same thing the first import means.
+        unreadAnchor = UnixDate(Date(timeIntervalSince1970: defaults.double(forKey: Self.lastSeenKey)))
         startObserving()
     }
 
@@ -56,6 +61,10 @@ public final class TimelineStore {
         case popover
         case window
     }
+
+    /// Where the per-host preferences and the unread anchor live. A named
+    /// suite rather than `.standard` so a test can hand the store its own.
+    public static let defaultsSuite = "app.backglance.Backglance"
 
     /// Days, newest first, each already flattened into draw-order slots.
     public private(set) var sections: [TimelineSection.Model] = []
@@ -138,6 +147,75 @@ public final class TimelineStore {
         sections.flatMap(\.items)
     }
 
+    /// Snapshots the unread anchor just before a surface opens.
+    ///
+    /// Opening the timeline *is* "the user looked", but the divider they see
+    /// has to reflect the moment before they clicked — so the anchor is
+    /// resolved and frozen here, and only advanced when the surface closes.
+    /// The anchor is the later of the two things that count as looking: the
+    /// last time a surface was open, and the end of the last away session.
+    public func surfaceWillOpen() {
+        let sessionEnd = try? archive.lastAwaySessionEnd()
+        if let sessionEnd, sessionEnd > unreadAnchor {
+            unreadAnchor = sessionEnd
+        }
+        regroup()
+    }
+
+    /// Advances the anchor after a surface closes: everything up to now has
+    /// been seen, so the badge resets and the next open starts a new divider.
+    public func surfaceDidClose() {
+        let now = Date()
+        defaults.set(now.timeIntervalSince1970, forKey: Self.lastSeenKey)
+        unreadAnchor = UnixDate(now)
+        unreadBadgeCount = 0
+        cancelVisibilityTimers()
+        // The badge query is defined by the anchor, so a moved anchor needs a
+        // new subscription rather than a recount of the old one.
+        startObserving()
+    }
+
+    /// Starts the "seen for a second" timer for a row that scrolled into view.
+    ///
+    /// A second is the threshold because anything shorter marks rows read that
+    /// merely flew past under a flick scroll — the one failure mode that would
+    /// make the badge untrustworthy.
+    public func rowBecameVisible(_ id: Int64) {
+        guard visibilityTimers[id] == nil else {
+            return
+        }
+        visibilityTimers[id] = Task { [archive] in
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else {
+                return
+            }
+            // A read flag that fails to persist is not worth a banner: the row
+            // is still on screen, and the next pass tries again.
+            _ = try? archive.markRead(id)
+        }
+    }
+
+    /// Cancels that timer when the row scrolls away unseen.
+    public func rowBecameHidden(_ id: Int64) {
+        visibilityTimers.removeValue(forKey: id)?.cancel()
+    }
+
+    /// Opening a row reads it, immediately — no timer, no ambiguity.
+    public func open(_ id: Int64) {
+        selectedID = id
+        _ = try? archive.markRead(id)
+    }
+
+    /// Marks everything in the archive read. One statement; the subscription
+    /// echoes it back to every open surface.
+    public func markAllRead() {
+        do {
+            _ = try archive.markAllRead()
+        } catch {
+            loadError = Self.message(for: error)
+        }
+    }
+
     /// Re-subscribes after a read failure. The rows already on screen stay put
     /// while it retries: a stale timeline with a banner beats a blank one.
     public func retry() {
@@ -189,6 +267,10 @@ public final class TimelineStore {
     }
 
     // MARK: Internal
+
+    /// When a surface was last open. Shared by both hosts on purpose: opening
+    /// either one counts as having looked.
+    static let lastSeenKey = "timeline.lastSeenAt"
 
     /// Rows per page, and the ceiling on rows held in memory (~1 MB).
     static let pageSize = Archive.timelinePageSize
@@ -338,12 +420,18 @@ public final class TimelineStore {
     private let archive: Archive
     private let triage: any TriageEvaluating
     private let host: Host
+    private let defaults: UserDefaults
     private let calendar: Calendar
 
     private var rows: [ArchivedNotification] = []
     private var apps: [Int64: AppRecord] = [:]
     private var cursor: TimelineCursor?
-    private var unreadAnchor: UnixDate = .init(.distantPast)
+    private var unreadAnchor: UnixDate
+
+    /// One live timer per visible row. Held so scrolling a row back off screen
+    /// before it has been seen for a second cancels it — a row that flew past
+    /// under the user's scroll was not read.
+    @ObservationIgnored private var visibilityTimers: [Int64: Task<Void, Never>] = [:]
     /// Only ever assigned on the main actor, and `@ObservationIgnored` because a
     /// view has no business redrawing when the subscription is replaced. The
     /// isolation opt-out is what lets `deinit` — which is not main-actor
@@ -357,6 +445,13 @@ public final class TimelineStore {
     private static func message(for error: Error) -> String {
         (error as? ArchiveError)?.userMessage
             ?? ArchiveError.observationFailed(String(describing: type(of: error))).userMessage
+    }
+
+    private func cancelVisibilityTimers() {
+        for timer in visibilityTimers.values {
+            timer.cancel()
+        }
+        visibilityTimers.removeAll()
     }
 
     private func startObserving() {

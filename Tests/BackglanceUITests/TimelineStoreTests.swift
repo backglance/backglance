@@ -16,6 +16,10 @@ final class TimelineStoreTests: XCTestCase {
     override func tearDownWithError() throws {
         store = nil
         archive = nil
+        if let defaultsSuiteName {
+            UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName)
+            self.defaultsSuiteName = nil
+        }
         try super.tearDownWithError()
     }
 
@@ -28,8 +32,7 @@ final class TimelineStoreTests: XCTestCase {
         let archive = try XCTUnwrap(archive)
         try seed(archive, count: 3)
 
-        let store = TimelineStore(archive: archive)
-        self.store = store
+        let store = makeStore(archive: archive)
         try await waitUntil { !store.sections.isEmpty }
 
         XCTAssertEqual(store.visibleItems.count, 3)
@@ -40,8 +43,7 @@ final class TimelineStoreTests: XCTestCase {
     func testAnInsertReachesTheOpenTimeline() async throws {
         let archive = try XCTUnwrap(archive)
         try seed(archive, count: 1)
-        let store = TimelineStore(archive: archive)
-        self.store = store
+        let store = makeStore(archive: archive)
         try await waitUntil { store.visibleItems.count == 1 }
 
         try seed(archive, count: 1, startingAt: 99, secondsAgo: 0)
@@ -55,8 +57,7 @@ final class TimelineStoreTests: XCTestCase {
         try seed(archive, count: 2)
         try seed(archive, count: 3, startingAt: 50, bundleID: Stubs.BundleID.mail, muted: true)
 
-        let store = TimelineStore(archive: archive)
-        self.store = store
+        let store = makeStore(archive: archive)
         try await waitUntil { store.unreadBadgeCount > 0 }
 
         XCTAssertEqual(store.unreadBadgeCount, 2)
@@ -69,8 +70,7 @@ final class TimelineStoreTests: XCTestCase {
     /// capture inserted a row.
     func testMergingTheNewestPageKeepsThePagesBelowIt() throws {
         let archive = try XCTUnwrap(archive)
-        let store = TimelineStore(archive: archive)
-        self.store = store
+        let store = makeStore(archive: archive)
 
         store.mergeFirstPage(rows(ids: [10, 9, 8]))
         store.mergeFirstPage(rows(ids: [12, 11, 10, 9]))
@@ -81,8 +81,7 @@ final class TimelineStoreTests: XCTestCase {
 
     func testAnEmptyFirstPageEmptiesTheTimeline() throws {
         let archive = try XCTUnwrap(archive)
-        let store = TimelineStore(archive: archive)
-        self.store = store
+        let store = makeStore(archive: archive)
         store.mergeFirstPage(rows(ids: [3, 2, 1]))
 
         store.mergeFirstPage([])
@@ -95,8 +94,7 @@ final class TimelineStoreTests: XCTestCase {
     /// A timeline that pages forever must not also grow forever.
     func testRowsAreCappedSoScrollbackCannotGrowWithoutBound() throws {
         let archive = try XCTUnwrap(archive)
-        let store = TimelineStore(archive: archive)
-        self.store = store
+        let store = makeStore(archive: archive)
 
         store.mergeFirstPage(rows(ids: Array((1 ... 1_200).reversed())))
         store.regroup()
@@ -111,8 +109,7 @@ final class TimelineStoreTests: XCTestCase {
     func testPagingAppendsOlderRowsWithoutDuplicating() async throws {
         let archive = try XCTUnwrap(archive)
         try seed(archive, count: 250)
-        let store = TimelineStore(archive: archive)
-        self.store = store
+        let store = makeStore(archive: archive)
         try await waitUntil { store.visibleItems.count == TimelineStore.pageSize }
 
         await store.loadNextPage()
@@ -125,8 +122,7 @@ final class TimelineStoreTests: XCTestCase {
     func testPagingPastTheEndIsANoOp() async throws {
         let archive = try XCTUnwrap(archive)
         try seed(archive, count: 5)
-        let store = TimelineStore(archive: archive)
-        self.store = store
+        let store = makeStore(archive: archive)
         try await waitUntil { store.visibleItems.count == 5 }
 
         await store.loadNextPage()
@@ -142,8 +138,7 @@ final class TimelineStoreTests: XCTestCase {
         let archive = try XCTUnwrap(archive)
         try seed(archive, count: 2)
         try seed(archive, count: 3, startingAt: 50, bundleID: Stubs.BundleID.mail)
-        let store = TimelineStore(archive: archive)
-        self.store = store
+        let store = makeStore(archive: archive)
         try await waitUntil { store.visibleItems.count == 5 }
 
         store.appFilter = [Stubs.BundleID.mail]
@@ -155,13 +150,120 @@ final class TimelineStoreTests: XCTestCase {
     func testAnEmptyFilterMeansEverythingRatherThanNothing() async throws {
         let archive = try XCTUnwrap(archive)
         try seed(archive, count: 4)
-        let store = TimelineStore(archive: archive)
-        self.store = store
+        let store = makeStore(archive: archive)
         try await waitUntil { store.visibleItems.count == 4 }
 
         store.appFilter = []
 
         XCTAssertEqual(store.visibleItems.count, 4)
+    }
+
+    // MARK: - Read state
+
+    /// A row that sat on screen for a second has been read. Anything shorter
+    /// would mark rows read that merely flew past under a flick scroll.
+    func testARowVisibleForASecondIsMarkedRead() async throws {
+        let archive = try XCTUnwrap(archive)
+        let inserted = try seed(archive, count: 1)
+        let id = try XCTUnwrap(inserted.first?.id)
+        let store = makeStore(archive: archive)
+        try await waitUntil { store.visibleItems.count == 1 }
+
+        store.rowBecameVisible(id)
+
+        try await waitUntil(timeout: 3) { store.visibleItems.first?.notification.isRead == true }
+    }
+
+    func testARowThatScrollsAwayEarlyStaysUnread() async throws {
+        let archive = try XCTUnwrap(archive)
+        let inserted = try seed(archive, count: 1)
+        let id = try XCTUnwrap(inserted.first?.id)
+        let store = makeStore(archive: archive)
+        try await waitUntil { store.visibleItems.count == 1 }
+
+        store.rowBecameVisible(id)
+        store.rowBecameHidden(id)
+        try await Task.sleep(for: .milliseconds(1_200))
+
+        XCTAssertEqual(store.visibleItems.first?.notification.isRead, false)
+    }
+
+    /// Opening a row is unambiguous — no timer, no threshold.
+    func testOpeningARowReadsItImmediately() async throws {
+        let archive = try XCTUnwrap(archive)
+        let inserted = try seed(archive, count: 1)
+        let id = try XCTUnwrap(inserted.first?.id)
+        let store = makeStore(archive: archive)
+        try await waitUntil { store.visibleItems.count == 1 }
+
+        store.open(id)
+
+        XCTAssertEqual(store.selectedID, id)
+        try await waitUntil { store.visibleItems.first?.notification.isRead == true }
+    }
+
+    func testMarkAllReadEmptiesTheBadge() async throws {
+        let archive = try XCTUnwrap(archive)
+        try seed(archive, count: 4)
+        let store = makeStore(archive: archive)
+        try await waitUntil { store.unreadBadgeCount == 4 }
+
+        store.markAllRead()
+
+        try await waitUntil { store.unreadBadgeCount == 0 }
+        XCTAssertNil(store.loadError)
+    }
+
+    // MARK: - The unread anchor
+
+    /// Closing a surface is what makes "new" mean something: everything up to
+    /// that moment has been seen, so the badge resets and the next open starts
+    /// a fresh divider.
+    func testClosingASurfaceAdvancesTheAnchorAndPersistsIt() async throws {
+        let archive = try XCTUnwrap(archive)
+        try seed(archive, count: 3)
+        let defaults = try XCTUnwrap(makeDefaults())
+        let store = makeStore(archive: archive, defaults: defaults)
+        try await waitUntil { store.unreadBadgeCount == 3 }
+
+        store.surfaceDidClose()
+
+        XCTAssertEqual(store.unreadBadgeCount, 0)
+        XCTAssertEqual(
+            defaults.double(forKey: TimelineStore.lastSeenKey),
+            Date().timeIntervalSince1970,
+            accuracy: 5,
+            "the anchor has to survive a relaunch, so it is persisted rather than kept in memory"
+        )
+        // The badge query is defined by the anchor, so the fresh subscription
+        // must not resurrect the old count.
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertEqual(store.unreadBadgeCount, 0)
+    }
+
+    /// A stored anchor means a relaunch does not re-announce everything the
+    /// user has already seen.
+    func testAStoredAnchorSurvivesANewStore() async throws {
+        let archive = try XCTUnwrap(archive)
+        try seed(archive, count: 3)
+        let defaults = try XCTUnwrap(makeDefaults())
+        defaults.set(Date().timeIntervalSince1970, forKey: TimelineStore.lastSeenKey)
+
+        let store = makeStore(archive: archive, defaults: defaults)
+        try await waitUntil { !store.sections.isEmpty }
+
+        XCTAssertEqual(store.unreadBadgeCount, 0, "nothing arrived after the stored anchor")
+    }
+
+    func testOpeningASurfaceWithoutAwaySessionsLeavesTheAnchorAlone() async throws {
+        let archive = try XCTUnwrap(archive)
+        try seed(archive, count: 2)
+        let store = makeStore(archive: archive)
+        try await waitUntil { store.unreadBadgeCount == 2 }
+
+        store.surfaceWillOpen()
+
+        XCTAssertEqual(store.unreadBadgeCount, 2, "looking at the timeline does not itself clear the badge")
     }
 
     // MARK: - Empty states
@@ -170,8 +272,7 @@ final class TimelineStoreTests: XCTestCase {
     /// meaning gets its own sentence and its own button.
     func testTheEmptyStateExplainsWhyTheTimelineIsEmpty() throws {
         let archive = try XCTUnwrap(archive)
-        let store = TimelineStore(archive: archive)
-        self.store = store
+        let store = makeStore(archive: archive)
 
         store.captureState = .running
         XCTAssertEqual(store.emptyStateKind, .nothingYet)
@@ -194,6 +295,24 @@ final class TimelineStoreTests: XCTestCase {
 
     private var archive: Archive?
     private var store: TimelineStore?
+    private var defaultsSuiteName: String?
+
+    /// A store held by the test case, so the subscription is not cancelled by
+    /// `deinit` the moment the local goes out of scope.
+    @discardableResult
+    private func makeStore(archive: Archive, defaults: UserDefaults? = nil) -> TimelineStore {
+        let store = TimelineStore(archive: archive, defaults: defaults ?? makeDefaults() ?? .standard)
+        self.store = store
+        return store
+    }
+
+    /// A throwaway defaults suite per test: the real one is the user's, and a
+    /// test that wrote the unread anchor into it would move their timeline.
+    private func makeDefaults() -> UserDefaults? {
+        let name = "app.backglance.tests.\(UUID().uuidString)"
+        defaultsSuiteName = name
+        return UserDefaults(suiteName: name)
+    }
 
     /// Notifications that were never inserted — enough for the pure merge and
     /// cap paths, which never touch the archive.
