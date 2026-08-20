@@ -724,13 +724,16 @@ public struct SearchHit: Sendable, Equatable, Identifiable {
 | `from:` / `app:` | `from:slack`, `app:com.tinyspeck.slackmacgap` | app by display name (case-insensitive contains) or exact bundle id |
 | `sender:` | `sender:alice` | `sender` column contains |
 | `thread:` | `thread:abc123` | exact `thread_id` |
-| `before:` | `before:2026-08-01` | `delivered_at <` start of that local day |
-| `after:` | `after:2026-08-01`, `after:-7d` | `delivered_at >=` start of day; relative `-Nd`, `-Nh` from now |
-| `is:` | `is:unread`, `is:pinned`, `is:missed`, `is:read` | flags (`is_read`, `is_pinned`, `away_session_id IS NOT NULL`) |
+| `before:` | `before:2026-08-01`, `before:today` | `delivered_at <` start of that local day |
+| `after:` | `after:2026-08-01`, `after:-7d` | `delivered_at >=` start of day |
+| `on:` | `on:2026-08-01`, `on:yesterday` | that local calendar day; sets both `after` (start of day) and `before` (start of next day) |
+| `is:` | `is:unread`, `is:read`, `is:pinned`, `is:missed`, `is:vip` | flags (`is_read`, `is_pinned`, `away_session_id IS NOT NULL`, VIP rule match) |
 | `has:` | `has:link`, `has:attachment` | `deep_link IS NOT NULL`, `attachments_json IS NOT NULL` |
 | `redacted:` | `redacted:yes` | `redaction = 'otp'` |
 
-Rules: tokens are separated by whitespace; a `key:` with an unknown key is treated as a bare word (so `note:` searches for the text `note:`); dates use `yyyy-MM-dd` in the local calendar; an unbalanced quote runs to the end of the text. Only the free terms go into `MATCH`, quoted with FTS5 double-quote escaping, so user input never reaches SQL as raw text.
+`before:`, `after:`, and `on:` all accept the same set of date forms: an absolute `yyyy-MM-dd`; the named days `today` and `yesterday`; and a relative offset from `now` — `-Nd` (days), `-Nw` (weeks), or `-Nh` (hours). Day and week offsets snap to that day's local midnight; hour offsets are exact (`-36h` is a moment, not a day).
+
+Rules: tokens are separated by whitespace; a `key:` with an unknown key, or a known key with a value it doesn't recognize (e.g. `is:archived`), is treated as a bare word rather than an error; an unbalanced quote runs to the end of the text. Only the free terms go into `MATCH`, quoted with FTS5 double-quote escaping, so user input never reaches SQL as raw text.
 
 ```swift
 public struct ParsedQuery: Sendable, Equatable {
@@ -743,22 +746,23 @@ public struct ParsedQuery: Sendable, Equatable {
     public var before: Date?
     public var after: Date?
     public var flags: Set<Flag>
-    public enum Flag: Sendable { case unread, read, pinned, missed, hasLink, hasAttachment, redacted }
+    public enum Flag: Sendable { case unread, read, pinned, missed, vip, hasLink, hasAttachment, redacted }
 }
 
 public enum QueryParser {
-    public static func parse(_ text: String, now: Date = Date()) throws -> ParsedQuery
+    public static func parse(_ text: String, now: Date = Date(), calendar: Calendar = .current) throws -> ParsedQuery
 }
 ```
 
-**Errors.** `SearchError.invalidQuery(String)` only for a `before:`/`after:` value that is neither a date nor a relative offset. Everything else parses to *something*.
+**Errors.** `SearchError.invalidQuery(String)` only for a `before:`/`after:`/`on:` value that is neither a recognized date form nor a relative offset. Everything else parses to *something*.
 
 ```swift
 let q = try QueryParser.parse("from:slack before:2026-08-01 invoice")
-// q.appNameContains == "slack", q.before == 2026-08-01 00:00 local, q.ftsMatch == "\"invoice\"*"
+// q.appNameContains == "slack", q.before == 2026-08-01 00:00 local, q.ftsMatch == "(\"invoice\"*)"
 
-do { _ = try QueryParser.parse("after:yesterday") }
-catch SearchError.invalidQuery(let why) { print(why) }   // "after: expects yyyy-MM-dd or -Nd/-Nh"
+do { _ = try QueryParser.parse("before:whenever soon") }
+catch SearchError.invalidQuery(let why) { print(why) }
+// "before: use yyyy-MM-dd, today, yesterday, or a relative offset like -7d, -2w, -36h."
 ```
 
 ### `HybridSearch`
