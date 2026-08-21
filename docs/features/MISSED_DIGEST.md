@@ -434,102 +434,47 @@ those notifications enter the digest regardless of whether we noticed the sessio
 
 ```swift
 // Packages/BackglanceCore/Sources/BackglanceCore/Digest/DigestEngine.swift
-import Foundation
-import GRDB
-import os
-
 public struct DigestEngine: Sendable {
-    public enum DigestError: Error, LocalizedError {
-        case sessionNotPersisted
+    public enum DigestError: Error, Equatable {
+        case sessionNotPersisted          // never inserted, or still open
         case alreadyBuilt(digestID: Int64)
-        public var errorDescription: String? {
-            switch self {
-            case .sessionNotPersisted: return "Away session has no archive id yet."
-            case .alreadyBuilt:        return "A digest for this away session already exists."
-            }
-        }
+        public var logDescription: String // identifiers only, safe for the file log
     }
 
     public static let shownCap = 50
-    static let skewWindow: TimeInterval = 120     // ± 2 min around the session for presented = 0
+    public static let skewWindow: TimeInterval = 120   // ± 2 min around the session
 
-    private let archive: Archive
-    private let log = Logger(subsystem: "app.backglance.Backglance", category: "digest")
+    /// `triage` is the `TriageEvaluating` seam, defaulting to `NoTriage()`. `RulesEngine`
+    /// is a later milestone and becomes one more conformance rather than an edit here —
+    /// the same seam `TimelineStore` already depends on.
+    public init(archive: Archive,
+                triage: any TriageEvaluating = NoTriage(),
+                now: @escaping @Sendable () -> Date = { Date() })
 
-    public init(archive: Archive) { self.archive = archive }
-
-    /// Builds and persists the digest for a finished, persisted away session.
-    /// Returns nil when the session yields zero notifications (no digest row is written).
-    public func build(for session: AwaySession) async throws -> Digest? {
-        guard let sessionID = session.id, let end = session.endedAt else {
-            throw DigestError.sessionNotPersisted
-        }
-        return try await archive.writer.write { db in
-            // One digest per session, enforced at the data layer.
-            if let existing = try Int64.fetchOne(
-                db, sql: "SELECT id FROM digests WHERE away_session_id = ?", arguments: [sessionID]) {
-                throw DigestError.alreadyBuilt(digestID: existing)
-            }
-
-            let start = session.startedAt.timeIntervalSince1970
-            let endTS = end.timeIntervalSince1970
-            let rows = try ArchivedNotification.fetchAll(db, sql: """
-                SELECT n.* FROM notifications n
-                JOIN apps a ON a.id = n.app_id
-                WHERE n.is_deleted = 0
-                  AND a.is_excluded = 0
-                  AND n.id NOT IN (SELECT notification_id FROM digest_items)
-                  AND ( (n.delivered_at >= ? AND n.delivered_at <= ?)
-                     OR (n.presented = 0 AND n.delivered_at >= ? AND n.delivered_at <= ?) )
-                ORDER BY n.delivered_at DESC
-                """, arguments: [start, endTS,
-                                 start - Self.skewWindow, endTS + Self.skewWindow])
-            guard !rows.isEmpty else {
-                self.log.info("Session \(sessionID): 0 notifications, no digest")
-                return nil
-            }
-
-            // Triage for ranking: VIP/highlight first, muted apps last.
-            let rules = try Rule.filter(Column("is_enabled") == true).fetchAll(db)
-            let mutedAppIDs = try Set(Int64.fetchAll(db, sql: "SELECT id FROM apps WHERE is_muted = 1"))
-            let ranked = rows.sorted { a, b in
-                let ta = RulesEngine.evaluate(a, rules: rules)
-                let tb = RulesEngine.evaluate(b, rules: rules)
-                let aVIP = ta.highlight != nil || ta.pinned
-                let bVIP = tb.highlight != nil || tb.pinned
-                if aVIP != bVIP { return aVIP }
-                let aMuted = mutedAppIDs.contains(a.appID)
-                let bMuted = mutedAppIDs.contains(b.appID)
-                if aMuted != bMuted { return bMuted }
-                return a.deliveredAt > b.deliveredAt
-            }
-
-            var digest = Digest(id: nil, awaySessionID: sessionID,
-                                createdAt: Date(), shownAt: nil, dismissedAt: nil,
-                                itemCount: ranked.count)
-            try digest.insert(db)
-            let digestID = db.lastInsertedRowID
-            digest.id = digestID
-
-            for (rank, n) in ranked.prefix(Self.shownCap).enumerated() {
-                try db.execute(sql: """
-                    INSERT INTO digest_items(digest_id, notification_id, rank) VALUES (?, ?, ?)
-                    """, arguments: [digestID, n.id, rank])
-            }
-            // Tag every selected notification (not just the shown 50) with the session,
-            // so `is:missed` and "Open timeline at this point" cover the tail too.
-            let ids = ranked.compactMap(\.id)
-            try db.execute(sql: """
-                UPDATE notifications SET away_session_id = ?
-                WHERE id IN (\(ids.map { _ in "?" }.joined(separator: ",")))
-                """, arguments: StatementArguments([sessionID] + ids))
-
-            self.log.info("Digest \(digestID) built: \(ranked.count) items, \(min(ranked.count, Self.shownCap)) shown")
-            return digest
-        }
-    }
+    /// Returns nil when the session yields zero notifications; no digest row is written.
+    @discardableResult
+    public func build(for session: AwaySession) throws -> Digest?
 }
 ```
+
+The parts that are easy to get subtly wrong:
+
+- **Triage is evaluated once per item, not once per comparison.** A comparator that calls
+  the rules engine runs it O(n log n) times for a value that cannot change during the
+  sort, so the sort key is computed up front.
+- **`item_count` counts everything selected, not the shown 50.** It is the headline number
+  — "you missed 63" — and it has to stay true after retention prunes the items it counted.
+- **Zero notifications writes nothing.** An empty digest is not a quiet digest; it is an
+  interruption that says nothing happened.
+- **`alreadyBuilt` is enforced inside the transaction**, not by callers remembering to
+  check. Wake and unlock race often enough that a second build attempt is an ordinary
+  event.
+- **The session link claims only rows with `away_session_id IS NULL`.** Most of the
+  selection was already linked when the session was recorded
+  ([above](#archive-tables-involved)); what this picks up is the `presented = 0`
+  stragglers that fall outside the exact window. Restricting it to unclaimed rows is what
+  stops an overlapping session from stealing another's notifications. Items past the
+  shown cap are linked too, so `is:missed` and "open the timeline here" cover the tail.
 
 Error paths at the call site: `alreadyBuilt` is swallowed with a debug log (double session-end events are possible when wake and unlock race); any `DatabaseError` is logged and retried once after 5 s; a second failure surfaces as a Settings ▸ Status line ("Last digest failed to build — see log") rather than an alert, because the notifications themselves are safely in the archive and reachable through the timeline either way.
 
