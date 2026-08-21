@@ -78,6 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The interface, retained for the same reason: a status item whose
     /// controller is deallocated stays in the menu bar and stops responding.
     private var store: TimelineStore?
+    private var digests: DigestPresenter?
     private var search: SearchService?
     private var searchModel: SearchViewModel?
     private var settings: SettingsWindowController?
@@ -112,8 +113,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// logged and dropped rather than retried: the notifications it would have grouped
     /// are already archived, and the next session is seconds away.
     nonisolated private static func record(_ ended: AwaySessionTracker.EndedSession, in archive: Archive) {
+        let stored: AwaySession
         do {
-            let stored = try archive.insertAwaySession(ended.session)
+            stored = try archive.insertAwaySession(ended.session)
             // Linking here, not at digest-build time. A session under the threshold never
             // gets a digest, and the whole reason those rows are kept is that they are
             // still worth searching — so `is:missed` has to be able to find them.
@@ -122,6 +124,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             let detail = (error as? ArchiveError)?.logDescription ?? ArchiveError.detail(from: error)
             Log.digest.error("away session not recorded: \(detail)")
+            return
+        }
+        build(for: stored, causes: ended, in: archive)
+    }
+
+    /// Builds the digest for a session that has just been recorded, if the user's
+    /// settings want one.
+    ///
+    /// The policy is read here rather than captured at launch, so changing the threshold
+    /// or switching a reason off takes effect on the next session instead of the next
+    /// launch. It is checked *before* the build, not after: a digest written and then
+    /// never shown is a row nobody asked for, and "never means never" has to stop the
+    /// build (docs/features/MISSED_DIGEST.md#never-nagging-rules).
+    ///
+    /// Nothing here is presented. The popover looks for a pending digest when it opens,
+    /// which is what keeps "at most one, and only when you come back and look" a property
+    /// of one place rather than of this call site.
+    nonisolated private static func build(
+        for stored: AwaySession,
+        causes ended: AwaySessionTracker.EndedSession,
+        in archive: Archive
+    ) {
+        guard DigestPolicy(defaults: .standard).allows(ended) else {
+            Log.digest.info("Away session \(stored.id ?? 0) earns no digest under the current settings")
+            return
+        }
+        do {
+            try DigestEngine(archive: archive).build(for: stored)
+        } catch let error as DigestEngine.DigestError {
+            // `alreadyBuilt` is ordinary, not exceptional: wake and unlock race often
+            // enough that a second session-end event is a normal Tuesday.
+            Log.digest.debug("Digest not built: \(error.logDescription)")
+        } catch {
+            let detail = (error as? ArchiveError)?.logDescription ?? ArchiveError.detail(from: error)
+            Log.digest.error("digest not built: \(detail)")
         }
     }
 
@@ -270,10 +307,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated { search?.semanticEnabled ?? false }
         }
         let searchModel = SearchViewModel(search: search, semanticEnabled: semanticEnabled)
+        // Holds whichever digest is waiting to be seen. It reads the archive only when
+        // the popover is about to open, so an app that never comes back from an away
+        // session never asks the question.
+        let digests = DigestPresenter(archive: archive)
+        digests.onOpenTimeline = { _ in window.show() }
         let statusItem = StatusItemController(
             store: store,
             search: searchModel,
             searchService: search,
+            digests: digests,
             menuActions: .init(
                 openWindow: { window.show() },
                 pauseForAnHour: { [weak self] in
@@ -299,6 +342,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.store = store
         self.search = search
         self.searchModel = searchModel
+        self.digests = digests
         self.settings = settings
         self.window = window
         self.statusItem = statusItem

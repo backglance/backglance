@@ -33,6 +33,7 @@ struct MenuBarPopoverView: View {
 
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: presenter?.hasDigest)
 
             // Only when capture is not simply running: a permanent status strip
             // in a 520-point-tall popover is 6% of the timeline spent saying
@@ -59,13 +60,32 @@ struct MenuBarPopoverView: View {
     @Environment(\.timelineActions)
     private var actions
 
+    /// Optional so a preview — and any host that has no archive to look a digest up in —
+    /// simply renders the timeline.
+    @Environment(DigestPresenter.self)
+    private var presenter: DigestPresenter?
+
     /// Present only in the app; a preview leaves it nil and simply shows no
     /// indexing progress.
     @Environment(\.searchService)
     private var searchService
 
+    /// Reduce Motion drops the card's slide-in — docs/reference/ACCESSIBILITY.md#reduced-motion.
+    /// The digest still appears and still goes away on dismiss; it just does not travel to
+    /// get there, which matters more here than elsewhere because the card arrives
+    /// unprompted, on an open the user began for some other reason.
+    @Environment(\.accessibilityReduceMotion)
+    private var reduceMotion
+
     @ViewBuilder private var content: some View {
-        if search.hasQuery {
+        // The digest takes the whole surface while it is up. A 380 × 520 popover cannot
+        // show a summary *and* the timeline it summarises without shortchanging both, and
+        // the card's two exits — "Open timeline at this point" and dismiss — are the two
+        // things someone reading it wants next anyway.
+        if let digest = presenter?.current, !search.hasQuery {
+            DigestView(model: digest)
+                .transition(reduceMotion ? .identity : .move(edge: .top).combined(with: .opacity))
+        } else if search.hasQuery {
             if search.hits.isEmpty {
                 SearchEmptyState(kind: search.emptyStateKind, onClearFilters: search.clear)
             } else {

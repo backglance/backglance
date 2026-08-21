@@ -21,10 +21,17 @@ import SwiftUI
 final class StatusItemController: NSObject, NSPopoverDelegate {
     // MARK: Lifecycle
 
-    init(store: TimelineStore, search: SearchViewModel, searchService: SearchService, menuActions: MenuActions) {
+    init(
+        store: TimelineStore,
+        search: SearchViewModel,
+        searchService: SearchService,
+        digests: DigestPresenter?,
+        menuActions: MenuActions
+    ) {
         self.store = store
         self.search = search
         self.searchService = searchService
+        self.digests = digests
         self.menuActions = menuActions
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
@@ -42,6 +49,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             rootView: MenuBarPopoverView()
                 .environment(store)
                 .environment(search)
+                .environment(digests)
                 .environment(\.searchService, searchService)
                 .environment(\.timelineActions, actions)
         )
@@ -104,6 +112,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         // Snapshot before showing: the divider the user sees has to reflect the
         // moment before they clicked, not after.
         store.surfaceWillOpen()
+        // Same moment, same reason: a digest built while the popover was closed has to
+        // be on screen for this open, and this is the last instant it can be looked up
+        // without the lookup landing inside the first-paint budget's own interval.
+        digests?.refresh()
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         // An agent app is never frontmost on its own, so the popover has to ask
         // for key status or the timeline cannot take a keystroke.
@@ -126,6 +138,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
+    /// `nil` when the app has no archive, which is the same condition that leaves the
+    /// timeline empty — there is nothing to look a digest up in.
+    private let digests: DigestPresenter?
+
     private let store: TimelineStore
     private let search: SearchViewModel
     private let searchService: SearchService

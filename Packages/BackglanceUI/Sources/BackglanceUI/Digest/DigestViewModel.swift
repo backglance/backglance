@@ -80,6 +80,12 @@ public final class DigestViewModel {
     /// leaves the button out, which is how a preview renders the card without a window.
     public var onOpenTimeline: ((AwaySession) -> Void)?
 
+    /// Fired once the digest has been retired, so the host can take the card down.
+    /// A callback rather than the host observing ``isDismissed``: the write has already
+    /// happened by the time this runs, so there is no window in which the card is gone
+    /// from the screen but still pending in the archive.
+    public var onDismissed: (() -> Void)?
+
     public var mutedCount: Int {
         mutedItems.count
     }
@@ -169,6 +175,7 @@ public final class DigestViewModel {
     /// and stay findable — only the summary goes away, and it never comes back.
     public func dismiss() {
         isDismissed = true
+        defer { onDismissed?() }
         guard let digestID = digest.id else {
             return
         }
@@ -176,6 +183,8 @@ public final class DigestViewModel {
             try archive.dismissDigest(digestID, at: now())
             Log.digest.info("Digest \(digestID) dismissed")
         } catch {
+            // The card still goes away. Leaving it up because the write failed would
+            // mean the one click the contract promises did nothing.
             Log.digest.error("Digest dismiss failed: \(ArchiveError.detail(from: error))")
         }
     }

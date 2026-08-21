@@ -42,6 +42,8 @@ Design intent, in order:
 | `FocusAssertionWatcher` | ⚠️ file watcher on the DND assertions database | `BackglanceCore` |
 | `PresentationDetector` | ⚠️ heuristic frontmost-app + window scan | `BackglanceCore` |
 | `DigestEngine` | pure selection/ranking, writes `digests` + `digest_items` | `BackglanceCore` |
+| `DigestPolicy` | whether a finished session earns a digest at all | `BackglanceCore` |
+| `DigestPresenter` | whether the popover shows one, and which | `BackglanceUI` |
 | `DigestView` | SwiftUI, shown in the popover; also the full timeline entry point | `BackglanceUI` |
 | Banner | optional `UNUserNotificationCenter` local notification | app target |
 
@@ -608,7 +610,7 @@ Settings ▸ Digest, stored in `UserDefaults` (suite `app.backglance.Backglance`
 | Setting | Key | Default |
 |---|---|---|
 | Show digest | `digest.threshold` = `after5min` / `after15min` / `always` / `never` | `after5min` |
-| Don't show for these reasons | `digest.disabledReasons` (Set of `AwayReason` raw values) | empty |
+| Don't show for these reasons | `digest.disabledReasons` (array of `AwayReason` raw values, read by `DigestPolicy`) | empty |
 | Also show a notification banner | `digest.banner.enabled` | on |
 | Banner for Focus sessions | `digest.banner.focus` | off |
 | Banner sound | `digest.banner.sound` | off |
@@ -628,6 +630,16 @@ The explicit contract, testable line by line:
 7. **"never" means never.** With `digest.threshold = never`, nothing is built or posted; away sessions are still tracked for `is:missed`.
 
 > ✅ **Do:** treat these as invariants in code review. A change that can produce a second banner for one session is a bug, whatever the justification.
+
+### Where each rule actually lives
+
+The rules are enforced in two types, so a change that could break one is visible in a diff rather than spread across the UI:
+
+`DigestPolicy` (`BackglanceCore`) gates the **build**. It reads `digest.threshold` and `digest.disabledReasons` at the moment a session ends — not at launch, so changing a setting takes effect on the next session — and the app shell calls it before `DigestEngine.build(for:)` ever runs. That is what makes rules 6 and 7 true: below-threshold and `never` sessions produce no row at all, rather than a row that presentation later declines to show. A session is suppressed by reason only when **every** one of its causes is disabled; locking the lid during a Focus is still a lock, and switching off Focus digests is not a request to stop hearing about a shut Mac.
+
+`DigestPresenter` (`BackglanceUI`) gates the **presentation**. It is asked for a digest when the popover is about to open — the only moment the answer can have changed for someone who is looking — and it can only ever surface `Archive.pendingDigest()`, which is `dismissed_at IS NULL`. So rule 3 holds across relaunches without any in-memory "already shown" flag, and being shown does not retire a digest: closing the popover mid-read is not an answer. Refreshing while the same digest is already up returns the same model rather than rebuilding it, so the card does not reset under someone who is reading it.
+
+The card takes the whole popover while it is up rather than sitting above the timeline. A 380 × 520 surface cannot show a summary and the thing it summarises without shortchanging both, and the card's two exits — "Open timeline at this point" and dismiss — are what someone finishing it wants next. Reduce Motion drops the slide-in: the card arrives unprompted, on an open the user began for some other reason, which is exactly when unrequested movement is least welcome.
 
 ## Edge Cases and Error Handling
 
