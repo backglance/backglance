@@ -172,6 +172,12 @@ public enum OTPPatterns {
     /// Tokenised on anything that is not a letter or a hyphen, so "pin" does not match
     /// inside "shipping" and "code" does not match inside "barcode" — substring matching
     /// here would redact half the notifications an online shop sends.
+    ///
+    /// A trailing "s" is allowed, so "Your codes are…" matches "code". Only a suffix, and
+    /// only that one letter: it catches the plural without reopening the substring problem,
+    /// because "barcode" is a *prefix* of nothing the lists contain. A missed code is the
+    /// worse direction to fail in — the digits get archived — so this side of the trade is
+    /// where the tolerance belongs.
     public static func keywordSet(in text: String, among sets: [KeywordSet] = builtIn) -> KeywordSet? {
         let tokens = text.matchKey.split { !($0.isLetter || $0 == "-") }.map(String.init)
         guard !tokens.isEmpty else {
@@ -179,7 +185,12 @@ public enum OTPPatterns {
         }
         return sets.first { set in
             set.keywords.contains { keyword in
-                tokens.contains { set.prefixMatch ? $0.hasPrefix(keyword) : $0 == keyword }
+                tokens.contains { token in
+                    if set.prefixMatch {
+                        return token.hasPrefix(keyword)
+                    }
+                    return token == keyword || token == keyword + "s"
+                }
             }
         }
     }

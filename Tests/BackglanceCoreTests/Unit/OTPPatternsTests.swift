@@ -178,6 +178,19 @@ final class OTPPatternsTests: XCTestCase {
         XCTAssertNotNil(OTPPatterns.keywordSet(in: "Your Code Is"))
     }
 
+    func testAPluralKeywordStillMatches() {
+        // "Your codes are…" is ordinary English, and an exact-token rule would let both
+        // codes through. A missed code is the worse way to fail: the digits get archived.
+        XCTAssertEqual(OTPPatterns.keywordSet(in: "your codes are")?.patternID, "otp.keyword.en")
+        XCTAssertEqual(OTPPatterns.keywordSet(in: "two passcodes below")?.patternID, "otp.keyword.en")
+    }
+
+    func testThePluralAllowanceIsASuffixOnlyAndDoesNotReopenSubstringMatching() {
+        // Only a trailing "s", so "barcode" — a word the lists are *inside* — still misses.
+        XCTAssertNil(OTPPatterns.keywordSet(in: "scan the barcodes below"))
+        XCTAssertNil(OTPPatterns.keywordSet(in: "shipping updates"))
+    }
+
     func testAKeywordInsideALongerWordDoesNotMatch() {
         // The whole reason matching is tokenised: substring matching would redact a
         // shipping notification's tracking number and a barcode's digits.

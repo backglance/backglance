@@ -403,173 +403,59 @@ The redactor is intentionally rule-based and small. It has three pattern familie
 | `otp.keyword.de` | Same, German keywords `Code`, `Bestätigungscode`, `Einmalpasswort` |
 | `otp.bare` | The whole field, trimmed, is nothing but a digit group ("`123 456`"-shaped SMS bodies from some senders) |
 
-A *digit group* is 4–8 consecutive digits, or two groups of 3–4 digits separated by one space or hyphen. Keyword matching is case-insensitive and diacritic-insensitive (`String.folding` with `locale: nil`, the same locale-neutral folding used by the rules engine and the FTS tokenizer; see [INTERNATIONALIZATION.md](../reference/INTERNATIONALIZATION.md) for the Turkish dotted/dotless I discussion). A keyword in the title or subtitle counts as context for digits in the body, because titles are short and senders often put "Verification code" in the title.
+A *digit group* is 4–8 consecutive digits, or two groups of 3–4 digits separated by one space or hyphen. Keyword matching goes through `String.matchKey` — locale-neutral folding, case- and diacritic-insensitive, shared with the rules engine (see [INTERNATIONALIZATION.md](../reference/INTERNATIONALIZATION.md) for the Turkish dotted/dotless I discussion). It is **tokenised**, not substring: "pin" must not match inside "shipping", nor "code" inside "barcode", or a large share of what online shops send would be redacted. A keyword in the title or subtitle counts as context for digits in the body, because titles are short and senders often put "Verification code" in the title.
 
 Context rules that reject a candidate (false-positive guards):
 
 | Guard | Rejects |
 |---|---|
-| Not glued to other digits, decimals, `+`, `(`, `:` or a currency symbol before; not followed by digits, `.`, `,`, `:`, `%` or a currency | prices (`1.234,56`, `$4999`), percentages, times (`12:30`), reference numbers inside longer runs |
-| Part of a longer number: extending through digits, spaces, hyphens, parentheses and `+` yields more than 8 digits or starts with `+` | phone numbers (`+1 555 0100`, `(555) 010-0100`) |
-| Date neighbour: `dd.mm.` / `dd/mm/` before, or `-mm-dd` after | `01.09.2026`, `2026-09-01` |
-| Year-like (four digits, 1900–2099): keyword must be within 12 characters, not 40 | "see you in 2027, login at…" |
+| `OTPPatterns.hasCodeBoundaries` — not glued to a decimal, `,`, `:`, `+`, `(` or a currency symbol before; not followed by `.`, `,`, `:`, `%`, a currency symbol, or a currency word (`USD`, `EUR`, `TRY`, `TL`, `GBP`) | prices (`1.234,56`, `$4999`, `4999 USD`), percentages, times (`12:30`), reference numbers inside longer runs |
+| `OTPPatterns.partOfLongerNumber` — extending through digits, spaces, hyphens, parentheses and `+` yields more than 8 digits, or the run starts with `+` | phone numbers (`+1 555 0100`, `(555) 010-0100`) |
+| `OTPPatterns.looksLikeDate` — `dd.mm.` / `dd/mm/` before, or `-mm-dd` after | `01.09.2026`, `2026-09-01` |
+| `OTPPatterns.isYearLike` — four digits in 1900–2099 need a keyword within 12 characters rather than 40, and may not borrow the header's | "see you in 2027, login at…" |
 
 ### OTPRedactor
 
-The type is pure and synchronous. It never logs, never touches the archive, and returns the redacted notification plus an audit event with no content.
+The type is pure and synchronous. It never logs, never touches the archive, and returns the redacted text plus an audit event with no content in it.
+
+It takes a `Content` triple — title, subtitle, body — rather than a `ParsedNotification`, because that type belongs to `BackglanceCapture`, which depends on `BackglanceCore` and not the other way round ([ARCHITECTURE.md](../architecture/ARCHITECTURE.md#dependency-graph)). `BackglanceCapture` adds the adapter, which is also what keeps the redactor testable against plain strings:
 
 ```swift
-import Foundation
-
-/// Redacts one-time codes from a parsed notification before it is inserted into the archive.
-/// Pure: no I/O, no logging. Runs on the capture actor before `Archive.insert`.
+// Packages/BackglanceCore/Sources/BackglanceCore/Redaction/OTPRedactor.swift
 public struct OTPRedactor: Sendable {
-
-    public static let placeholder = "[code redacted]"
-    public static let `default` = OTPRedactor(window: 40, keywordSets: KeywordSet.builtIn)
-
-    /// Distance in characters between a keyword and a digit group for the keyword rule.
-    public let window: Int
-    public let keywordSets: [KeywordSet]
-
-    public struct KeywordSet: Sendable {
-        public let patternID: String
-        public let keywords: [String]      // stored folded: lowercase, diacritics removed
-        public let prefixMatch: Bool       // Turkish suffixes: "kod" must match "kodunuz"
-
-        public init(patternID: String, keywords: [String], prefixMatch: Bool = false) {
-            self.patternID = patternID
-            self.keywords = keywords.map(OTPRedactor.fold)
-            self.prefixMatch = prefixMatch
-        }
-
-        public static let builtIn: [KeywordSet] = [
-            KeywordSet(patternID: "otp.keyword.en",
-                       keywords: ["code", "verification", "passcode", "otp", "one-time", "pin", "login"]),
-            KeywordSet(patternID: "otp.keyword.tr",
-                       keywords: ["kod", "doğrulama", "şifre"], prefixMatch: true),
-            KeywordSet(patternID: "otp.keyword.de",
-                       keywords: ["code", "bestätigungscode", "einmalpasswort"]),
-        ]
+    public struct Content: Sendable, Equatable {
+        public var title: String?
+        public var subtitle: String?
+        public var body: String?
     }
 
-    public init(window: Int, keywordSets: [KeywordSet]) {
-        self.window = window
-        self.keywordSets = keywordSets
+    public struct Result: Sendable, Equatable {
+        public let content: Content
+        public let event: RedactionEvent?      // nil ⇒ content is byte-identical to the input
     }
 
-    // 4–8 digits, or 3–4 + separator + 3–4. Lookarounds reject digits glued to other digits,
-    // decimals, '+', '(', ':' and currency (before) or digits/decimals/percent/currency (after).
-    private static let candidate = try! NSRegularExpression(
-        pattern: #"(?<![\d.,:+(\p{Sc}])(\d{3,4}[ -]\d{3,4}|\d{4,8})(?![\d.,:%]|\s?(?:€|₺|\$|£|USD|EUR|TRY|TL|GBP))"#)
+    public static let `default` = OTPRedactor()
 
-    // The whole field is only a code once trimmed.
-    private static let bareField = try! NSRegularExpression(
-        pattern: #"^\s*(\d{3,4}[ -]\d{3,4}|\d{4,8})\s*$"#)
+    public func redact(_ content: Content) -> Result
+}
 
-    // Date fragments directly around the group.
-    private static let dateBefore = try! NSRegularExpression(pattern: #"\d{1,2}[./-]\d{1,2}[./-]\s?$"#)
-    private static let dateAfter  = try! NSRegularExpression(pattern: #"^\s?[./-]\d{1,2}[./-]\d{1,2}|^-\d{2}-\d{2}"#)
-
-    // MARK: Public API
-
-    public func redact(_ n: ParsedNotification) -> (ParsedNotification, RedactionEvent?) {
-        var out = n
-        var firstPatternID: String?
-
-        // A keyword in the title/subtitle is context for the body (titles are short).
-        let headerSet = keywordSet(in: Self.fold(n.title ?? ""))
-                     ?? keywordSet(in: Self.fold(n.subtitle ?? ""))
-
-        let fields: [WritableKeyPath<ParsedNotification, String?>] = [\.title, \.subtitle, \.body]
-        for (index, field) in fields.enumerated() {
-            guard let text = out[keyPath: field], !text.isEmpty else { continue }
-            let isBody = index == 2
-            let (redacted, patternID) = redactField(text, headerSet: isBody ? headerSet : nil)
-            if let patternID {
-                out[keyPath: field] = redacted
-                if firstPatternID == nil { firstPatternID = patternID }
-            }
-        }
-
-        guard let patternID = firstPatternID else { return (n, nil) }   // untouched: no event
-        return (out, RedactionEvent(kind: .otp, patternID: patternID, redactedAt: Date()))
-    }
-
-    // MARK: Internals
-
-    private func redactField(_ text: String, headerSet: KeywordSet?) -> (String, String?) {
-        let ns = text as NSString
-        let full = NSRange(location: 0, length: ns.length)
-
-        if Self.bareField.firstMatch(in: text, range: full) != nil {
-            return (Self.placeholder, "otp.bare")
-        }
-
-        var result = text
-        var patternID: String?
-        // Reversed so earlier ranges stay valid while we replace later ones.
-        for m in Self.candidate.matches(in: text, range: full).reversed() {
-            let r = m.range(at: 1)
-            let digits = ns.substring(with: r)
-            let beforeRange = NSRange(location: max(0, r.location - window), length: min(window, r.location))
-            let afterStart = r.location + r.length
-            let afterRange = NSRange(location: afterStart, length: min(window, ns.length - afterStart))
-            let before = ns.substring(with: beforeRange)
-            let after = ns.substring(with: afterRange)
-
-            if Self.looksLikeDate(before: before, after: after) { continue }
-            if Self.partOfLongerNumber(digits: digits, before: before, after: after) { continue }
-
-            let yearLike = digits.count == 4 && (1900...2099).contains(Int(digits) ?? 0)
-            let near = yearLike ? 12 : window
-            let context = String(before.suffix(near)) + " " + String(after.prefix(near))
-            let set = keywordSet(in: Self.fold(context)) ?? (yearLike ? nil : headerSet)
-            guard let set else { continue }
-
-            result = (result as NSString).replacingCharacters(in: r, with: Self.placeholder)
-            patternID = set.patternID
-        }
-        return (result, patternID)
-    }
-
-    static func fold(_ s: String) -> String {
-        s.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil)
-    }
-
-    private func keywordSet(in folded: String) -> KeywordSet? {
-        // Tokenise on anything that is not a letter or '-', so "pin" does not match "shipping".
-        let tokens = folded.split(whereSeparator: { !($0.isLetter || $0 == "-") }).map(String.init)
-        guard !tokens.isEmpty else { return nil }
-        return keywordSets.first { set in
-            set.keywords.contains { kw in
-                tokens.contains { set.prefixMatch ? $0.hasPrefix(kw) : $0 == kw }
-            }
-        }
-    }
-
-    private static func looksLikeDate(before: String, after: String) -> Bool {
-        let b = before as NSString, a = after as NSString
-        return dateBefore.firstMatch(in: before, range: NSRange(location: 0, length: b.length)) != nil
-            || dateAfter.firstMatch(in: after, range: NSRange(location: 0, length: a.length)) != nil
-    }
-
-    /// Phone-number guard: walk outward through digits, spaces, hyphens, parentheses and '+'.
-    /// More than 8 digits in the run, or a run that starts with '+', is not a code.
-    private static func partOfLongerNumber(digits: String, before: String, after: String) -> Bool {
-        let glue: Set<Character> = [" ", "-", "(", ")", "+"]
-        var run = digits.filter(\.isNumber).count
-        var startsWithPlus = false
-        for ch in before.reversed() {
-            if ch.isNumber { run += 1 } else if glue.contains(ch) { if ch == "+" { startsWithPlus = true } } else { break }
-        }
-        for ch in after {
-            if ch.isNumber { run += 1 } else if glue.contains(ch) { continue } else { break }
-        }
-        return run > 8 || startsWithPlus
-    }
+// Packages/BackglanceCapture/Sources/BackglanceCapture/Parsing/ParsedNotification+Redaction.swift
+public extension ParsedNotification {
+    func redactingOTP(with redactor: OTPRedactor = .default) -> (ParsedNotification, RedactionEvent?)
 }
 ```
+
+The walk over a field, in order:
+
+1. **Bare field.** If the whole field trimmed is a digit group, it is the code — some senders' SMS bodies are literally `445 566`, and no keyword can rescue those. A year-like value is exempt: a body of `2026` is a date far more often than a code.
+2. **Candidates, back to front.** Each code-shaped group is checked against the boundary, date and phone guards from `OTPPatterns`. Replacing from the end keeps earlier ranges valid — the placeholder is a different length from the digits, so going forwards would invalidate every index after the first substitution.
+3. **Context.** A keyword within the window vouches for the group. A year-like group has to find one within 12 characters and may not borrow the header's, because "see you in 2027" inside a notification titled "Login code" is a date, and the year is the part the reader needs.
+
+A keyword in the **title or subtitle is context for digits in the body** — titles are short, and senders routinely put "Verification code" in the title with the digits alone in the body. It does not work the other way round: a long body that mentions "code" somewhere should not license redacting a number in the title.
+
+The pattern that fires first, in title → subtitle → body order, is the one recorded on the audit row.
+
+> ℹ️ **Note:** the shipped matcher does not use the regex lookarounds this document originally sketched. Swift's `Regex` has no lookbehind, and the alternative — `NSRegularExpression` built with `try!` — turns a typo in a pattern into a crash on the first notification. The boundary rules live in `OTPPatterns.hasCodeBoundaries(before:after:)` instead, where each is a named function with its own test, and every pattern is a compile-time-checked literal.
 
 `RedactionEvent` is the GRDB record for the `redactions` table:
 
