@@ -196,11 +196,12 @@ struct GetMissedDigestIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ReturnsValue<[NotificationEntity]> & ProvidesDialog {
         // Latest digest, or nil if no away session has produced one yet.
-        guard let digest = try await Archive.shared.latestDigest() else {
+        guard let digest = try Archive.shared.lastDigest(), let digestID = digest.id else {
             return .result(value: [], dialog: "Nothing missed.")
         }
-        let items = try await Archive.shared.digestItems(digestID: digest.id)   // [(notification, appName)] ranked
-        let entities = items.map { NotificationEntity($0.notification, appName: $0.appName) }
+        let items = try Archive.shared.digestNotifications(digestID: digestID)   // ranked
+        let apps = try Archive.shared.appsByID()
+        let entities = items.map { NotificationEntity($0, appName: apps[$0.appId]?.displayName ?? "") }
         let count = entities.count
         let dialog: IntentDialog = count == 0
             ? "Nothing missed."
@@ -461,8 +462,20 @@ public final class Archive: Sendable {
     public func notifications(uuids: [UUID]) async throws -> [(notification: ArchivedNotification, appName: String)]
     public func recentNotifications(limit: Int) async throws -> [(notification: ArchivedNotification, appName: String)]
     public func countNotifications(includingDeleted: Bool) throws -> Int
-    public func latestDigest() async throws -> Digest?
-    public func digestItems(digestID: Int64) async throws -> [(notification: ArchivedNotification, appName: String)]
+
+    // Digests. Reads are synchronous like the rest of the archive's typed helpers;
+    // `Archive+Digest.swift` has the full set (docs/features/MISSED_DIGEST.md#digestview).
+    public func pendingDigest() throws -> Digest?            // newest with dismissed_at IS NULL
+    public func lastDigest() throws -> Digest?               // newest, whatever its state
+    public func awaySession(id: Int64) throws -> AwaySession?
+    public func digestNotifications(digestID: Int64) throws -> [ArchivedNotification]   // in rank order
+    public func deliveryDates(inAwaySession sessionID: Int64) throws -> [Date]
+    @discardableResult
+    public func markDigestShown(_ id: Int64, at date: Date) throws -> Bool   // once only
+    @discardableResult
+    public func dismissDigest(_ id: Int64, at date: Date) throws -> Bool     // once only
+    @discardableResult
+    public func markRead(ids: [Int64]) throws -> Int
 
     // capture_state, as opaque values. BackglanceCapture puts the typed accessors on top.
     public func captureState(_ key: CaptureStateKey) throws -> String?

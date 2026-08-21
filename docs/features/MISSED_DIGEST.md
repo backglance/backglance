@@ -485,6 +485,8 @@ Error paths at the call site: `alreadyBuilt` is swallowed with a debug log (doub
 | Component | Module | Notes |
 |---|---|---|
 | `DigestView` | `BackglanceUI` | the digest card; hosted in the popover on first open after return |
+| `DigestViewModel` | `BackglanceUI` | `@MainActor @Observable`; loads the digest's rows, groups them, owns the three writes |
+| `DigestSection`, `DigestDayCount` | `BackglanceUI` | the value types the card renders, built by `DigestViewModel` |
 | `DigestAppSection` | `BackglanceUI` | app icon + name + that app's rows (reuses `NotificationRow`) |
 | `DigestHeader` | `BackglanceUI` | headline, reason glyphs (🔒 / 😴 / 🌙 / 📽 / ✋), duration, partial/reconstructed badges |
 | `DigestSettingsView` | `BackglanceUI` | thresholds, reasons, banner toggle |
@@ -494,93 +496,57 @@ Error paths at the call site: `alreadyBuilt` is swallowed with a debug log (doub
 
 Shown at the top of the popover the first time it opens after a digest is built; also reachable later via `backglance://digest` and the menu item "Last digest".
 
+`DigestView` is a thin wrapper: it reads the view model and hands plain values to `DigestCard`, which is what actually draws. The split is not ceremony — it is what makes every state the card can be in (overflowing, muted-only, a failed read) reachable from a `#Preview` and a test without seeding an archive first.
+
 ```swift
 // Packages/BackglanceUI/Sources/BackglanceUI/Digest/DigestView.swift
-import SwiftUI
-import BackglanceCore
-
 public struct DigestView: View {
     public let model: DigestViewModel
 
-    public init(model: DigestViewModel) { self.model = model }
-
     public var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            header
-            Divider()
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 6, pinnedViews: .sectionHeaders) {
-                    ForEach(model.appSections) { section in
-                        Section {
-                            ForEach(section.notifications) { n in
-                                NotificationRow(notification: n, style: .digest)
-                            }
-                        } header: {
-                            DigestAppSectionHeader(app: section.app, count: section.notifications.count)
-                        }
-                    }
-                    if model.mutedCount > 0 {
-                        DisclosureGroup("\(model.mutedCount) more from muted apps") {
-                            ForEach(model.mutedNotifications) { n in
-                                NotificationRow(notification: n, style: .digest)
-                            }
-                        }
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                    }
-                    if model.overflowCount > 0 {
-                        Button("and \(model.overflowCount) more…") { model.openTimelineAtSession() }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .frame(maxHeight: 380)
-            footer
+        DigestCard(
+            reasonSymbol: model.primaryReasonSymbol,   // "lock.fill"
+            headline: model.headline,                  // "You missed 12 notifications from 4 apps"
+            subheadline: model.subheadline,            // "while locked · 47 min · ended 09:12"
+            isPartial: model.isPartial,
+            isReconstructed: model.isReconstructed,
+            dayCounts: model.dayCounts,                // "Fri 34 · Sat 12 · Sun 41", multi-day only
+            appSections: model.appSections,
+            mutedItems: model.mutedItems,
+            overflowCount: model.overflowCount,
+            loadError: model.loadError,
+            canOpenTimeline: model.session != nil,
+            onDismiss: { model.dismiss() },
+            onOpenTimeline: { model.openTimelineAtSession() },
+            onMarkAllRead: { model.markAllRead() }
+        )
+        // Loading and the once-only `shown_at` stamp happen together: the moment the
+        // card is on screen is the moment it has been shown.
+        .task {
+            model.load()
+            model.markShown()
         }
-        .padding(12)
-        .task { await model.markShown() }   // sets digests.shown_at once
-    }
-
-    private var header: some View {
-        HStack(spacing: 8) {
-            Image(systemName: model.primaryReasonSymbol)   // e.g. "lock.fill"
-            VStack(alignment: .leading, spacing: 2) {
-                Text(model.headline)                        // "You missed 12 notifications from 4 apps"
-                    .font(.headline)
-                Text(model.subheadline)                     // "while locked · 47 min · ended 09:12"
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if model.isReconstructed {
-                    Label("Reconstructed — Backglance wasn't running for part of this time",
-                          systemImage: "clock.arrow.circlepath")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer()
-            Button {
-                model.dismiss()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Dismiss digest")
-        }
-    }
-
-    private var footer: some View {
-        HStack {
-            Button("Open timeline at this point") { model.openTimelineAtSession() }
-            Spacer()
-            Button("Mark all read") { Task { await model.markAllRead() } }
-        }
-        .font(.callout)
     }
 }
 ```
 
-`DigestViewModel.dismiss()` writes `dismissed_at` and removes the card; the digest remains queryable (timeline filter "Missed", `is:missed` in [SEARCH.md](./SEARCH.md)) but is never presented again. "Open timeline at this point" opens `TimelineWindow` scrolled to `started_at` with the session's rows tinted ([TIMELINE.md](./TIMELINE.md)). "Mark all read" sets `is_read = 1` for the digest's notification ids through the shared `NotificationActionHandler` ([ACTIONS.md](./ACTIONS.md)).
+`DigestCard` is a `VStack` of `DigestHeader`, a `ScrollView` capped at 380 pt over the `DigestAppSection`s, the collapsed muted `DisclosureGroup`, the "and *n* more…" button, and the footer. Rows are ordinary `NotificationRow`s in compact mode — a summary that rendered notifications differently from the timeline would make the user learn two layouts for one thing.
+
+The two honesty badges are the part that carries the feature's first design goal. `isPartial` (Backglance launched into an already-away Mac) and `isReconstructed` (the session was rebuilt after the fact) are **not columns** — they live on `AwaySessionTracker.EndedSession` and are gone once the session row is written. The build path knows them and passes them to the view model; reopening an old digest from "Last digest" does not, and the card renders without the badges rather than inventing them.
+
+The archive side is four reads and three writes, all in `Archive+Digest.swift`:
+
+| Call | Does |
+|---|---|
+| `pendingDigest()` | newest digest with `dismissed_at IS NULL` — `shown_at` is deliberately *not* in the predicate, so closing the popover mid-read is not an answer |
+| `lastDigest()` | newest digest whatever its state; what "Last digest" reopens read-only |
+| `digestNotifications(digestID:)` | the shown rows in `digest_items.rank` order, soft-deleted rows excluded |
+| `deliveryDates(inAwaySession:)` | timestamps only, for the multi-day header summary — the count has to cover the whole session, not the 50 rows shown |
+| `markDigestShown(_:at:)` | stamps `shown_at` where it `IS NULL`; returns whether this call was the first |
+| `dismissDigest(_:at:)` | same once-only stamp on `dismissed_at` |
+| `markRead(ids:)` | the digest's own "Mark all read" — *these* notifications, not the whole timeline |
+
+`DigestViewModel.dismiss()` writes `dismissed_at` and removes the card; the digest remains queryable (timeline filter "Missed", `is:missed` in [SEARCH.md](./SEARCH.md)) but is never presented again. "Open timeline at this point" fires `onOpenTimeline`, which the app shell wires to `TimelineWindow` scrolled to `started_at` with the session's rows tinted ([TIMELINE.md](./TIMELINE.md)); the button is absent when the digest has no session to open. "Mark all read" sets `is_read = 1` for the digest's notification ids — it will move to the shared `NotificationActionHandler` when that ships ([ACTIONS.md](./ACTIONS.md)).
 
 ### The Local Notification Banner
 

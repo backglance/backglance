@@ -104,6 +104,53 @@ public enum PreviewData {
         ]
     }
 
+    /// Two apps' worth of rows, grouped the way ``DigestViewModel`` groups them.
+    ///
+    /// Each section's rows really do come from that section's app — a preview that mixed
+    /// them would make the digest look like it groups wrongly, which is exactly the bug
+    /// a preview is supposed to catch.
+    public static var digestSections: [DigestSection] {
+        [
+            DigestSection(
+                id: "app.backglance.fixture.mail",
+                appName: "Fixture Mail",
+                bundleID: "app.backglance.fixture.mail",
+                items: [
+                    item(
+                        id: 11,
+                        appName: "Fixture Mail",
+                        bundleID: "app.backglance.fixture.mail",
+                        title: "Deploy finished",
+                        body: "Fixture message 000041",
+                        minutesAgo: 12
+                    ),
+                    item(
+                        id: 12,
+                        appName: "Fixture Mail",
+                        bundleID: "app.backglance.fixture.mail",
+                        title: "Fixture message 000045",
+                        minutesAgo: 34
+                    ),
+                ]
+            ),
+            DigestSection(
+                id: "app.backglance.fixture.chat",
+                appName: "Fixture Chat",
+                bundleID: "app.backglance.fixture.chat",
+                items: [
+                    item(
+                        id: 13,
+                        appName: "Fixture Chat",
+                        bundleID: "app.backglance.fixture.chat",
+                        title: "Standup moved",
+                        body: "Fixture message 000042",
+                        minutesAgo: 51
+                    ),
+                ]
+            ),
+        ]
+    }
+
     /// A synthetic archived row. `appId` is a fixed fixture id — previews
     /// never join against a real `apps` table, so the exact value only needs
     /// to be stable, not meaningful.
