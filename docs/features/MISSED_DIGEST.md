@@ -45,7 +45,8 @@ Design intent, in order:
 | `DigestPolicy` | whether a finished session earns a digest at all | `BackglanceCore` |
 | `DigestPresenter` | whether the popover shows one, and which | `BackglanceUI` |
 | `DigestView` | SwiftUI, shown in the popover; also the full timeline entry point | `BackglanceUI` |
-| Banner | optional `UNUserNotificationCenter` local notification | app target |
+| `DigestBannerPolicy` | whether a digest also earns a banner | `BackglanceCore` |
+| `DigestBannerPoster` | optional `UNUserNotificationCenter` local notification | app target |
 
 > ℹ️ **Info:** The digest reads only Backglance's archive. Notifications that were never captured (capture paused, app excluded, FDA revoked — see [CAPTURE.md](./CAPTURE.md) and [PERMISSIONS_PRIVACY.md](./PERMISSIONS_PRIVACY.md)) cannot appear in a digest.
 
@@ -552,56 +553,44 @@ The archive side is four reads and three writes, all in `Archive+Digest.swift`:
 
 ### The Local Notification Banner
 
-Optional (Settings ▸ Digest ▸ "Also show a notification banner", default **on** for lock/sleep, off for focus — a Focus usually means "do not ping me"). Posted only when the user has not already opened the popover within 30 s of return:
+Optional, and **off** until the user turns it on in Settings ▸ Digest.
+
+Off is the default because of the permission rule, not timidity: Backglance requests Notifications authorization only from an explicit user action ([PERMISSIONS_PRIVACY.md](./PERMISSIONS_PRIVACY.md#notifications-backglances-own-local-notifications)), and a banner that defaulted on would have to ask on its own behalf the first time somebody came back to their Mac. The digest's default presentation is the popover, which needs no permission at all.
+
+The decision and the posting are two types, so the never-nagging rules are testable without `UserNotifications` anywhere near them:
+
+`DigestBannerPolicy` (`BackglanceCore`) is a pure function of the three settings, the session's reason, when the user came back, when they last opened the popover, and one authorization flag. Every gate can say no and none says yes on its own:
+
+| Gate | Refuses when |
+|---|---|
+| `digest.banner.enabled` | the user has not switched banners on (rule: nothing unasked-for) |
+| authorization | `UNUserNotificationCenter` would not deliver — denied *and* never-asked collapse here, since both mean nothing appears |
+| `digest.banner.focus` | the session was a Focus and Focus banners are off — a Focus usually means "do not ping me" |
+| the grace window | the popover was opened between the session's end and 30 s after it (rule 2) |
+
+The window is anchored to the session's end rather than to "now minus 30 s", so a digest that takes a moment to build cannot slip past a popover the user opened the instant they sat down. An open from *before* they left does not count — that was not about this digest.
+
+`DigestBannerPoster` (app target) holds the only `UserNotifications` import and does no deciding. It reads authorization and never requests it; `LocalNotificationAuthorizer.requestIfNeeded()` is the only thing that asks, and only the Settings toggle calls it. A previous denial is respected rather than re-asked — macOS shows nothing on a second call, so a button that silently did nothing would be worse than the link Settings offers instead.
 
 ```swift
 // Backglance/Scenes/Digest/DigestBannerPoster.swift
-import UserNotifications
-import os
+let content = UNMutableNotificationContent()
+content.title = String(localized: "What did I miss")
+content.body = Self.body(itemCount: digest.itemCount, appCount: appCount, reason: reason)
+content.sound = policy.playsSound ? .default : nil          // rule 4: silent unless asked
+content.userInfo = [Self.digestIDKey: digestID]
 
-struct DigestBannerPoster {
-    private let log = Logger(subsystem: "app.backglance.Backglance", category: "digest")
-
-    func post(digest: Digest, appCount: Int, duration: TimeInterval, reason: AwayReason) async {
-        let center = UNUserNotificationCenter.current()
-        do {
-            // provisional: delivered quietly, no authorization prompt on first run.
-            let granted = try await center.requestAuthorization(options: [.alert, .provisional])
-            guard granted else {
-                log.notice("Digest banner skipped: notification authorization denied")
-                return
-            }
-            let content = UNMutableNotificationContent()
-            content.title = "What did I miss"
-            let minutes = Int(duration / 60)
-            content.body = "You missed \(digest.itemCount) notification\(digest.itemCount == 1 ? "" : "s") "
-                + "from \(appCount) app\(appCount == 1 ? "" : "s") while \(reasonLabel(reason)) (\(minutes) min)"
-            content.sound = nil                      // never a sound by default
-            content.userInfo = ["digestID": digest.id ?? 0]
-            let request = UNNotificationRequest(identifier: "digest-\(digest.id ?? 0)",
-                                                content: content, trigger: nil)   // deliver now
-            try await center.add(request)
-            log.info("Digest banner posted for digest \(digest.id ?? 0)")
-        } catch {
-            // Failure to post a banner must never surface as an error dialog:
-            // the digest still shows in the popover, which is the primary path.
-            log.error("Digest banner failed: \(error.localizedDescription, privacy: .public)")
-        }
-    }
-
-    private func reasonLabel(_ r: AwayReason) -> String {
-        switch r {
-        case .locked: return "locked"
-        case .asleep: return "asleep"
-        case .focus: return "in a Focus"
-        case .presenting: return "presenting"
-        case .manual: return "away"
-        }
-    }
-}
+// Deterministic identifier: a second post for one digest replaces the first banner
+// rather than adding one, so rule 1 holds even if a caller races.
+let request = UNNotificationRequest(identifier: "digest-\(digestID)", content: content, trigger: nil)
+try await center.add(request)
 ```
 
-Yes, a notification-history app posting a notification is mildly ironic; that is exactly why it is one per session, silent, and one toggle from gone. Tapping it opens the popover on the digest (via `UNUserNotificationCenterDelegate` → `StatusItemController`).
+> 🔒 **Privacy:** nothing from a captured notification reaches that content. The title is fixed and the body is built from two counts and one `AwayReason` — never a title, a sender or a body. A digest banner that quoted what you missed would put another app's notification text on screen, and into the system's own store on the way there.
+
+Tapping the banner opens the popover, which is already showing that digest — `DigestPresenter` surfaces whatever is pending, and the banner exists only because something is. One path to the digest rather than two that could disagree.
+
+Yes, a notification-history app posting a notification is mildly ironic; that is exactly why it is off until asked for, one per session, silent, and one toggle from gone.
 
 ### Settings
 
@@ -611,7 +600,7 @@ Settings ▸ Digest, stored in `UserDefaults` (suite `app.backglance.Backglance`
 |---|---|---|
 | Show digest | `digest.threshold` = `after5min` / `after15min` / `always` / `never` | `after5min` |
 | Don't show for these reasons | `digest.disabledReasons` (array of `AwayReason` raw values, read by `DigestPolicy`) | empty |
-| Also show a notification banner | `digest.banner.enabled` | on |
+| Also show a notification banner | `digest.banner.enabled` | **off** — turning it on is what requests Notifications authorization |
 | Banner for Focus sessions | `digest.banner.focus` | off |
 | Banner sound | `digest.banner.sound` | off |
 
@@ -622,9 +611,9 @@ Settings ▸ Status additionally shows the live detection lines: "Lock/unlock: a
 The explicit contract, testable line by line:
 
 1. **At most one banner per away session.** Enforced by the deterministic request identifier `digest-<id>` plus the one-digest-per-session constraint.
-2. **No banner if the user opened the popover within 30 s of return.** They're already looking; `StatusItemController` reports the last-open timestamp and the poster checks it.
+2. **No banner if the user opened the popover within 30 s of return.** They're already looking; `StatusItemController.lastOpenedAt` reports it and `DigestBannerPolicy` checks it.
 3. **No repeats.** A dismissed digest (`dismissed_at` set) is never shown again — not on relaunch, not on next popover open. An unshown digest appears in the popover only until it is shown once and dismissed.
-4. **No sound by default.** `content.sound = nil`; opt-in toggle exists for people who want it.
+4. **No sound by default.** `content.sound = nil` unless `digest.banner.sound` is on; the sound option is requested up front only so the toggle has something to turn on.
 5. **No badge.** The digest never contributes to the menu bar unread badge beyond the notifications it contains (which count via `is_read` as usual, [TIMELINE.md](./TIMELINE.md)).
 6. **Below-threshold and zero-item sessions are silent.** Recorded, never presented.
 7. **"never" means never.** With `digest.threshold = never`, nothing is built or posted; away sessions are still tracked for `is:missed`.

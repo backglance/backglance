@@ -29,3 +29,21 @@ public enum AwayReason: String, Codable, Hashable, Sendable, CaseIterable {
     /// The user said so. Exact by definition.
     case manual
 }
+
+public extension AwayReason {
+    /// "while locked" — the reason as a sentence fragment, for the digest's subheadline
+    /// and the banner's body.
+    ///
+    /// User-facing text in `BackglanceCore` is unusual, and it is here because both the
+    /// card (`BackglanceUI`) and the banner (the app target) say it. Two copies of five
+    /// strings is two places for a translation to drift.
+    var whileLabel: String {
+        switch self {
+        case .locked: String(localized: "while locked")
+        case .asleep: String(localized: "while asleep")
+        case .focus: String(localized: "while in a Focus")
+        case .presenting: String(localized: "while presenting")
+        case .manual: String(localized: "while away")
+        }
+    }
+}

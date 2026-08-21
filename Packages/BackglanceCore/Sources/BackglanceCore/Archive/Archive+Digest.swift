@@ -79,6 +79,29 @@ public extension Archive {
         }
     }
 
+    /// How many distinct apps the digest's shown rows come from.
+    ///
+    /// A `COUNT(DISTINCT)` rather than decoding fifty rows to count two apps: the banner
+    /// needs the number and nothing else, and it runs on a path that has just finished
+    /// writing.
+    func digestAppCount(digestID: Int64) throws -> Int {
+        do {
+            return try pool.read { db in
+                try Int.fetchOne(
+                    db,
+                    sql: """
+                    SELECT COUNT(DISTINCT n.app_id) FROM notifications n
+                    JOIN digest_items i ON i.notification_id = n.id
+                    WHERE i.digest_id = ? AND n.is_deleted = 0
+                    """,
+                    arguments: [digestID]
+                ) ?? 0
+            }
+        } catch {
+            throw ArchiveError.observationFailed(ArchiveError.detail(from: error))
+        }
+    }
+
     /// The delivery timestamps of everything the session claimed, oldest first.
     ///
     /// A multi-day session's header summarises per day ("Fri 34 · Sat 12 · Sun 41"), and

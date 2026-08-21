@@ -92,8 +92,21 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         var openSettings: () -> Void
     }
 
+    /// When the popover was last opened, or `nil` if it never has been this launch.
+    /// Read by the digest banner, which does not post about something already on screen.
+    private(set) var lastOpenedAt: Date?
+
     /// Shows the popover, or hides it if it is already up. Bound to the status
     /// item's left click and to ⌃⌥N.
+    /// Opens the popover showing the digest, for a banner tap. A no-op if it is already
+    /// open — the digest is what it would be showing anyway.
+    func openOnDigest() {
+        guard !popover.isShown else {
+            return
+        }
+        togglePopover()
+    }
+
     func togglePopover() {
         if popover.isShown {
             popover.performClose(nil)
@@ -112,6 +125,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         // Snapshot before showing: the divider the user sees has to reflect the
         // moment before they clicked, not after.
         store.surfaceWillOpen()
+        // What the digest banner checks against: someone who opened the popover on
+        // returning is already looking, and does not also need to be told
+        // (docs/features/MISSED_DIGEST.md#never-nagging-rules, rule 2).
+        lastOpenedAt = Date()
         // Same moment, same reason: a digest built while the popover was closed has to
         // be on screen for this open, and this is the last instant it can be looked up
         // without the lookup landing inside the first-paint budget's own interval.
@@ -138,6 +155,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
+
     /// `nil` when the app has no archive, which is the same condition that leaves the
     /// timeline empty — there is nothing to look a digest up in.
     private let digests: DigestPresenter?

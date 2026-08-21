@@ -116,7 +116,7 @@ public final class DigestViewModel {
     public var subheadline: String {
         var parts: [String] = []
         if let session {
-            parts.append(Self.whileLabel(for: session.reason))
+            parts.append(session.reason.whileLabel)
         }
         if let duration = durationText {
             parts.append(duration)
@@ -208,17 +208,6 @@ public final class DigestViewModel {
     }
 
     // MARK: Internal
-
-    /// "while locked" — the reason as the subheadline says it.
-    static func whileLabel(for reason: AwayReason) -> String {
-        switch reason {
-        case .locked: String(localized: "while locked")
-        case .asleep: String(localized: "while asleep")
-        case .focus: String(localized: "while in a Focus")
-        case .presenting: String(localized: "while presenting")
-        case .manual: String(localized: "while away")
-        }
-    }
 
     /// The glyph per reason — docs/features/MISSED_DIGEST.md#digestheader lists them as
     /// emoji (🔒 / 😴 / 🌙 / 📽 / ✋); these are the SF Symbols that say the same thing

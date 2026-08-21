@@ -3,6 +3,7 @@ import BackglanceCapture
 import BackglanceCore
 import BackglanceUI
 import os
+import UserNotifications
 
 /// Application delegate for the Backglance agent app.
 ///
@@ -19,7 +20,7 @@ import os
 /// `CaptureEngine.start()` writes the capture fingerprint on its very first bootstrap and
 /// would otherwise write into a schema that does not exist yet.
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     // MARK: Internal
 
     func applicationDidFinishLaunching(_: Notification) {
@@ -32,6 +33,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startCapture()
         startAwayTracking()
         startInterface()
+        // Setting a delegate neither requests authorization nor shows anything; it is
+        // only how a tap on a banner we may never post finds its way back here.
+        UNUserNotificationCenter.current().delegate = self
     }
 
     func applicationWillTerminate(_: Notification) {
@@ -55,6 +59,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// macOS 14 warns on delegates that do not answer this; Backglance restores no state.
     func applicationSupportsSecureRestorableState(_: NSApplication) -> Bool {
         true
+    }
+
+    /// A tap on the digest banner opens the popover, which is already showing that digest:
+    /// `DigestPresenter` surfaces whatever is pending, and the banner exists only because
+    /// something is. So this opens the surface rather than routing an identifier through
+    /// it — one path to the digest, not two that could disagree.
+    func userNotificationCenter(
+        _: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        defer { completionHandler() }
+        guard response.notification.request.content.userInfo[DigestBannerPoster.digestIDKey] != nil else {
+            return
+        }
+        statusItem?.openOnDigest()
+    }
+
+    /// Backglance is an agent app and is almost never frontmost, but it *is* frontmost
+    /// while its own popover has key — exactly when a digest banner can arrive. Without
+    /// this the system would swallow it, and the user would have switched banners on for
+    /// nothing.
+    func userNotificationCenter(
+        _: UNUserNotificationCenter,
+        willPresent _: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .list])
     }
 
     // MARK: Private
@@ -112,7 +144,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// write failure costs one session's worth of granularity and nothing else, so it is
     /// logged and dropped rather than retried: the notifications it would have grouped
     /// are already archived, and the next session is seconds away.
-    nonisolated private static func record(_ ended: AwaySessionTracker.EndedSession, in archive: Archive) {
+    @discardableResult
+    nonisolated private static func record(
+        _ ended: AwaySessionTracker.EndedSession,
+        in archive: Archive
+    ) -> (digest: Digest, session: AwaySession)? {
         let stored: AwaySession
         do {
             stored = try archive.insertAwaySession(ended.session)
@@ -124,9 +160,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             let detail = (error as? ArchiveError)?.logDescription ?? ArchiveError.detail(from: error)
             Log.digest.error("away session not recorded: \(detail)")
-            return
+            return nil
         }
-        build(for: stored, causes: ended, in: archive)
+        return build(for: stored, causes: ended, in: archive).map { (digest: $0, session: stored) }
     }
 
     /// Builds the digest for a session that has just been recorded, if the user's
@@ -145,13 +181,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         for stored: AwaySession,
         causes ended: AwaySessionTracker.EndedSession,
         in archive: Archive
-    ) {
+    ) -> Digest? {
         guard DigestPolicy(defaults: .standard).allows(ended) else {
             Log.digest.info("Away session \(stored.id ?? 0) earns no digest under the current settings")
-            return
+            return nil
         }
         do {
-            try DigestEngine(archive: archive).build(for: stored)
+            return try DigestEngine(archive: archive).build(for: stored)
         } catch let error as DigestEngine.DigestError {
             // `alreadyBuilt` is ordinary, not exceptional: wake and unlock race often
             // enough that a second session-end event is a normal Tuesday.
@@ -160,6 +196,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let detail = (error as? ArchiveError)?.logDescription ?? ArchiveError.detail(from: error)
             Log.digest.error("digest not built: \(detail)")
         }
+        return nil
+    }
+
+    /// Offers the freshly built digest to the banner.
+    ///
+    /// On the main actor because the one thing it needs beyond the archive — when the
+    /// popover was last opened — lives on the status item. `DigestBannerPoster` refuses on
+    /// its own if banners are off, unauthorized, or the user has already looked; nothing
+    /// here second-guesses that, so there is one place where the answer is decided.
+    private func postDigestBanner(_ digest: Digest, for session: AwaySession, in archive: Archive) async {
+        guard let digestID = digest.id, let endedAt = session.endedAt else {
+            return
+        }
+        let appCount = (try? archive.digestAppCount(digestID: digestID)) ?? 0
+        await DigestBannerPoster().post(
+            digest: digest,
+            appCount: appCount,
+            reason: session.reason,
+            sessionEndedAt: endedAt.date,
+            popoverLastOpenedAt: statusItem?.lastOpenedAt
+        )
     }
 
     /// Opens the archive, builds the capture engine on top of it, and starts watching.
@@ -236,8 +293,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // tracker's executor instead of hopping to the main actor. A synchronous SQLite
         // write on the main thread would block behind whatever write lock capture is
         // holding, and a 500-record batch is not a wait the menu bar should take.
-        let tracker = AwaySessionTracker(minDuration: DigestThreshold.minDuration()) { [archive] ended in
-            Self.record(ended, in: archive)
+        let tracker = AwaySessionTracker(minDuration: DigestThreshold.minDuration()) { [weak self, archive] ended in
+            guard let built = Self.record(ended, in: archive) else {
+                return
+            }
+            // The banner is the only part of this that has to be on the main actor, and it
+            // is the only part that can wait: the digest is already written and the popover
+            // will show it whether or not this hop ever completes.
+            Task { @MainActor in
+                await self?.postDigestBanner(built.digest, for: built.session, in: archive)
+            }
         }
         let bridge = AwayEventBridge(tracker: tracker)
         bridge.start()

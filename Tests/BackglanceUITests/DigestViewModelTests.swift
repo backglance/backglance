@@ -116,7 +116,7 @@ final class DigestViewModelTests: XCTestCase {
 
         let vm = try makeViewModel(digest: digest, session: stored)
 
-        let expectedWhile = DigestViewModel.whileLabel(for: .locked)
+        let expectedWhile = AwayReason.locked.whileLabel
         let expectedDuration = Duration.seconds(duration).formatted(.units(allowed: [.minutes], width: .abbreviated))
         let parts = vm.subheadline.components(separatedBy: " · ")
 
