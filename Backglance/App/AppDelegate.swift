@@ -72,6 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// holding its OS observers, and both die with the app.
     private var awayTracker: AwaySessionTracker?
     private var awayBridge: AwayEventBridge?
+    private var focusWatcher: FocusAssertionWatcher?
 
     /// The interface, retained for the same reason: a status item whose
     /// controller is deallocated stays in the menu bar and stops responding.
@@ -198,8 +199,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let bridge = AwayEventBridge(tracker: tracker)
         bridge.start()
 
+        // ⚠️ Focus has no public API, so this reads a private file and may simply not
+        // work. It feeds the same tracker directly rather than through the bridge: the
+        // watcher already delivers on its own queue, and routing a background event
+        // through the main actor to reach an actor would be a hop for nothing.
+        let focus = FocusAssertionWatcher { status in
+            switch status {
+            case .active:
+                Task { await tracker.handle(.focusChanged(active: true)) }
+
+            case .inactive:
+                Task { await tracker.handle(.focusChanged(active: false)) }
+
+            case .unavailable:
+                // Clearing matters as much as the watcher stopping. Focus detection can
+                // fail *after* reporting `.active` — the file is replaced with a shape we
+                // do not know while a Focus is on — and a cause that never clears is a
+                // session that never ends. Sessions keep forming from lock and sleep.
+                Task { await tracker.handle(.focusChanged(active: false)) }
+            }
+        }
+        focus.start()
+
         awayTracker = tracker
         awayBridge = bridge
+        focusWatcher = focus
     }
 
     /// Builds the timeline and everything that shows it.

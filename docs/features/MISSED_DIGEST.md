@@ -298,85 +298,60 @@ anchor reads.
 
 ```swift
 // Packages/BackglanceCore/Sources/BackglanceCore/Away/FocusAssertionWatcher.swift
-import Foundation
-import os
-
 /// Watches ~/Library/DoNotDisturb/DB/Assertions.json for active Focus assertions.
 /// ⚠️ Private file, no API. Requires FDA (which Backglance has for capture anyway).
-/// On any read/parse failure the watcher reports `.unavailable` and stays quiet.
 public final class FocusAssertionWatcher: @unchecked Sendable {
-    public enum Status: Sendable, Equatable { case active, inactive, unavailable(String) }
-
-    private let url: URL
-    private var source: DispatchSourceFileSystemObject?
-    private var fd: CInt = -1
-    private let queue = DispatchQueue(label: "app.backglance.Backglance.focuswatch")
-    private let onChange: @Sendable (Status) -> Void
-    private let log = Logger(subsystem: "app.backglance.Backglance", category: "focus")
-
-    public init(url: URL = FileManager.default.homeDirectoryForCurrentUser
-                    .appendingPathComponent("Library/DoNotDisturb/DB/Assertions.json"),
-                onChange: @escaping @Sendable (Status) -> Void) {
-        self.url = url
-        self.onChange = onChange
+    public enum Status: Sendable, Equatable {
+        case active, inactive
+        case unavailable(Unavailable)
     }
 
-    public func start() {
-        queue.async { [self] in
-            fd = open(url.path, O_EVTONLY)
-            guard fd >= 0 else {
-                // ENOENT: no Focus ever configured, or the format moved. Both mean "can't watch".
-                onChange(.unavailable("Assertions.json not readable (errno \(errno))"))
-                return
-            }
-            let src = DispatchSource.makeFileSystemObjectSource(
-                fileDescriptor: fd, eventMask: [.write, .delete, .rename], queue: queue)
-            src.setEventHandler { [weak self] in
-                guard let self else { return }
-                if self.source?.data.contains(.delete) == true || self.source?.data.contains(.rename) == true {
-                    // The file is replaced atomically on every change; reopen and re-arm.
-                    self.stop(); self.start()
-                }
-                self.onChange(self.readStatus())
-            }
-            src.setCancelHandler { [fd] in close(fd) }
-            source = src
-            src.resume()
-            onChange(readStatus())   // initial state
-        }
+    /// A fixed vocabulary, not a free string: these render into the file log and into a
+    /// Settings row, and an `Error`'s description would put the user's home directory in
+    /// both. `logDescription` and `userMessage` follow the `DegradedReason` pattern.
+    public enum Unavailable: Sendable, Equatable {
+        case notReadable(code: Int32)   // errno; ENOENT is the ordinary "no Focus ever set up"
+        case readFailed                 // opened, but the bytes are not JSON
+        case tooLarge(bytes: Int)       // past `sizeLimit`, so not the format we know
+        case unexpectedRoot             // JSON, but the root is not an object
+        case missingDataArray           // no top-level "data" array of objects
+
+        /// Whether this is a shape nobody has seen, rather than a file that is absent or
+        /// was caught mid-write. Only structural reasons stop the watcher.
+        public var isStructural: Bool
     }
 
-    public func stop() {
-        source?.cancel(); source = nil; fd = -1
-    }
+    public static let defaultURL: URL
+    public static let sizeLimit = 4 * 1_024 * 1_024
 
-    /// Tolerant parse: we look for a top-level "data" array whose entries contain a
-    /// non-empty "storeAssertionRecords" array — the shape observed on macOS 13–26.
-    /// Anything else → .unavailable, never a crash, never a guess.
-    func readStatus() -> Status {
-        do {
-            let data = try Data(contentsOf: url)
-            guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                return .unavailable("Unexpected root shape")
-            }
-            guard let dataArray = root["data"] as? [[String: Any]] else {
-                return .unavailable("Missing 'data' array — format may have changed")
-            }
-            for entry in dataArray {
-                if let records = entry["storeAssertionRecords"] as? [[String: Any]], !records.isEmpty {
-                    return .active
-                }
-            }
-            return .inactive
-        } catch {
-            log.notice("Focus assertions unreadable: \(error.localizedDescription, privacy: .public)")
-            return .unavailable(error.localizedDescription)
-        }
-    }
+    public init(url: URL = Self.defaultURL, onChange: @escaping @Sendable (Status) -> Void)
+    public func start()   // idempotent; reports the initial state before any change
+    public func stop()
+
+    /// Tolerant parse: a top-level `data` array whose entries carry a non-empty
+    /// `storeAssertionRecords` array — the shape observed on macOS 13–26. No
+    /// `NSKeyedUnarchiver`, no assumptions about key order, no crash on any input.
+    func readStatus() -> Status
 }
 ```
 
-Wiring: `.active`/`.inactive` become `tracker.handle(.focusChanged(active:))`; `.unavailable` flips the Settings ▸ Status line to "Focus detection: unavailable" and stops feeding focus events. The store's `presented = 0` flag remains as the passive fallback: even with the watcher dead, suppressed notifications are still selected into the next lock/sleep digest by the `presented = 0` clause below.
+Three behaviours matter more than the parse itself:
+
+- **Only a format change latches it off.** `unexpectedRoot`, `missingDataArray` and
+  `tooLarge` cancel the source for the session — continuing to parse a shape nobody has
+  seen *is* guessing. But bytes that are not JSON at all are a torn read of an atomic
+  replace far more often than a format change, so `readFailed` leaves the watcher armed
+  and the next event re-reads. A missing file is not a failure at all: a Mac on which no
+  Focus was ever configured has none.
+- **Settings writes this file by replacing it.** That leaves a `DispatchSource` watching a
+  descriptor for an unlinked inode, so `.delete`/`.rename` re-arms on the new file rather
+  than reporting on the old one.
+- **`.unavailable` must clear the focus cause, not just stop feeding.** Detection can fail
+  *after* reporting `.active` — the file is replaced with an unknown shape while a Focus
+  is on — and a cause that never clears is a session that never ends. `AppDelegate` sends
+  `.focusChanged(active: false)` on every `.unavailable`.
+
+Wiring: `.active`/`.inactive` become `tracker.handle(.focusChanged(active:))`; `.unavailable` additionally flips the Settings ▸ Status line to `Unavailable.userMessage` and stops feeding focus events. The store's `presented = 0` flag remains as the passive fallback: even with the watcher dead, suppressed notifications are still selected into the next lock/sleep digest by the `presented = 0` clause below.
 
 ### Presenting and Screen-Share Detection
 
