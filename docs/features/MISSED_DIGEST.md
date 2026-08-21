@@ -111,7 +111,14 @@ Conventions:
 
 - A session with overlapping causes is **one row**; `reason` stores the primary reason (first cause chronologically), and the full set travels to the digest build on `AwaySessionTracker.EndedSession.reasons` rather than to a column. The column keeps the schema simple for v1.0; the set is not persisted, so anything that needs it must read it before the session is written.
 - `digests.shown_at IS NULL` means "built but the user hasn't seen it yet"; `dismissed_at` set means it will never be shown again. One digest per session is enforced by `DigestEngine` checking for an existing row (`SELECT id FROM digests WHERE away_session_id = ?`) before building.
-- `notifications.away_session_id` is set by the digest build, which also makes `is:missed` in search work ([SEARCH.md](./SEARCH.md)).
+- `notifications.away_session_id` is set when the session is **recorded**, by
+  `Archive.linkNotifications(to:)`, not when a digest is built. A session under the digest
+  threshold never gets a digest, and the stated reason for keeping those rows is that they
+  are still worth searching — linking only at build time would leave exactly those sessions
+  unlinked and quietly make that false. It claims only rows with `away_session_id IS NULL`
+  and `is_deleted = 0`, so a re-run never moves a notification between sessions. This is
+  what makes `is:missed` in search work ([SEARCH.md](./SEARCH.md)); the digest build reads
+  the column rather than filling it.
 - `ON DELETE CASCADE` on `digest_items.notification_id` means retention pruning shrinks old digests naturally; `item_count` keeps the original headline number.
 
 ## The Away-Session Model

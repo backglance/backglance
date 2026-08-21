@@ -52,6 +52,63 @@ public extension Archive {
         }
     }
 
+    /// Stamps the notifications delivered during a session with its id.
+    ///
+    /// This is what makes `is:missed` answer for a session, and what the timeline uses to
+    /// open "everything from while you were away". It runs when the session is
+    /// **recorded**, not when a digest is built: sessions under the digest threshold
+    /// produce no digest at all, and the reason the archive keeps them anyway is that
+    /// they are still worth searching (docs/features/MISSED_DIGEST.md#session-merging-and-thresholds).
+    /// Linking only at build time would leave exactly those sessions unlinked and quietly
+    /// make that promise false.
+    ///
+    /// Two conditions keep it from claiming what is not its own:
+    ///
+    /// - `away_session_id IS NULL` — a notification belongs to the first session that
+    ///   claimed it. Sessions the tracker produces cannot overlap, but a re-run over a
+    ///   window that was already linked must not move rows between sessions.
+    /// - `is_deleted = 0` — a row the user deleted is not part of what they missed.
+    ///
+    /// The window is exact. The ± 2 min skew allowance belongs to the digest's
+    /// `presented = 0` clause, which is a *second* selection signal rather than a claim
+    /// of membership in the session.
+    ///
+    /// - Returns: how many notifications were linked.
+    @discardableResult
+    func linkNotifications(toAwaySession sessionID: Int64, from start: Date, through end: Date) throws -> Int {
+        do {
+            return try pool.write { db in
+                try ArchivedNotification
+                    .filter(Column("away_session_id") == nil)
+                    .filter(Column("is_deleted") == false)
+                    .filter(Column("delivered_at") >= UnixDate(start))
+                    .filter(Column("delivered_at") <= UnixDate(end))
+                    .updateAll(db, Column("away_session_id").set(to: sessionID))
+            }
+        } catch {
+            throw ArchiveError.writeFailed(
+                table: ArchivedNotification.databaseTableName,
+                underlying: ArchiveError.detail(from: error)
+            )
+        }
+    }
+
+    /// Links the notifications delivered during a session that has been persisted.
+    ///
+    /// A no-op for a session with no `id` (never inserted) or no `endedAt` (still open) —
+    /// neither is a window that can be claimed.
+    @discardableResult
+    func linkNotifications(to session: AwaySession) throws -> Int {
+        guard let sessionID = session.id, let endedAt = session.endedAt else {
+            return 0
+        }
+        return try linkNotifications(
+            toAwaySession: sessionID,
+            from: session.startedAt.date,
+            through: endedAt.date
+        )
+    }
+
     /// Away sessions that finished inside a window, newest first.
     ///
     /// The digest build's entry point, and the Settings ▸ Status "recent sessions" list.

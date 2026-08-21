@@ -113,7 +113,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// are already archived, and the next session is seconds away.
     nonisolated private static func record(_ ended: AwaySessionTracker.EndedSession, in archive: Archive) {
         do {
-            try archive.insertAwaySession(ended.session)
+            let stored = try archive.insertAwaySession(ended.session)
+            // Linking here, not at digest-build time. A session under the threshold never
+            // gets a digest, and the whole reason those rows are kept is that they are
+            // still worth searching — so `is:missed` has to be able to find them.
+            let linked = try archive.linkNotifications(to: stored)
+            Log.digest.info("Away session recorded, \(linked) notification(s) linked")
         } catch {
             let detail = (error as? ArchiveError)?.logDescription ?? ArchiveError.detail(from: error)
             Log.digest.error("away session not recorded: \(detail)")
