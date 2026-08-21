@@ -109,7 +109,7 @@ CREATE TABLE digest_items (
 
 Conventions:
 
-- A session with overlapping causes is **one row**; `reason` stores the primary reason (first cause chronologically) and the full set is recoverable from the tracker log line. The in-memory model carries `Set<AwayReason>`; the column keeps the schema simple for v1.0.
+- A session with overlapping causes is **one row**; `reason` stores the primary reason (first cause chronologically), and the full set travels to the digest build on `AwaySessionTracker.EndedSession.reasons` rather than to a column. The column keeps the schema simple for v1.0; the set is not persisted, so anything that needs it must read it before the session is written.
 - `digests.shown_at IS NULL` means "built but the user hasn't seen it yet"; `dismissed_at` set means it will never be shown again. One digest per session is enforced by `DigestEngine` checking for an existing row (`SELECT id FROM digests WHERE away_session_id = ?`) before building.
 - `notifications.away_session_id` is set by the digest build, which also makes `is:missed` in search work ([SEARCH.md](./SEARCH.md)).
 - `ON DELETE CASCADE` on `digest_items.notification_id` means retention pruning shrinks old digests naturally; `item_count` keeps the original headline number.
@@ -117,18 +117,32 @@ Conventions:
 ## The Away-Session Model
 
 ```swift
-// Packages/BackglanceCore/Sources/BackglanceCore/Away/AwaySession.swift
-public enum AwayReason: String, Codable, Sendable, CaseIterable {
+// Packages/BackglanceCore/Sources/BackglanceCore/Away/AwayReason.swift
+public enum AwayReason: String, Codable, Hashable, Sendable, CaseIterable {
     case locked, asleep, focus, presenting, manual
 }
 
-public struct AwaySession: Codable, Sendable, Equatable, Identifiable {
+// Packages/BackglanceCore/Sources/BackglanceCore/Models/AwaySession.swift
+// The persisted row, and only what the column vocabulary can hold. `Reason` is a
+// typealias for `AwayReason`, so `session.reason` reads naturally at the call site
+// without the model owning a second copy of the vocabulary.
+public struct AwaySession: Codable, FetchableRecord, MutablePersistableRecord, ... {
     public var id: Int64?
-    public var startedAt: Date
-    public var endedAt: Date?
-    public var reasons: Set<AwayReason>       // persisted as the primary reason string
-    public var isPartial: Bool                // app launched mid-session; start = app launch
-    public var isReconstructed: Bool          // rebuilt from store timestamps after the fact
+    public var startedAt: UnixDate
+    public var endedAt: UnixDate?
+    public var reason: Reason                 // the primary cause — see below
+}
+
+// Packages/BackglanceCore/Sources/BackglanceCore/Away/AwaySessionTracker.swift
+// What the tracker hands back when a session commits. The set and the two flags have
+// no columns behind them: they exist for as long as the digest build needs them.
+public struct EndedSession: Sendable, Equatable {
+    public let session: AwaySession           // `id` is nil; the caller inserts it
+    public let reasons: Set<AwayReason>       // every cause seen during the session
+    public let isPartial: Bool                // app launched mid-session; start = app launch
+    public let isReconstructed: Bool          // rebuilt from store timestamps after the fact
+    public let meetsDigestThreshold: Bool
+    public var duration: TimeInterval
 }
 ```
 
@@ -162,9 +176,6 @@ The tracker is an actor consuming a single event enum. All OS callbacks are adap
 
 ```swift
 // Packages/BackglanceCore/Sources/BackglanceCore/Away/AwaySessionTracker.swift
-import Foundation
-import os
-
 public actor AwaySessionTracker {
     public enum Event: Sendable, Equatable {
         case screenLocked, screenUnlocked
@@ -172,142 +183,114 @@ public actor AwaySessionTracker {
         case focusChanged(active: Bool)
         case presentingChanged(active: Bool)
         case manualAway(active: Bool)
-        case appLaunched(coldStart: Bool)     // sessions started here are flagged partial
     }
 
-    public struct EndedSession: Sendable, Equatable {
-        public let session: AwaySession
-        public let meetsDigestThreshold: Bool
+    /// One session in progress. `primary` is the first cause chronologically — what the
+    /// single `away_sessions.reason` column keeps. `active` is what is holding the
+    /// session open right now; `seen` is everything it has ever had.
+    private struct Span: Equatable {
+        var primary: AwayReason
+        var active: Set<AwayReason>
+        var seen: Set<AwayReason>
+        var since: Date
+        var isPartial: Bool
     }
 
     private enum State: Equatable {
         case idle
-        case away(reasons: Set<AwayReason>, since: Date, partial: Bool)
-        case ending(reasons: Set<AwayReason>, since: Date, partial: Bool, candidateEnd: Date)
+        case away(Span)
+        case ending(Span, candidateEnd: Date)   // waiting out the merge gap
     }
 
-    private var state: State = .idle
-    private let clock: any AwayClock                 // ContinuousClock-backed in prod, manual in tests
-    private let minDuration: () -> TimeInterval      // reads the setting, default 300
-    private let mergeGap: TimeInterval = 60
-    private var mergeTask: Task<Void, Never>?
-    private let onEnd: @Sendable (EndedSession) async -> Void
-    private let log = Logger(subsystem: "app.backglance.Backglance", category: "away")
+    public static let defaultMinDuration: TimeInterval = 300
+    public static let mergeGap: TimeInterval = 60
 
-    public init(clock: any AwayClock,
-                minDuration: @escaping () -> TimeInterval = { 300 },
-                onEnd: @escaping @Sendable (EndedSession) async -> Void) {
-        self.clock = clock
-        self.minDuration = minDuration
-        self.onEnd = onEnd
-    }
+    public init(clock: any AwayClock = SystemAwayClock(),
+                minDuration: @escaping @Sendable () -> TimeInterval = { Self.defaultMinDuration },
+                onEnd: @escaping @Sendable (EndedSession) async -> Void)
 
-    public func handle(_ event: Event) async {
-        let now = clock.now
-        switch event {
-        case .screenLocked:            await activate(.locked, at: now)
-        case .screenUnlocked:          await deactivate(.locked, at: now)
-        case .willSleep:               await activate(.asleep, at: now)
-        case .didWake:                 await deactivate(.asleep, at: now)
-        case .focusChanged(true):      await activate(.focus, at: now)
-        case .focusChanged(false):     await deactivate(.focus, at: now)
-        case .presentingChanged(true): await activate(.presenting, at: now)
-        case .presentingChanged(false):await deactivate(.presenting, at: now)
-        case .manualAway(true):        await activate(.manual, at: now)
-        case .manualAway(false):       await deactivate(.manual, at: now)
-        case .appLaunched:             break   // reconstruction handled by DigestEngine at launch
-        }
-    }
+    public func handle(_ event: Event)
 
-    private func activate(_ reason: AwayReason, at now: Date) async {
-        mergeTask?.cancel(); mergeTask = nil
-        switch state {
-        case .idle:
-            state = .away(reasons: [reason], since: now, partial: false)
-            log.info("Away session started, reason \(reason.rawValue, privacy: .public)")
-        case .away(var reasons, let since, let partial):
-            reasons.insert(reason)
-            state = .away(reasons: reasons, since: since, partial: partial)
-        case .ending(var reasons, let since, let partial, _):
-            // Re-activated within the merge gap: same session continues.
-            reasons.insert(reason)
-            state = .away(reasons: reasons, since: since, partial: partial)
-            log.debug("Merged: re-activated within gap")
-        }
-    }
+    /// Opens a flagged session for a Mac that was already away at launch. The real start
+    /// is unknowable, so it starts now rather than at a guessed time. No-op unless idle.
+    public func beginPartial(reason: AwayReason, at now: Date? = nil)
 
-    private func deactivate(_ reason: AwayReason, at now: Date) async {
-        guard case .away(var reasons, let since, let partial) = state else {
-            if case .ending = state { return }   // already winding down
-            return                                // deactivation while idle: stray event, ignore
-        }
-        reasons.remove(reason)
-        if reasons.isEmpty {
-            state = .ending(reasons: [reason], since: since, partial: partial, candidateEnd: now)
-            scheduleFinalize()
-        } else {
-            state = .away(reasons: reasons, since: since, partial: partial)
-        }
-    }
-
-    private func scheduleFinalize() {
-        mergeTask = Task { [mergeGap] in
-            try? await clock.sleep(for: mergeGap)
-            guard !Task.isCancelled else { return }
-            await self.finalize()
-        }
-    }
-
-    private func finalize() async {
-        guard case .ending(let reasons, let since, let partial, let end) = state else { return }
-        state = .idle
-        let session = AwaySession(id: nil, startedAt: since, endedAt: end,
-                                  reasons: reasons, isPartial: partial, isReconstructed: false)
-        let duration = end.timeIntervalSince(since)
-        let meets = duration >= minDuration()
-        log.info("Away session ended after \(Int(duration))s, digest eligible: \(meets)")
-        await onEnd(EndedSession(session: session, meetsDigestThreshold: meets))
-    }
-
-    /// Called by AppDelegate when launching while already locked/away (cold start mid-session).
-    public func beginPartial(reason: AwayReason, at now: Date) {
-        if case .idle = state {
-            state = .away(reasons: [reason], since: now, partial: true)
-        }
-    }
+    /// Commits an open session immediately, skipping the merge gap — for termination,
+    /// where waiting 60 s for a timer about to be torn down is not an option.
+    public func flush() async
 }
 
 public protocol AwayClock: Sendable {
     var now: Date { get }
-    func sleep(for seconds: TimeInterval) async throws
+    /// An absolute deadline, not a duration — see the note under `finalize` below.
+    func sleep(until deadline: Date) async throws
 }
 ```
 
-The `AppDelegate` glue subscribes the OS sources and forwards events:
+The three transitions are the whole of it:
+
+- **activate** cancels any pending merge timer, then: from `.idle` opens a `Span` whose
+  `primary` is this cause; from `.away` adds the cause to `active` and `seen`; from
+  `.ending` discards the candidate end and returns to `.away` — that is the merge.
+- **deactivate** removes the cause from `active`. While anything is left, the session
+  stays open. When `active` empties, the state becomes `.ending` and a timer starts.
+  Deactivation while `.idle` is a stray event (an unlock with no preceding lock, which is
+  what login looks like) and is ignored rather than turned into a zero-length session.
+- **finalize** runs when the merge gap elapses. It builds the `AwaySession` row from
+  `primary`, `since` and the candidate end, compares the duration against `minDuration()`
+  — read per session, so changing the setting needs no rebuild — and hands the result to
+  `onEnd`. A cancelled timer never reaches it, and a re-activation that beats the timer to
+  the actor leaves the state no longer `.ending`, so it returns without committing.
+
+> ⚠️ **Warning:** the merge deadline is computed **synchronously in `deactivate`**, as
+> `clearedAt + mergeGap`, and handed to the waiting task as an absolute `Date`. Computing
+> it inside that task instead — `sleep(for: mergeGap)` — starts the gap whenever the
+> executor happens to run the task, which is an unbounded delay: the gap silently
+> lengthens under load, and against an injected clock the deadline can land past every
+> advance a test intends to make, so the timer never fires at all. The duration form of
+> this API does not exist for that reason.
+
+The tracker writes nothing itself. `onEnd` is where the row is persisted, through
+`Archive.insertAwaySession(_:)` — including sessions under the threshold, which earn no
+digest but still make `is:missed` answer honestly.
+
+The `AwayEventBridge` in the app target subscribes the OS sources and forwards events. It
+lives there rather than in `BackglanceCore` because the tracker is deliberately AppKit-free
+— that split is what lets the state machine be driven from a scripted stream in tests:
 
 ```swift
-// Backglance/App/AppDelegate.swift (excerpt)
+// Backglance/App/AwayEventBridge.swift (excerpt)
 let dnc = DistributedNotificationCenter.default()
-dnc.addObserver(forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main) { _ in
-    Task { await tracker.handle(.screenLocked) }
-}
-dnc.addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main) { _ in
-    Task { await tracker.handle(.screenUnlocked) }
-}
+observe(dnc, .init("com.apple.screenIsLocked"), .screenLocked)
+observe(dnc, .init("com.apple.screenIsUnlocked"), .screenUnlocked)
+
 let wnc = NSWorkspace.shared.notificationCenter
-wnc.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { _ in
-    Task { await tracker.handle(.willSleep) }
-}
-wnc.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
-    Task { await tracker.handle(.didWake) }
-}
-wnc.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { _ in
-    Task { await tracker.handle(.willSleep) }    // display sleep counts as asleep
-}
-wnc.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { _ in
-    Task { await tracker.handle(.didWake) }
+observe(wnc, NSWorkspace.willSleepNotification, .willSleep)
+observe(wnc, NSWorkspace.didWakeNotification, .didWake)
+// Display-only sleep counts as asleep: notifications still arrive, nobody is looking.
+observe(wnc, NSWorkspace.screensDidSleepNotification, .willSleep)
+observe(wnc, NSWorkspace.screensDidWakeNotification, .didWake)
+
+// A Mac already locked at launch is away, and its lock notification fired before there
+// was anything to hear it. `CGSessionCopyCurrentDictionary` is the read-only way to ask;
+// an absent key means unlocked, so an unreadable dictionary means "assume not locked"
+// rather than opening a session the user never had.
+if Self.screenIsLocked() {
+    Task { await tracker.beginPartial(reason: .locked) }
 }
 ```
+
+`start()` is idempotent — it unregisters before it registers, so one lock never produces
+two events — and the tokens are torn down from a `nonisolated` helper that `deinit` can
+call without `MainActor.assumeIsolated`, which would trap if the last release landed off
+the main thread.
+
+Two ends need the same care as the start. `AppDelegate` calls `flush()` on termination, so
+quitting while locked commits the open session instead of losing it; and at launch it calls
+`Archive.closeOpenAwaySessions(endedAt:)`, because a session a crash left open would sit in
+the table looking like the user never came back — which is exactly the row the unread
+anchor reads.
+
 
 ### FocusAssertionWatcher
 

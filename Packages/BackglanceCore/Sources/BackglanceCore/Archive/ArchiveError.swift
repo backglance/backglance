@@ -34,6 +34,12 @@ public enum ArchiveError: Error, Sendable {
     /// Insert of the notification identified by `uuid` failed.
     case insertFailed(uuid: UUID, underlying: String)
 
+    /// A write to `table` failed.
+    ///
+    /// The general case, for rows that have no `uuid` to name them — an away session,
+    /// a digest, a retention prune. `table` is a schema identifier, never user data.
+    case writeFailed(table: String, underlying: String)
+
     /// A `PRAGMA integrity_check` (or equivalent) turned up a problem.
     case integrityCheckFailed(String)
 
@@ -67,6 +73,9 @@ public enum ArchiveError: Error, Sendable {
         case let .insertFailed(uuid, underlying):
             "insert \(uuid.uuidString) failed: \(underlying)"
 
+        case let .writeFailed(table, underlying):
+            "write to \(table) failed: \(underlying)"
+
         case let .integrityCheckFailed(detail):
             "integrity: \(detail)"
 
@@ -95,6 +104,9 @@ public enum ArchiveError: Error, Sendable {
 
         case .insertFailed:
             "A notification couldn't be saved."
+
+        case .writeFailed:
+            "Backglance couldn't save a change to its archive."
 
         case .integrityCheckFailed:
             "The archive failed an integrity check."

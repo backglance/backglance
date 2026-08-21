@@ -15,16 +15,13 @@ import GRDB
 /// > equivalent note on ``AppRecord``. `PersistableRecord.didInsert(_:)` is
 /// > non-mutating and would not write `id` back to the caller's variable.
 public struct AwaySession: Codable, FetchableRecord, MutablePersistableRecord, Identifiable, Hashable, Sendable {
-    /// Why the session started. Raw values are the archive column
-    /// vocabulary (`away_sessions.reason`) — never a Swift case name change
-    /// without a migration.
-    public enum Reason: String, Codable, Hashable, Sendable {
-        case locked
-        case asleep
-        case focus
-        case presenting
-        case manual
-    }
+    /// Why the session started.
+    ///
+    /// The vocabulary lives in ``AwayReason`` so the tracker — which reasons about a
+    /// *set* of simultaneous causes, none of which the single column can hold — does
+    /// not have to spell a persistence type. Nested here because `session.reason` is
+    /// read far more often than the enum is named.
+    public typealias Reason = AwayReason
 
     public static let databaseTableName = "away_sessions"
     public static let databaseColumnDecodingStrategy = DatabaseColumnDecodingStrategy.convertFromSnakeCase

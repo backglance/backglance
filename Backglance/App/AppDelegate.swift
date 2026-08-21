@@ -30,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         logger.notice("Backglance launched as an agent app")
 
         startCapture()
+        startAwayTracking()
         startInterface()
     }
 
@@ -38,6 +39,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // *after* each batch commits, precisely so that being killed mid-tick costs a
         // re-read of records the unique index then discards, never a lost notification —
         // so a quit that outruns this teardown is a case the design already covers.
+        // The away tracker holds any open session in memory; committing it here is what
+        // turns "quit while locked" into a session row instead of nothing. Same
+        // best-effort posture as the engine below.
+        if let awayTracker {
+            Task { await awayTracker.flush() }
+        }
+
         guard let engine else {
             return
         }
@@ -59,6 +67,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var archive: Archive?
     private var watcher: StoreWatcher?
     private var engine: CaptureEngine?
+
+    /// The away model. The tracker is the state machine; the bridge is the only thing
+    /// holding its OS observers, and both die with the app.
+    private var awayTracker: AwaySessionTracker?
+    private var awayBridge: AwayEventBridge?
 
     /// The interface, retained for the same reason: a status item whose
     /// controller is deallocated stays in the menu bar and stops responding.
@@ -87,6 +100,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         case .stopped:
             .stopped
+        }
+    }
+
+    /// Persists one finished session.
+    ///
+    /// `static` and `nonisolated` so it can run wherever the tracker calls it from. A
+    /// write failure costs one session's worth of granularity and nothing else, so it is
+    /// logged and dropped rather than retried: the notifications it would have grouped
+    /// are already archived, and the next session is seconds away.
+    nonisolated private static func record(_ ended: AwaySessionTracker.EndedSession, in archive: Archive) {
+        do {
+            try archive.insertAwaySession(ended.session)
+        } catch {
+            let detail = (error as? ArchiveError)?.logDescription ?? ArchiveError.detail(from: error)
+            Log.digest.error("away session not recorded: \(detail)")
         }
     }
 
@@ -132,6 +160,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // agrees to, with its own progress UI, in the onboarding milestone
         // (docs/features/CAPTURE.md#first-launch-import).
         Task { await engine.start() }
+    }
+
+    /// Starts watching for the user going away, and writes finished sessions down.
+    ///
+    /// Ordered after `startCapture()` because it needs the archive that opened there — no
+    /// archive means no place to put a session, so there is no point tracking one. The
+    /// digest that reads these rows arrives with its own board task; until then the
+    /// sessions are what makes `is:missed` and the unread anchor honest
+    /// (docs/features/MISSED_DIGEST.md#the-away-session-model).
+    private func startAwayTracking() {
+        guard let archive else {
+            return
+        }
+
+        // A session left open by a crash or a power loss would sit in the table looking
+        // like the user never came back, which is exactly the state the unread anchor
+        // reads. Closing it at launch is the honest repair: the end is unknown, and now
+        // is the last moment we can prove the Mac was in use.
+        do {
+            let closed = try archive.closeOpenAwaySessions(endedAt: Date())
+            if closed > 0 {
+                logger.notice("closed \(closed, privacy: .public) away session(s) left open by a previous run")
+            }
+        } catch {
+            let detail = (error as? ArchiveError)?.logDescription ?? ArchiveError.detail(from: error)
+            logger.error("could not close stale away sessions: \(detail, privacy: .public)")
+        }
+
+        // `archive`, not `self`: `Archive` is `Sendable`, so the insert runs on the
+        // tracker's executor instead of hopping to the main actor. A synchronous SQLite
+        // write on the main thread would block behind whatever write lock capture is
+        // holding, and a 500-record batch is not a wait the menu bar should take.
+        let tracker = AwaySessionTracker { [archive] ended in
+            Self.record(ended, in: archive)
+        }
+        let bridge = AwayEventBridge(tracker: tracker)
+        bridge.start()
+
+        awayTracker = tracker
+        awayBridge = bridge
     }
 
     /// Builds the timeline and everything that shows it.
