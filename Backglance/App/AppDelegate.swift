@@ -199,6 +199,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return nil
     }
 
+    /// The Digest pane's model, and the only place in Backglance that can cause a
+    /// permission prompt — and only when the user switches banners on.
+    ///
+    /// Both closures are `UserNotifications` calls, which `BackglanceUI` cannot make
+    /// itself: passing them in is what keeps that framework's one import in the app target,
+    /// and what makes the single trigger for the request visible at a call site.
+    private static func digestSettings() -> DigestSettingsModel {
+        DigestSettingsModel(authorization: BannerAuthorizing(
+            read: { await LocalNotificationAuthorizer.status().bannerAuthorization },
+            request: { await LocalNotificationAuthorizer.requestIfNeeded().bannerAuthorization }
+        ))
+    }
+
     /// Offers the freshly built digest to the banner.
     ///
     /// On the main actor because the one thing it needs beyond the archive — when the
@@ -363,7 +376,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // which stay asleep until the user turns the setting on.
         let search = SearchService(archive: archive)
         search.start()
-        let settings = SettingsWindowController(search: search)
+        let settings = SettingsWindowController(search: search, digest: Self.digestSettings())
         // The field's own state: what was typed, what came back, what is still
         // in flight. It asks `search` its questions through `SearchRunning`.
         // Read per call rather than captured once: the toggle can change

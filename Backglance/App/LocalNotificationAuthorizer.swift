@@ -1,4 +1,5 @@
 import BackglanceCore
+import BackglanceUI
 import UserNotifications
 
 // MARK: - LocalNotificationAuthorizer
@@ -74,6 +75,32 @@ enum LocalNotificationAuthorizer {
             // from a non-app path. Both mean the same thing to the caller.
             Log.digest.error("notification authorization request failed: \(error.localizedDescription)")
             return .denied
+        }
+    }
+}
+
+// MARK: - UNAuthorizationStatus + BannerAuthorization
+
+extension UNAuthorizationStatus {
+    /// The three answers Settings has different words for.
+    ///
+    /// `provisional` and `ephemeral` count as authorized because a banner posted under
+    /// either does arrive; the pane's question is only ever "would the user see this".
+    var bannerAuthorization: BannerAuthorization {
+        switch self {
+        case .authorized,
+             .provisional,
+             .ephemeral:
+            .authorized
+
+        case .denied:
+            .denied
+
+        case .notDetermined:
+            .notDetermined
+
+        @unknown default:
+            .notDetermined
         }
     }
 }

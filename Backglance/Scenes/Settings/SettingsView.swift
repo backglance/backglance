@@ -3,17 +3,22 @@ import SwiftUI
 
 // MARK: - SettingsView
 
-/// Settings, as far as Phase 2 has settings.
+/// Settings, as far as this milestone has settings.
 ///
-/// One pane today — Search — because semantic indexing is the first thing the
+/// Two sections today. Search, because semantic indexing is the first thing the
 /// app does that needs the user's permission in the plain sense: it reads every
-/// notification they have ever received and writes a vector for each one. That
-/// deserves a switch, an honest description of what it costs, and a way to undo
-/// it. Capture, privacy and rules panes arrive with their milestones.
+/// notification they have ever received and writes a vector for each one. And
+/// Digest, which owns the app's only permission prompt — switching banners on is
+/// what asks for Notifications authorization, and nothing else in Backglance
+/// asks for anything. Capture, privacy and rules panes arrive with their
+/// milestones, at which point this becomes a `TabView`
+/// (docs/getting-started/DEVELOPMENT_GUIDE.md#backglanceui).
 struct SettingsView: View {
     // MARK: Internal
 
     @Bindable var search: SearchService
+
+    let digest: DigestSettingsModel
 
     var body: some View {
         Form {
@@ -37,9 +42,11 @@ struct SettingsView: View {
             } header: {
                 Text(String(localized: "Search"))
             }
+
+            DigestSettingsView(model: digest)
         }
         .formStyle(.grouped)
-        .frame(minWidth: 460, minHeight: 200)
+        .frame(minWidth: 460, minHeight: 260)
     }
 
     // MARK: Private

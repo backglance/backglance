@@ -1,4 +1,5 @@
 import AppKit
+import BackglanceUI
 import SwiftUI
 
 // MARK: - SettingsWindowController
@@ -12,22 +13,22 @@ import SwiftUI
 final class SettingsWindowController: NSWindowController {
     // MARK: Lifecycle
 
-    convenience init(search: SearchService) {
+    convenience init(search: SearchService, digest: DigestSettingsModel) {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 260),
+            contentRect: NSRect(x: 0, y: 0, width: 460, height: 520),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
         window.title = String(localized: "Backglance Settings")
         window.setFrameAutosaveName("SettingsWindow")
-        let hosting = NSHostingController(rootView: SettingsView(search: search))
+        let hosting = NSHostingController(rootView: SettingsView(search: search, digest: digest))
         // The window owns its size. Left to the hosting controller, the form's
         // fitting size came back zero-width — measured, not guessed: the
         // autosaved frame was "0 260 0 32".
         hosting.sizingOptions = []
         window.contentViewController = hosting
-        window.setContentSize(NSSize(width: 460, height: 260))
+        window.setContentSize(NSSize(width: 460, height: 520))
         window.isReleasedWhenClosed = false
         self.init(window: window)
     }

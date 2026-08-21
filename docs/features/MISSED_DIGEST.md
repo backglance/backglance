@@ -493,6 +493,7 @@ Error paths at the call site: `alreadyBuilt` is swallowed with a debug log (doub
 | `DigestAppSection` | `BackglanceUI` | app icon + name + that app's rows (reuses `NotificationRow`) |
 | `DigestHeader` | `BackglanceUI` | headline, reason glyphs (🔒 / 😴 / 🌙 / 📽 / ✋), duration, partial/reconstructed badges |
 | `DigestSettingsView` | `BackglanceUI` | thresholds, reasons, banner toggle |
+| `DigestSettingsModel` | `BackglanceUI` | the pane's values; the injected authorization request lives here |
 | Banner | app target | `UNUserNotificationCenter` local notification, optional |
 
 ### DigestView
@@ -594,15 +595,23 @@ Yes, a notification-history app posting a notification is mildly ironic; that is
 
 ### Settings
 
-Settings ▸ Digest, stored in `UserDefaults` (suite `app.backglance.Backglance`) via `@AppStorage`:
+Settings ▸ Digest, stored in `UserDefaults` (suite `app.backglance.Backglance`) and read back by `DigestThreshold`, `DigestPolicy` and `DigestBannerPolicy` at the moment each is needed — there is no apply step and no cached copy to go stale:
 
 | Setting | Key | Default |
 |---|---|---|
 | Show digest | `digest.threshold` = `after5min` / `after15min` / `always` / `never` | `after5min` |
-| Don't show for these reasons | `digest.disabledReasons` (array of `AwayReason` raw values, read by `DigestPolicy`) | empty |
+| Count time away when | `digest.disabledReasons` (array of `AwayReason` raw values, stored as the *complement* of the checkboxes) | empty |
 | Also show a notification banner | `digest.banner.enabled` | **off** — turning it on is what requests Notifications authorization |
 | Banner for Focus sessions | `digest.banner.focus` | off |
-| Banner sound | `digest.banner.sound` | off |
+| Play a sound | `digest.banner.sound` | off |
+
+`DigestSettingsView` (`BackglanceUI`) draws the pane; `DigestSettingsModel` owns the values. Three things about it are deliberate:
+
+- **The reason checkboxes read as positives** ("Count time away when: Locked, Asleep…") while the stored key is the negative set. A list of exclusions is a list people read backwards.
+- **Choosing "Never" hides everything below it** and says what it does *not* do: away sessions keep being recorded, so `is:missed` keeps working. That is exactly what someone picking "Never" would otherwise assume they had switched off.
+- **The banner toggle flips synchronously and undoes itself** if authorization is refused. A toggle whose `set` only starts async work desyncs from its `get` on the very next redraw — it renders off while the model says on. Flipping first and reverting on refusal is both correct and the more honest animation: the switch visibly declines to stay on, and the pane then says where to change it.
+
+The authorization calls are injected into the model as closures rather than made by it. `BackglanceUI` does not import `UserNotifications`, and more to the point the request must fire on exactly one trigger — this toggle going on — which passing it in makes visible at the call site.
 
 Settings ▸ Status additionally shows the live detection lines: "Lock/unlock: active · Sleep/wake: active · Focus detection: active/unavailable · Presenting detection: active/limited".
 
