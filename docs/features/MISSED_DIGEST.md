@@ -167,7 +167,7 @@ Stated plainly, source by source. Settings ▸ Status shows a live line per sour
 ### Session Merging and Thresholds
 
 - **Merge gap: 60 s.** Unlocking to glance at the screen and re-locking within a minute does not split the session; the tracker holds a candidate end and cancels it if a new reason activates within 60 s.
-- **Minimum duration: 5 min (default, configurable).** Shorter sessions are recorded in `away_sessions` (they are still useful to `is:missed`) but produce no digest. Options: 5 / 15 min / always / never (see [Settings](#settings)).
+- **Minimum duration: 5 min (default, configurable).** Shorter sessions are recorded in `away_sessions` (they are still useful to `is:missed`) but produce no digest. Options: 5 / 15 min / always / never (see [Settings](#settings)), modelled by `DigestThreshold` in `BackglanceCore/Digest/`. Its `minimumDuration` for `never` is `.infinity` rather than a large number, so rule 7 below holds by construction — there is no duration a session can reach to outlast it. `AwaySessionTracker` takes it as `DigestThreshold.minDuration()`, a closure read once per finished session, so changing the setting applies to the next session rather than the next launch.
 - **Zero notifications → no digest**, whatever the duration.
 
 ### AwaySessionTracker

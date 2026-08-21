@@ -194,7 +194,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // tracker's executor instead of hopping to the main actor. A synchronous SQLite
         // write on the main thread would block behind whatever write lock capture is
         // holding, and a 500-record batch is not a wait the menu bar should take.
-        let tracker = AwaySessionTracker { [archive] ended in
+        let tracker = AwaySessionTracker(minDuration: DigestThreshold.minDuration()) { [archive] ended in
             Self.record(ended, in: archive)
         }
         let bridge = AwayEventBridge(tracker: tracker)
