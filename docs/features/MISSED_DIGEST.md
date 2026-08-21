@@ -42,6 +42,7 @@ Design intent, in order:
 | `FocusAssertionWatcher` | ⚠️ file watcher on the DND assertions database | `BackglanceCore` |
 | `PresentationDetector` | ⚠️ heuristic frontmost-app + window scan | `BackglanceCore` |
 | `DigestEngine` | pure selection/ranking, writes `digests` + `digest_items` | `BackglanceCore` |
+| `AwaySessionRecorder` | record → link → build, in that order, for one finished session | `BackglanceCore` |
 | `DigestPolicy` | whether a finished session earns a digest at all | `BackglanceCore` |
 | `DigestPresenter` | whether the popover shows one, and which | `BackglanceUI` |
 | `DigestView` | SwiftUI, shown in the popover; also the full timeline entry point | `BackglanceUI` |
@@ -650,7 +651,7 @@ The card takes the whole popover while it is up rather than sitting above the ti
 | App not running during the away period at all | on launch, `reconstructIfNeeded()` builds a reconstructed session from store timestamps + `presented` flags after the capture backfill; digest is labeled "Reconstructed" |
 | A 3-day trip | one session; the digest caps at 50 shown and the header groups the summary per day ("Fri 34 · Sat 12 · Sun 41"); "and n more" opens the timeline at the session start |
 | Zero notifications | session recorded, no digest row, nothing shown |
-| Double session-end events (wake and unlock race) | second `build` throws `alreadyBuilt`; swallowed with a debug log |
+| Double session-end events (wake and unlock race) | absorbed by `AwaySessionTracker`, one layer earlier than the digest: overlapping causes are one span and `onEnd` fires once per finished session, so only one `EndedSession` is ever recorded. `DigestEngine`'s `alreadyBuilt` guard is the second line — it refuses a second build for an already-summarised **session id**, which is what a retry or the future reconstruction path could produce. Swallowed with a debug log |
 | Assertions.json format changes | `FocusAssertionWatcher` returns `.unavailable`; Focus events stop; sessions still form from lock/sleep; Settings ▸ Status shows "Focus detection: unavailable"; `presented = 0` still routes suppressed notifications into digests |
 | Zoom/Meet/Teams rename their indicator windows | presenting detection silently misses; `presented = 0` fallback still catches what macOS suppressed during sharing |
 | Notification arrives seconds before lock, banner suppressed | the ± 2 min skew window plus `presented = 0` pulls it in |

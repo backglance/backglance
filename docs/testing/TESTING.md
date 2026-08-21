@@ -61,7 +61,7 @@ The pyramid is deliberately bottom-heavy. A UI test that fails tells you somethi
 Tests/
 ├── BackglanceCoreTests/
 │   ├── Unit/            RetentionJobTests, RulesEngineTests, DigestEngineTests, OTPRedactorTests, ...
-│   ├── Integration/     ArchiveMigrationTests, RetentionOverArchiveTests, ExportServiceTests
+│   ├── Integration/     DigestFlowTests, ArchiveMigrationTests, RetentionOverArchiveTests, ExportServiceTests
 │   └── Support/         Stubs.swift, TestClock.swift, SplitMix64.swift
 ├── BackglanceCaptureTests/
 │   ├── Unit/            StoreFingerprintTests, RecordParserTests, RecordParserFuzzTests, StoreCursorTests
@@ -1091,58 +1091,41 @@ final class QueryParserTests: XCTestCase {
 
 ## Digest tests
 
-`DigestEngine` and `AwaySessionTracker` never touch the wall clock or the real notification centers in tests. Both take a `Clock` closure and an `AsyncStream<SystemEvent>`:
+Neither `AwaySessionTracker` nor `DigestEngine` touches the wall clock in tests. The tracker takes an `AwayClock`, the engine takes a `now` closure, and the archive is `Archive(inMemory: true)`.
+
+The tracker's 60-second merge gap is the reason the clock is injected rather than the events being fast: a test that waited it out would cost a minute per case. `ScriptedAwayClock` (in `AwaySessionTrackerTests`) is a clock the test moves, whose `sleep` polls it — one real millisecond per turn, returning the instant the test advances past the deadline.
 
 ```swift
-import XCTest
-@testable import BackglanceCore
-
-final class DigestEngineTests: XCTestCase {
-    private var archive: Archive!
-    private var clock: TestClock!         // Tests/…/Support/TestClock.swift: `now`, `advance(by:)`
-
-    override func setUpWithError() throws {
-        archive = try Archive(inMemory: true)
-        clock = TestClock(start: Date(timeIntervalSince1970: 1_755_421_200))   // 2026-08-17 09:00 UTC
-    }
-
-    func test_whenLockedThenUnlockedAfterTenMinutesWithNotifications_thenDigestBuilt() async throws {
-        let (events, continuation) = AsyncStream<SystemEvent>.makeStream()
-        let tracker = AwaySessionTracker(archive: archive, events: events, clock: { self.clock.now })
-        let engine = DigestEngine(archive: archive, clock: { self.clock.now }, minimumDuration: 5 * 60)
-        let run = Task { await tracker.run(onSessionEnd: engine.build) }
-
-        continuation.yield(.screenLocked)
-        clock.advance(by: 4 * 60)
-        let app = try archive.upsertApp(bundleID: "com.example.chat", now: clock.now)
-        _ = try archive.insert(ArchivedNotification.stub(appID: app.id, deliveredAt: clock.now))
-        clock.advance(by: 6 * 60)
-        continuation.yield(.screenUnlocked)
-        continuation.finish()
-        _ = await run.result
-
-        let digests = try archive.allDigests()
-        XCTAssertEqual(digests.count, 1)
-        XCTAssertEqual(digests[0].itemCount, 1)
-        let session = try XCTUnwrap(try archive.awaySession(id: digests[0].awaySessionID))
-        XCTAssertEqual(session.reason, .locked)
-        XCTAssertEqual(session.endedAt?.timeIntervalSince1970, clock.now.timeIntervalSince1970, accuracy: 0.001)
-    }
+// Tests/BackglanceCoreTests/Integration/DigestFlowTests.swift
+let clock = ScriptedAwayClock(now: base)
+let recorder = AwaySessionRecorder(archive: archive, policy: { DigestPolicy(defaults: defaults) })
+let tracker = AwaySessionTracker(clock: clock, minDuration: { 300 }) { ended in
+    recorder.record(ended)
 }
+
+await tracker.handle(.screenLocked)
+clock.advance(by: 10 * 60)
+try seedNotification(at: clock.now)
+await tracker.handle(.screenUnlocked)
+clock.advance(by: AwaySessionTracker.mergeGap + 1)   // let the session commit
 ```
 
-The remaining cases follow the same injected-clock, injected-stream shape:
+`AwaySessionRecorder` is what makes this an integration test rather than a lookalike. Recording a session, linking what arrived during it, and building the digest are one ordered decision, and it lives in `BackglanceCore` precisely so a test can drive the same code the app delegate calls — wiring that only exists inside an `NSApplicationDelegate` is wiring nothing can check.
 
 | Test | Asserts |
 |---|---|
-| `…test_whenSessionShorterThanFiveMinutes_thenNoDigest` | `< 5 min` suppression; away session itself still recorded |
-| `…test_whenNoNotificationsDuringSession_thenNoDigest` | zero-notification suppression |
-| `…test_whenPresentedFalseOutsideSession_thenStillIncluded` | the store's `presented == false` flag counts as missed even when `delivered_at` is outside the session |
-| `…test_whenDigestBuilt_thenGroupedByAppWithVIPFirst` | grouped by app, VIP-rule matches ranked first |
-| `…test_whenDigestDismissed_thenNeverShownAgainForThatSession` | one banner per away session; rebuilding for the same session is a no-op ("never nagging") |
-| `AwaySessionTrackerTests.test_whenSleepDuringLock_thenOneSessionWithEarliestReason` | overlapping lock + sleep collapse to a single session |
+| `DigestFlowTests` — the headline case | lock → 10 min with one notification → unlock produces one session, one digest, `item_count == 1`, and the notification linked to that session |
+| `DigestFlowTests` — never twice | a second `record` for the same session builds nothing; `pendingDigest()` returns the one digest, and nothing after it is dismissed |
+| `DigestFlowTests` — under the threshold | a 2-minute session **is** recorded (that is what makes `is:missed` work) but earns no digest |
+| `DigestFlowTests` — nothing arrived | a session with zero notifications writes no digest row at all |
+| `DigestFlowTests` — "never" means never | `digest.threshold = never` records the session and builds nothing |
+| `DigestFlowTests` — a disabled reason | a lock-only session is suppressed when `locked` is disabled; `{locked, focus}` still builds, because one live cause is enough |
+| `DigestEngineTests` | the two selection signals, the ± 2 min skew edges, exclusions, VIP-first ranking, the shown cap, and `alreadyBuilt` inside the transaction |
+| `DigestPolicyTests`, `DigestBannerPolicyTests` | the build gate and the banner gate, as pure functions |
+| `DigestPresenterTests` | only an undismissed digest is ever surfaced, and the same digest keeps the same model |
+| `AwaySessionTrackerTests` | overlapping lock + sleep collapse to one session with the earliest cause as primary |
 
-`SystemEvent` is the tracker's input enum (`screenLocked`, `screenUnlocked`, `willSleep`, `didWake`, `focusBegan`, `focusEnded`, `presentingBegan(app:)`, `presentingEnded`, `manualStart`, `manualEnd`); the production adapters that turn `DistributedNotificationCenter` / `NSWorkspace` / the DoNotDisturb JSON files into these events are not unit-tested — they are covered by the manual checklist in [MISSED_DIGEST.md](../features/MISSED_DIGEST.md), and marked ⚠️ fragile there.
+`AwaySessionTracker.Event` is the tracker's input enum (`screenLocked`, `screenUnlocked`, `willSleep`, `didWake`, `focusChanged(active:)`, `presentingChanged(active:)`, `manualAway(active:)`). The production adapters that turn `DistributedNotificationCenter`, `NSWorkspace` and the DoNotDisturb JSON into these events are not unit-tested — they are covered by the manual checklist in [MISSED_DIGEST.md](../features/MISSED_DIGEST.md), and marked ⚠️ fragile there.
 
 ## Retention tests
 

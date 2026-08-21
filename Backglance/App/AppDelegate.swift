@@ -138,67 +138,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
     }
 
-    /// Persists one finished session.
-    ///
-    /// `static` and `nonisolated` so it can run wherever the tracker calls it from. A
-    /// write failure costs one session's worth of granularity and nothing else, so it is
-    /// logged and dropped rather than retried: the notifications it would have grouped
-    /// are already archived, and the next session is seconds away.
-    @discardableResult
-    nonisolated private static func record(
-        _ ended: AwaySessionTracker.EndedSession,
-        in archive: Archive
-    ) -> (digest: Digest, session: AwaySession)? {
-        let stored: AwaySession
-        do {
-            stored = try archive.insertAwaySession(ended.session)
-            // Linking here, not at digest-build time. A session under the threshold never
-            // gets a digest, and the whole reason those rows are kept is that they are
-            // still worth searching — so `is:missed` has to be able to find them.
-            let linked = try archive.linkNotifications(to: stored)
-            Log.digest.info("Away session recorded, \(linked) notification(s) linked")
-        } catch {
-            let detail = (error as? ArchiveError)?.logDescription ?? ArchiveError.detail(from: error)
-            Log.digest.error("away session not recorded: \(detail)")
-            return nil
-        }
-        return build(for: stored, causes: ended, in: archive).map { (digest: $0, session: stored) }
-    }
-
-    /// Builds the digest for a session that has just been recorded, if the user's
-    /// settings want one.
-    ///
-    /// The policy is read here rather than captured at launch, so changing the threshold
-    /// or switching a reason off takes effect on the next session instead of the next
-    /// launch. It is checked *before* the build, not after: a digest written and then
-    /// never shown is a row nobody asked for, and "never means never" has to stop the
-    /// build (docs/features/MISSED_DIGEST.md#never-nagging-rules).
-    ///
-    /// Nothing here is presented. The popover looks for a pending digest when it opens,
-    /// which is what keeps "at most one, and only when you come back and look" a property
-    /// of one place rather than of this call site.
-    nonisolated private static func build(
-        for stored: AwaySession,
-        causes ended: AwaySessionTracker.EndedSession,
-        in archive: Archive
-    ) -> Digest? {
-        guard DigestPolicy(defaults: .standard).allows(ended) else {
-            Log.digest.info("Away session \(stored.id ?? 0) earns no digest under the current settings")
-            return nil
-        }
-        do {
-            return try DigestEngine(archive: archive).build(for: stored)
-        } catch let error as DigestEngine.DigestError {
-            // `alreadyBuilt` is ordinary, not exceptional: wake and unlock race often
-            // enough that a second session-end event is a normal Tuesday.
-            Log.digest.debug("Digest not built: \(error.logDescription)")
-        } catch {
-            let detail = (error as? ArchiveError)?.logDescription ?? ArchiveError.detail(from: error)
-            Log.digest.error("digest not built: \(detail)")
-        }
-        return nil
-    }
-
     /// The Digest pane's model, and the only place in Backglance that can cause a
     /// permission prompt — and only when the user switches banners on.
     ///
@@ -306,15 +245,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // tracker's executor instead of hopping to the main actor. A synchronous SQLite
         // write on the main thread would block behind whatever write lock capture is
         // holding, and a 500-record batch is not a wait the menu bar should take.
-        let tracker = AwaySessionTracker(minDuration: DigestThreshold.minDuration()) { [weak self, archive] ended in
-            guard let built = Self.record(ended, in: archive) else {
+        // Recording, linking and building live in `BackglanceCore` so the whole chain can
+        // be driven by a test; this closure only decides what the *app* does afterwards.
+        let recorder = AwaySessionRecorder(archive: archive)
+        let tracker = AwaySessionTracker(minDuration: DigestThreshold.minDuration()) { [weak self] ended in
+            guard let outcome = recorder.record(ended), let digest = outcome.digest else {
                 return
             }
             // The banner is the only part of this that has to be on the main actor, and it
             // is the only part that can wait: the digest is already written and the popover
             // will show it whether or not this hop ever completes.
             Task { @MainActor in
-                await self?.postDigestBanner(built.digest, for: built.session, in: archive)
+                await self?.postDigestBanner(digest, for: outcome.session, in: archive)
             }
         }
         let bridge = AwayEventBridge(tracker: tracker)
