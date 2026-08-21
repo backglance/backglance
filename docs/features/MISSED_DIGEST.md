@@ -355,55 +355,64 @@ Wiring: `.active`/`.inactive` become `tracker.handle(.focusChanged(active:))`; `
 
 ### Presenting and Screen-Share Detection
 
-⚠️ Heuristic by construction. `PresentationDetector` polls every 15 s (piggybacking the capture poll timer) and reports a boolean:
+⚠️ Heuristic by construction, and split in two so the heuristic itself is testable without a window server: `PresentationPolicy` in `BackglanceCore` decides over an `Observation`, and `PresentationDetector` in the app target gathers one from `NSWorkspace` and `CGWindowList` every 15 s.
 
 ```swift
-// Packages/BackglanceCore/Sources/BackglanceCore/Away/PresentationDetector.swift
-import AppKit
-import CoreGraphics
-
-public struct PresentationDetector: Sendable {
-    /// Bundle ids that count as "presenting" when frontmost with a fullscreen borderless window.
-    static let presenterApps: Set<String> = [
-        "com.apple.iWork.Keynote", "com.microsoft.Powerpoint",
-    ]
-    /// Owner name prefixes of known "you are sharing" indicator windows.
-    static let shareIndicators: [(owner: String, namePrefix: String?)] = [
-        ("zoom.us", "zoom share"),           // Zoom floating share toolbar
-        ("Google Chrome", "meet.google.com is sharing"),
-        ("Microsoft Teams", "Sharing controls"),
-    ]
-
-    public func isPresenting() -> Bool {
-        // 1. Slideshow heuristic: presenter app frontmost.
-        if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
-           Self.presenterApps.contains(front) {
-            return true
-        }
-        // 2. Share-indicator windows. Window *names* need Screen Recording permission,
-        //    which Backglance does not request; without it kCGWindowName is absent and
-        //    we match on owner only for owners that exist solely while sharing.
-        guard let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
-                                                    kCGNullWindowID) as? [[String: Any]] else {
-            return false   // API failure → assume not presenting (false negatives preferred)
-        }
-        for window in info {
-            let owner = window[kCGWindowOwnerName as String] as? String ?? ""
-            let name = (window[kCGWindowName as String] as? String)?.lowercased()
-            for probe in Self.shareIndicators where owner == probe.owner {
-                if let prefix = probe.namePrefix {
-                    if let name, name.hasPrefix(prefix.lowercased()) { return true }
-                } else {
-                    return true
-                }
-            }
-        }
-        return false
+// Packages/BackglanceCore/Sources/BackglanceCore/Away/PresentationPolicy.swift
+public struct PresentationPolicy: Sendable, Equatable {
+    public struct WindowRef: Sendable, Equatable {
+        public let ownerName: String
+        public let name: String?      // nil without Screen Recording — the ordinary case
+        public let coversScreen: Bool
+        public let layer: Int         // kCGWindowLayer; a slideshow is layer 0
     }
+
+    public struct Observation: Sendable, Equatable {
+        public let frontmostBundleID: String?
+        public let windows: [WindowRef]   // empty when the window list could not be read
+    }
+
+    public enum ShareIndicator: Sendable, Equatable {
+        case ownerAndWindowName(owner: String, namePrefix: String)
+        /// ⚠️ Only ever for a process that exists *solely* while sharing. No shipped
+        /// indicator uses it — see below.
+        case ownerOnly(owner: String)
+    }
+
+    /// The user's allowlist, defaulting to Keynote and PowerPoint and persisted in
+    /// UserDefaults under `presentationDetection.presenterBundleIDs`.
+    public var presenterBundleIDs: Set<String>
+    public init(defaults: UserDefaults)
+    public static func save(presenterBundleIDs: Set<String>, to defaults: UserDefaults)
+    public static func resetPresenterBundleIDs(in defaults: UserDefaults)
+
+    public func isPresenting(_ observation: Observation) -> Bool
 }
 ```
 
-Honesty ledger for this detector: Keynote frontmost during *editing* is a false positive risk, mitigated by also requiring a fullscreen borderless window in the full implementation; a renamed Zoom toolbar is a silent false negative; Meet in Safari is not detected at all. The `presented = 0` flag covers much of the gap — while macOS itself suppresses banners during screen sharing, the store records it, and those notifications enter the digest regardless of whether we noticed the session.
+**Both halves of the slideshow test are required.** A presenter app being frontmost is not
+enough: Keynote is frontmost for the hours someone spends *building* a deck, and treating
+that as presenting would bury a working day in away sessions. It counts only with a
+layer-0 window covering a screen.
+
+**Share indicators match on the window title, never on the owner alone.** Every shipped
+owner — `zoom.us`, `Google Chrome`, `Microsoft Teams` — runs all day, so the title is the
+entire signal. Since `kCGWindowName` for another app's window needs Screen Recording,
+which Backglance does not request, those titles are usually `nil`, nothing matches, and
+presenting is simply not detected from indicators. Less detection, not a guess. The
+`ownerOnly` case exists for a genuinely share-only process and is asserted unused by a
+test, because applying it to an ordinary app would open an away session for as long as
+that app is running — the worst failure this detector has.
+
+**Everything that can fail, fails towards "not presenting."** No window list, no titles,
+no frontmost app: all report `false`, and the detector reports `false` rather than
+carrying the previous answer forward, because a stuck `true` never clears.
+
+Honesty ledger: a renamed vendor toolbar is a silent false negative; Meet in Safari is not
+detected at all; a full-screen Keynote *rehearsal* is a false positive the 5-minute
+minimum bounds but does not eliminate. The `presented = 0` flag covers much of the gap —
+while macOS itself suppresses banners during screen sharing, the store records it, and
+those notifications enter the digest regardless of whether we noticed the session.
 
 ## Business Logic: DigestEngine
 

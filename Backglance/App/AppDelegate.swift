@@ -73,6 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var awayTracker: AwaySessionTracker?
     private var awayBridge: AwayEventBridge?
     private var focusWatcher: FocusAssertionWatcher?
+    private var presentationDetector: PresentationDetector?
 
     /// The interface, retained for the same reason: a status item whose
     /// controller is deallocated stays in the menu bar and stops responding.
@@ -221,9 +222,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         focus.start()
 
+        // ⚠️ Also heuristic, and polled — there is no notification for "a share toolbar
+        // appeared". The policy is read per sample rather than captured, so editing the
+        // allowlist in Settings takes effect at the next poll instead of the next launch.
+        let presentation = PresentationDetector(
+            policy: { PresentationPolicy(defaults: .standard) },
+            onChange: { presenting in
+                Task { await tracker.handle(.presentingChanged(active: presenting)) }
+            }
+        )
+        presentation.start()
+
         awayTracker = tracker
         awayBridge = bridge
         focusWatcher = focus
+        presentationDetector = presentation
     }
 
     /// Builds the timeline and everything that shows it.
