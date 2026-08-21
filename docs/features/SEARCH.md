@@ -58,7 +58,7 @@ Search is the second thing people do with a notification archive, right after sc
                                 │ HybridSearch.search(SearchQuery)
                                 ▼
   ┌───────────────────────── BackglanceSearch ──────────────────────────┐
-  │  QueryParser ──► SearchQuery { matchExpression, filters, terms }    │
+  │  QueryParser ──► ParsedQuery { ftsMatch, terms, filters, flags }    │
   │                                                                     │
   │      ┌────────────┐   ┌───────────────┐   ┌────────────────────┐    │
   │      │  FTSIndex  │   │ FuzzyMatcher  │   │   SemanticIndex    │    │
@@ -297,96 +297,39 @@ The tokenizer, the per-key dispatch and the FTS quoting are deliberately not rep
 
 ```swift
 // Packages/BackglanceSearch/Sources/BackglanceSearch/FTSIndex.swift
-import Foundation
-import GRDB
-import BackglanceCore
-
 public struct FTSHit: Sendable, Equatable {
     public let notificationID: Int64
-    public let score: Double          // bm25: lower is better; negated before merge
-    public let snippet: String        // contains U+E000/U+E001 markers around matches
+    public let score: Double     // bm25: lower is better; negated before merge
+    public let snippet: String   // contains U+E000/U+E001 markers around the match
 }
 
 public struct FTSIndex: Sendable {
     public static let markerOpen = "\u{E000}"
     public static let markerClose = "\u{E001}"
 
-    private let archive: Archive
-    public init(archive: Archive) { self.archive = archive }
+    public init(archive: Archive)
 
-    public func search(_ q: SearchQuery, appIDs: [Int64], limit: Int = 200) async throws -> [FTSHit] {
-        guard let match = q.matchExpression else { return [] }
-        return try await archive.reader.read { db in
-            var sql = """
-                SELECT n.id AS id,
-                       bm25(notifications_fts, 3.0, 1.5, 1.0, 2.0) AS score,
-                       snippet(notifications_fts, 2, char(57344), char(57345), '…', 12) AS snippet
-                FROM notifications_fts
-                JOIN notifications n ON n.id = notifications_fts.rowid
-                WHERE notifications_fts MATCH ?
-                  AND n.is_deleted = 0
-                """
-            var args: StatementArguments = [match]
-            if !appIDs.isEmpty {
-                sql += " AND n.app_id IN (" + appIDs.map { _ in "?" }.joined(separator: ",") + ")"
-                args += StatementArguments(appIDs)
-            }
-            if let after = q.after  { sql += " AND n.delivered_at >= ?"; args += [after.timeIntervalSince1970] }
-            if let before = q.before { sql += " AND n.delivered_at < ?";  args += [before.timeIntervalSince1970] }
-            if q.flags.contains(.missed)  { sql += " AND (n.away_session_id IS NOT NULL OR n.presented = 0)" }
-            if q.flags.contains(.pinned)  { sql += " AND n.is_pinned = 1" }
-            if q.flags.contains(.hasLink) { sql += " AND n.deep_link IS NOT NULL" }
-            sql += " ORDER BY score LIMIT ?"
-            args += [limit]
+    /// `match` is a fully-built FTS5 `MATCH` expression from `QueryParser`.
+    /// `filter` is the structured `WHERE` fragment from `HybridSearch+Filters`,
+    /// applied inside this statement rather than as a second pass over the
+    /// candidate ids.
+    /// - Throws: `SearchError.indexUnavailable` if `notifications_fts` doesn't
+    ///   exist yet (only reachable mid-migration).
+    public func search(
+        match: String,
+        appIDs: [Int64] = [],
+        filter: (sql: String, arguments: StatementArguments)? = nil,
+        limit: Int = 200
+    ) throws -> [FTSHit]
 
-            do {
-                return try Row.fetchAll(db, sql: sql, arguments: args).map {
-                    FTSHit(notificationID: $0["id"], score: $0["score"], snippet: $0["snippet"])
-                }
-            } catch let error as DatabaseError where error.resultCode == .SQLITE_ERROR
-                        && (error.message ?? "").contains("fts5: syntax error") {
-                // Should be unreachable because every token is quoted; if a future FTS5
-                // build tightens the grammar we degrade to "no FTS hits" and let fuzzy run.
-                Logger.search.error("FTS syntax error for quoted expression: \(error.message ?? "", privacy: .public)")
-                return []
-            }
-        }
-    }
+    public func rebuild() throws    // notifications_fts('rebuild'); after a bulk import
+    public func optimize() throws   // notifications_fts('optimize'); after a big deletion batch
 }
 ```
 
-`snippet(..., 2, ...)` picks column 2 (`body`) as the snippet source with up to 12 tokens of context; `highlight()` is used instead when the row renders the full title (`highlight(notifications_fts, 0, char(57344), char(57345))`). The private-use markers are converted to `AttributedString` ranges in `MatchHighlighter`:
+The snippet is taken from column `-1` — FTS5's "whichever column matched best" — rather than a fixed column, so a title-only match still gets a snippet instead of SQL `NULL`. See `FTSIndex.swift` for the full statement and `FTSIndexTests.swift` for the ranking, snippet and `indexUnavailable` assertions.
 
-```swift
-// Packages/BackglanceUI/Sources/BackglanceUI/Search/MatchHighlighter.swift
-import Foundation
-
-enum MatchHighlighter {
-    static func attributed(_ marked: String) -> AttributedString {
-        var out = AttributedString()
-        var buffer = ""
-        var inMatch = false
-        for ch in marked {
-            switch ch {
-            case "\u{E000}":
-                out += AttributedString(buffer); buffer = ""; inMatch = true
-            case "\u{E001}":
-                var run = AttributedString(buffer)
-                run.inlinePresentationIntent = .stronglyEmphasized
-                out += run; buffer = ""; inMatch = false
-            default:
-                buffer.append(ch)
-            }
-        }
-        if !buffer.isEmpty {
-            var tail = AttributedString(buffer)
-            if inMatch { tail.inlinePresentationIntent = .stronglyEmphasized } // unbalanced marker: still bold
-            out += tail
-        }
-        return out
-    }
-}
-```
+The private-use markers are converted to `AttributedString` emphasis ranges by `MatchHighlighter.attributed(_:open:close:)` in `Packages/BackglanceUI/Sources/BackglanceUI/Search/MatchHighlighter.swift`. An unbalanced open marker (a truncated snippet) still emphasizes to the end of the string rather than dropping text or crashing.
 
 ### Fuzzy Fallback
 
@@ -657,32 +600,10 @@ See [INTERNATIONALIZATION.md](../reference/INTERNATIONALIZATION.md) for the broa
 
 ### HybridSearch Merge
 
-Ranking lists from the three layers are combined with reciprocal-rank fusion. Each layer contributes `weight × 1 / (k + rank)` with `k = 60` (the usual RRF constant) for every notification it returned; scores are summed per notification and the list is sorted descending. Weights are the PasteShelf values: **FTS 0.4, semantic 0.5, fuzzy 0.3**. Rank-based fusion is what lets a bm25 score (negative, unbounded) and a cosine (0…1) and a Levenshtein similarity (0…1) be merged without hand-tuned normalisers.
+Ranking lists from the three layers are combined with reciprocal-rank fusion. Each layer contributes `weight × 1 / (k + rank)` with `k = 60` (the usual RRF constant) for every notification it returned; scores are summed per notification and the list is sorted descending, with the newest id breaking a tie. Weights are the PasteShelf values: **FTS 0.4, semantic 0.5, fuzzy 0.3**. Rank-based fusion is what lets a bm25 score (negative, unbounded), a cosine similarity (0…1) and a Levenshtein similarity (0…1) be merged without hand-tuned normalisers.
 
 ```swift
 // Packages/BackglanceSearch/Sources/BackglanceSearch/HybridSearch.swift
-import Foundation
-import GRDB
-import BackglanceCore
-
-public struct SearchHit: Sendable, Equatable, Identifiable {
-    public enum Source: String, Sendable { case fts, fuzzy, semantic }
-    public let notificationID: Int64
-    public let score: Double
-    public let sources: Set<Source>
-    public let snippet: String?
-    public var id: Int64 { notificationID }
-}
-
-public struct SearchOptions: Sendable {
-    public var semanticEnabled: Bool
-    public var limit: Int
-    public init(semanticEnabled: Bool, limit: Int = 100) {
-        self.semanticEnabled = semanticEnabled
-        self.limit = limit
-    }
-}
-
 public actor HybridSearch {
     public enum Limits {
         public static let fuzzyCandidates = 5_000
@@ -692,149 +613,35 @@ public actor HybridSearch {
         public static let weightFTS = 0.4, weightSemantic = 0.5, weightFuzzy = 0.3
     }
 
-    private let archive: Archive
-    private let fts: FTSIndex
-    private let fuzzy: FuzzyMatcher
-    private let semantic: SemanticIndex
-    private let apps: AppResolver
+    public init(
+        archive: Archive,
+        semantic: SemanticIndex? = nil,
+        fuzzy: FuzzyMatcher = FuzzyMatcher(),
+        triage: any TriageEvaluating = NoTriage()
+    )
 
-    public init(archive: Archive, semantic: SemanticIndex) {
-        self.archive = archive
-        self.fts = FTSIndex(archive: archive)
-        self.fuzzy = FuzzyMatcher()
-        self.semantic = semantic
-        self.apps = AppResolver(archive: archive)
-    }
+    /// Parses `query.text`, then runs FTS, fuzzy (only when FTS came back
+    /// thin) and — when `semanticEnabled` and the free text reads as a
+    /// sentence — semantic, and fuses the branches.
+    /// - Throws: `SearchError.invalidQuery` for an unreadable date, and
+    ///   `SearchError.cancelled` when a later keystroke superseded this search.
+    public func search(_ query: SearchQuery, semanticEnabled: Bool = false) async throws -> [SearchHit]
 
-    public func search(_ q: SearchQuery, options: SearchOptions) async throws -> [SearchHit] {
-        if q.isEmpty { return [] }
-        let appIDs = try await apps.resolve(q.appTerms)
-        if !q.appTerms.isEmpty && appIDs.isEmpty { return [] }   // "from:xyz" matched nothing
-        try Task.checkCancellation()
+    /// Full text only, synchronously — what the timeline's search field calls
+    /// while the user is still typing.
+    nonisolated public func ftsOnly(_ query: SearchQuery, limit: Int = 200) throws -> [SearchHit]
 
-        // 1. FTS (or the negation-only / filter-only path)
-        let ftsHits: [FTSHit]
-        if q.matchExpression != nil {
-            ftsHits = try await fts.search(q, appIDs: appIDs)
-        } else {
-            ftsHits = try await filterOnly(q, appIDs: appIDs)
-        }
-        try Task.checkCancellation()
-
-        // 2. Fuzzy, only when FTS came back thin and there is something to fuzz.
-        async let fuzzyHits: [FuzzyMatcher.Match] = {
-            guard ftsHits.count < Limits.fuzzyTriggerBelow,
-                  let term = q.freeTerms.last, term.count >= 3 else { return [] }
-            let candidates = try await self.fuzzyCandidates(q, appIDs: appIDs)
-            return self.fuzzy.matches(query: term, in: candidates)
-        }()
-
-        // 3. Semantic, only when enabled, available and the free text is a sentence-ish thing.
-        async let semanticHits: [SemanticHit] = {
-            guard options.semanticEnabled, await self.semantic.isAvailable,
-                  q.freeTerms.count >= Limits.semanticMinWords else { return [] }
-            do {
-                let vector = try await self.semantic.embed(q.freeTerms.joined(separator: " "))
-                return try await self.semantic.search(queryVector: vector, appIDs: appIDs,
-                                                      after: q.after, before: q.before)
-            } catch let error as SemanticIndex.SemanticError {
-                Logger.search.notice("Semantic layer skipped: \(error.localizedDescription, privacy: .public)")
-                return []                                     // degrade, never fail the whole search
-            }
-        }()
-
-        let (fz, sm) = try await (fuzzyHits, semanticHits)
-        try Task.checkCancellation()
-
-        var merged = fuse(fts: ftsHits, fuzzy: fz, semantic: sm)
-        if q.flags.contains(.vip) { merged = try await applyVIPFilter(merged) }
-        return Array(merged.prefix(options.limit))
-    }
-
-    // MARK: - Fusion
-
-    func fuse(fts: [FTSHit], fuzzy: [FuzzyMatcher.Match], semantic: [SemanticHit]) -> [SearchHit] {
-        struct Acc { var score = 0.0; var sources = Set<SearchHit.Source>(); var snippet: String? }
-        var acc: [Int64: Acc] = [:]
-        func add(_ id: Int64, rank: Int, weight: Double, source: SearchHit.Source, snippet: String? = nil) {
-            var a = acc[id] ?? Acc()
-            a.score += weight * (1.0 / (Limits.rrfK + Double(rank)))
-            a.sources.insert(source)
-            if a.snippet == nil { a.snippet = snippet }
-            acc[id] = a
-        }
-        for (i, h) in fts.enumerated()      { add(h.notificationID, rank: i + 1, weight: Limits.weightFTS, source: .fts, snippet: h.snippet) }
-        for (i, h) in semantic.enumerated() { add(h.notificationID, rank: i + 1, weight: Limits.weightSemantic, source: .semantic) }
-        for (i, h) in fuzzy.enumerated()    { add(h.id, rank: i + 1, weight: Limits.weightFuzzy, source: .fuzzy) }
-        return acc.map { SearchHit(notificationID: $0.key, score: $0.value.score, sources: $0.value.sources, snippet: $0.value.snippet) }
-                  .sorted { $0.score == $1.score ? $0.notificationID > $1.notificationID : $0.score > $1.score }
-    }
-
-    // MARK: - Helpers
-
-    private func filterOnly(_ q: SearchQuery, appIDs: [Int64]) async throws -> [FTSHit] {
-        try await archive.reader.read { db in
-            var sql = "SELECT n.id AS id FROM notifications n WHERE n.is_deleted = 0"
-            var args = StatementArguments()
-            if !appIDs.isEmpty {
-                sql += " AND n.app_id IN (" + appIDs.map { _ in "?" }.joined(separator: ",") + ")"
-                args += StatementArguments(appIDs)
-            }
-            if let after = q.after  { sql += " AND n.delivered_at >= ?"; args += [after.timeIntervalSince1970] }
-            if let before = q.before { sql += " AND n.delivered_at < ?";  args += [before.timeIntervalSince1970] }
-            if q.flags.contains(.missed)  { sql += " AND (n.away_session_id IS NOT NULL OR n.presented = 0)" }
-            if q.flags.contains(.pinned)  { sql += " AND n.is_pinned = 1" }
-            if q.flags.contains(.hasLink) { sql += " AND n.deep_link IS NOT NULL" }
-            if let neg = q.negatedOnlyExpression {
-                sql += " AND n.id NOT IN (SELECT rowid FROM notifications_fts WHERE notifications_fts MATCH ?)"
-                args += [neg]
-            }
-            sql += " ORDER BY n.delivered_at DESC LIMIT 200"
-            return try Row.fetchAll(db, sql: sql, arguments: args).map {
-                FTSHit(notificationID: $0["id"], score: 0, snippet: "")
-            }
-        }
-    }
-
-    private func fuzzyCandidates(_ q: SearchQuery, appIDs: [Int64]) async throws -> [FuzzyMatcher.Candidate] {
-        try await archive.reader.read { db in
-            var sql = "SELECT id, title, sender FROM notifications WHERE is_deleted = 0"
-            var args = StatementArguments()
-            if !appIDs.isEmpty {
-                sql += " AND app_id IN (" + appIDs.map { _ in "?" }.joined(separator: ",") + ")"
-                args += StatementArguments(appIDs)
-            }
-            if let after = q.after  { sql += " AND delivered_at >= ?"; args += [after.timeIntervalSince1970] }
-            if let before = q.before { sql += " AND delivered_at < ?";  args += [before.timeIntervalSince1970] }
-            sql += " ORDER BY delivered_at DESC LIMIT ?"
-            args += [Limits.fuzzyCandidates]
-            var out: [FuzzyMatcher.Candidate] = []
-            for row in try Row.fetchAll(db, sql: sql, arguments: args) {
-                let id: Int64 = row["id"]
-                if let t: String = row["title"]  { out.append(.init(id: id, text: t)) }
-                if let s: String = row["sender"] { out.append(.init(id: id, text: s)) }
-            }
-            return out
-        }
-    }
-
-    private func applyVIPFilter(_ hits: [SearchHit]) async throws -> [SearchHit] {
-        let ids = hits.map(\.notificationID)
-        let vipIDs = try await archive.reader.read { db -> Set<Int64> in
-            let rules = try Rule.filter(Column("kind") == "vip" && Column("is_enabled") == true).fetchAll(db)
-            let rows = try ArchivedNotification.filter(ids.contains(Column("id"))).fetchAll(db)
-            var out = Set<Int64>()
-            for n in rows where RulesEngine.evaluate(n, rules: rules).matchedRuleIDs.isEmpty == false {
-                out.insert(n.id!)
-            }
-            return out
-        }
-        return hits.filter { vipIDs.contains($0.notificationID) }
-    }
+    /// The merge itself: static and pure, so the arithmetic is testable
+    /// without an archive, an index or an embedding model.
+    static func fuse(fts: [FTSHit], fuzzy: [FuzzyMatcher.Match], semantic: [SemanticHit]) -> [SearchHit]
 }
 ```
 
-`AppResolver.resolve` (not shown in full) does a case-insensitive match of each `from:` term against `apps.display_name`, then `apps.bundle_id`, then `bundle_id LIKE '%term%'`; if a term matches more than one app, all matching ids are included (`from:mail` returns Mail and Airmail; users disambiguate with the bundle id).
+A `from:`/`app:` term that matches no known app is a deliberate zero results, not a dropped filter — showing everything when a filter matched nothing is the failure that makes people stop trusting a search box. The structured filters (`after`, `before`, `sender`, `thread`, flags) ride inside the same FTS statement rather than a second pass over the candidate ids — built by `HybridSearch+Filters.swift`, which exposes `filterSQL`, `filterFragment` and `fuzzyCandidateSQL` as pure `(sql, arguments)` builders. The semantic branch never throws: a failure there costs the hit its `.semantic` source, never the whole search.
+
+`AppResolver.resolve(_:)` unions two passes: an exact match against every id in `bundleIDs`, and a case-insensitive substring match of `appNameContains` against `apps.display_name` OR `apps.bundle_id` — so `from:mail` returns both Mail and Airmail; users disambiguate with the bundle id.
+
+The merge loop and the SQL builders are deliberately not reproduced here; `HybridSearchTests.swift` pins the fusion arithmetic (weights, rank order, tie-breaking) and `HybridSearch.swift` is short enough to read directly.
 
 ### Debounce and Cancellation
 
@@ -842,59 +649,31 @@ Search runs as you type. Two mechanisms keep it cheap: a 120 ms debounce so a fa
 
 ```swift
 // Packages/BackglanceUI/Sources/BackglanceUI/Search/SearchViewModel.swift
-import Foundation
-import Observation
-import BackglanceSearch
-import BackglanceCore
-
 @MainActor @Observable
 public final class SearchViewModel {
-    public var text = "" { didSet { schedule() } }
-    public private(set) var hits: [SearchHit] = []
-    public private(set) var isSearching = false
-    public private(set) var inlineError: String?
+    public init(
+        search: any SearchRunning,
+        semanticEnabled: @escaping @Sendable () -> Bool = { false },
+        debounce: Duration = .milliseconds(120)
+    )
 
-    private let search: HybridSearch
-    private let parser = QueryParser()
-    private let semanticEnabled: () -> Bool
-    private var task: Task<Void, Never>?
+    public private(set) var hits: [SearchHit]
+    public private(set) var isSearching: Bool
+    public private(set) var inlineError: String?   // one sentence, never the query text
 
-    public init(search: HybridSearch, semanticEnabled: @escaping () -> Bool) {
-        self.search = search
-        self.semanticEnabled = semanticEnabled
-    }
+    /// Assigning schedules a search after `debounce`; it does not run one.
+    public var text: String
 
-    private func schedule() {
-        task?.cancel()
-        let snapshot = text
-        task = Task { [weak self] in
-            guard let self else { return }
-            do {
-                try await Task.sleep(for: .milliseconds(120))    // debounce; throws on cancel
-                let q = try parser.parse(snapshot)
-                self.inlineError = nil
-                if q.isEmpty { self.hits = []; self.isSearching = false; return }
-                self.isSearching = true
-                let result = try await search.search(q, options: .init(semanticEnabled: semanticEnabled()))
-                try Task.checkCancellation()                       // a newer query may have won
-                self.hits = result
-                self.isSearching = false
-            } catch is CancellationError {
-                // superseded; the newer task owns the UI now
-            } catch let error as QueryParser.ParseError {
-                self.inlineError = error.localizedDescription
-                self.isSearching = false
-            } catch {
-                self.inlineError = "Search failed. Try again or rebuild the index in Settings ▸ Advanced."
-                self.isSearching = false
-                Logger.ui.error("Search failed: \(error.localizedDescription, privacy: .public)")
-            }
-        }
-    }
+    public func clear()             // what Esc does before it closes anything
+    public func searchNow() async   // runs immediately, skipping the debounce — what ↩ does
 }
 ```
 
-The `SearchBar` view is thin: a `TextField` bound to `viewModel.text`, a `ProgressView` when `isSearching` (delayed by 200 ms so fast searches never flicker), the chip strip and the inline error `Text` in the secondary colour.
+`SearchRunning` is a one-method protocol (`search(_:semanticEnabled:) async throws -> [SearchHit]`) that `HybridSearch` conforms to; the view model depends on that protocol rather than importing `BackglanceSearch` directly, so `BackglanceUI` never imports the search engine (docs/getting-started/DEVELOPMENT_GUIDE.md#dependency-direction), and tests hand it a stub for determinism.
+
+Sleeping happens before any work starts, which is what makes this a debounce rather than a throttle: a cancelled sleep throws before the search runs. After the search returns, cancellation is checked once more — a newer keystroke may have won while the archive was being read — so a superseded result is dropped rather than shown. `SearchViewModelTests.swift` covers both: one query per pause, and a stale result losing the race.
+
+The `SearchBar` view is thin: a `TextField` bound to `viewModel.text`, a `ProgressView` when `isSearching` (delayed so a fast search never flickers one), the chip strip, and the inline error `Text` in the secondary colour.
 
 ## Performance Targets
 
@@ -930,9 +709,9 @@ Reads use `DatabasePool` readers so a search never blocks capture writes. If FTS
 | Unterminated quote (`"invoice over`) | treated as a phrase to end of input; no error |
 | Very short query (1 character) | FTS prefix on 1 char is allowed by SQLite but skipped by Backglance: the parser still runs, `HybridSearch` returns `[]` and the empty state shows the hint. 2+ characters search normally (prefix index covers 2 and 3). |
 | Only filters, no text (`is:missed from:slack`) | `filterOnly` path; ordered by `delivered_at DESC`, no snippets |
-| Only negations (`-draft`) | `negatedOnlyExpression` path; `NOT IN` subquery over the FTS table |
+| Only negations (`-draft`) | `isNegationOnly` is true and `ftsMatch` carries just the excluded terms; the caller wraps it in a `NOT IN` subquery over the FTS table |
 | `from:` matches nothing | zero results plus a chip reading "No app matches 'xyz'"; no error dialog |
-| `before:` / `after:` unreadable | `ParseError.badDate` shown inline; results from the previous good query stay on screen |
+| `before:` / `after:` unreadable | `SearchError.invalidQuery` shown inline; results from the previous good query stay on screen |
 | `after:` later than `before:` | valid query, zero results; the empty state says "Date range is empty" |
 | Turkish dotless ı / dotted İ | `unicode61` case-folds `I → i` and `İ → i̇` → (`remove_diacritics`) `i`, but **`ı` (U+0131) has no diacritic to remove and does not fold to `i`**. Typing `isik` will not match `ışık`; typing `ışık` matches exactly. Documented in Settings ▸ Search help and [INTERNATIONALIZATION.md](../reference/INTERNATIONALIZATION.md); the fuzzy layer usually rescues it (distance 1–2). |
 | German ß | not decomposed by `remove_diacritics`; `strasse` does not match `Straße` in FTS. Fuzzy layer catches short cases. |
@@ -951,118 +730,16 @@ Reads use `DatabasePool` readers so a search never blocks capture writes. If FTS
 
 ## Testing Approach
 
-All search tests live in `Tests/BackglanceSearchTests` and run against `Archive(inMemory: true)`; nothing touches the user's archive or Apple's store.
+Search tests split by what they need: parser and fusion-arithmetic tests are pure Swift, no archive; the FTS, semantic and end-to-end tests run against a real `Archive(inMemory: true)`, because the behavior under test — bm25 weighting, snippet markers, cosine ranking — only exists once the underlying engine actually runs the query. Nothing here touches the user's archive or Apple's store.
 
-**Query parser table tests** (Swift Testing, pure logic):
+- **`QueryParserTests.swift`** (`Tests/BackglanceSearchTests/Unit`) — every `key:value` filter, all three date tiers, phrases, negation, and `testInvalidDateThrowsWithoutEchoingTheQuery`, the one case that throws `SearchError.invalidQuery` and asserts the message never contains what the user typed.
+- **`FTSIndexTests.swift`** (`Unit`) — a real in-memory archive. `testTitleOutranksBody` for the bm25 column weights, `testSnippetCarriesMatchMarkers`, `testDeletedRowsNeverReturned`, and `testMissingIndexThrowsIndexUnavailable` for the one error `FTSIndex.search` throws.
+- **`HybridSearchTests.swift`** (`Integration`) — two halves: `HybridSearch.fuse` tested directly as pure arithmetic (weights, rank order, tie-breaking on id, `testNothingInNothingOut`), and `HybridSearch.search` tested end to end against a seeded archive (a free term, a filters-only query, a negation-only query, `testAnAppFilterThatMatchesNothingReturnsNothing`).
+- **`SemanticIndexTests.swift`** / **`EmbeddingIndexerTests.swift`** (`Unit`) — `embeddableText` as pure string-joining logic, candidate queries asserted to apply the same `after`/`before`/app filters the full-text branch does, and ranking against precomputed vectors rather than a live model, so these do not depend on `NLEmbedding` being present on the runner.
+- **`SearchViewModelTests.swift`** (`Tests/BackglanceUITests`) — the debounce (one search per pause, the last text typed wins), cancellation (`searchNow()` skips the wait, a cancelled search leaves no error), and every `emptyStateKind` case, all against a stub `SearchRunning`.
+- **`SearchLatencyTests.swift`** (`Performance`) — the p95 budgets from [PERFORMANCE_GUIDE.md](../deployment/PERFORMANCE_GUIDE.md), gated behind `BACKGLANCE_PERF=1` against a shared hundred-thousand-row archive, and skipped otherwise since runner variance would make the budget meaningless on an unstated machine.
 
-```swift
-import Testing
-@testable import BackglanceSearch
-
-@Suite struct QueryParserTests {
-    let parser = QueryParser()
-    let ctx = QueryParser.Context(now: Date(timeIntervalSince1970: 1_755_432_000), // 2026-08-17 12:00 UTC
-                                  calendar: { var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "UTC")!; return c }())
-
-    @Test(arguments: [
-        ("invoice",                    "(\"invoice\"*)"),
-        ("invoice over",               "(\"invoice\" \"over\"*)"),
-        ("\"invoice over\"",           "(\"invoice over\")"),
-        ("invoice -draft",             "(\"invoice\"*) NOT \"draft\""),
-        ("sender:Ayşe invoice",        "sender:\"Ayşe\"* AND (\"invoice\"*)"),
-        ("re:invoice",                 "(\"re:invoice\"*)"),
-        ("a AND (b",                   "(\"a\" \"AND\" \"(b\"*)"),
-        ("say \"hi\" there",           "(\"say\" \"hi\" \"there\"*)"),
-    ])
-    func matchExpression(input: String, expected: String) throws {
-        #expect(try parser.parse(input, context: ctx).matchExpression == expected)
-    }
-
-    @Test func relativeDates() throws {
-        let q = try parser.parse("after:-7d before:today", context: ctx)
-        #expect(q.after == Date(timeIntervalSince1970: 1_754_784_000))  // 2026-08-10 00:00 UTC
-        #expect(q.before == Date(timeIntervalSince1970: 1_755_388_800)) // 2026-08-17 00:00 UTC
-    }
-
-    @Test func badDateThrows() {
-        #expect(throws: QueryParser.ParseError.badDate(key: "before", value: "soonish")) {
-            _ = try parser.parse("before:soonish", context: ctx)
-        }
-    }
-
-    @Test func negationOnly() throws {
-        let q = try parser.parse("-draft -\"work in progress\"", context: ctx)
-        #expect(q.matchExpression == nil)
-        #expect(q.negatedOnlyExpression == "\"draft\" OR \"work in progress\"")
-    }
-}
-```
-
-**FTS ranking tests** with a seeded archive (`SeededArchive.make(count: 1_000, seed: 42)` in the test support target generates deterministic titles/bodies/senders across 12 synthetic apps; OTP-like bodies use `String(format: "%06d", rng.next() % 1_000_000)` and are run through `OTPRedactor` so the archive never contains a raw code):
-
-```swift
-import XCTest
-import GRDB
-@testable import BackglanceSearch
-@testable import BackglanceCore
-
-final class FTSRankingTests: XCTestCase {
-    var archive: Archive!
-    var search: HybridSearch!
-
-    override func setUp() async throws {
-        archive = try SeededArchive.make(count: 1_000, seed: 42)
-        search = HybridSearch(archive: archive, semantic: SemanticIndex(archive: archive))
-    }
-
-    func testTitleMatchOutranksBodyMatch() async throws {
-        // Seed guarantees: id 17 has "Invoice" in title only, id 18 has "invoice" in body only.
-        let hits = try await search.search(try QueryParser().parse("invoice"), options: .init(semanticEnabled: false))
-        let ids = hits.map(\.notificationID)
-        XCTAssertLessThan(ids.firstIndex(of: 17)!, ids.firstIndex(of: 18)!)
-    }
-
-    func testRedactedCodeIsFindableByPlaceholderOnly() async throws {
-        let placeholderHits = try await search.search(try QueryParser().parse("code redacted"), options: .init(semanticEnabled: false))
-        XCTAssertFalse(placeholderHits.isEmpty)
-        let digitHits = try await search.search(try QueryParser().parse("123456"), options: .init(semanticEnabled: false))
-        XCTAssertTrue(digitHits.isEmpty)   // digits never entered the archive
-    }
-
-    func testFuzzyRescuesTypo() async throws {
-        let hits = try await search.search(try QueryParser().parse("invoce"), options: .init(semanticEnabled: false))
-        XCTAssertTrue(hits.contains { $0.sources.contains(.fuzzy) })
-    }
-
-    func testFTSLatencyAt100k() async throws {
-        try XCTSkipUnless(ProcessInfo.processInfo.environment["BG_PERF"] == "1", "perf tests opt-in")
-        let big = try SeededArchive.make(count: 100_000, seed: 7)
-        let s = HybridSearch(archive: big, semantic: SemanticIndex(archive: big))
-        let q = try QueryParser().parse("from:slack after:-7d invoice")
-        measure(metrics: [XCTClockMetric()]) {
-            let exp = expectation(description: "search")
-            Task { _ = try await s.search(q, options: .init(semanticEnabled: false)); exp.fulfill() }
-            wait(for: [exp], timeout: 5)
-        }
-    }
-}
-```
-
-**Semantic tests** skip cleanly where the model is missing:
-
-```swift
-final class SemanticIndexTests: XCTestCase {
-    func testSentenceQueryFindsParaphrase() async throws {
-        let index = SemanticIndex(archive: try SeededArchive.make(count: 200, seed: 3))
-        try XCTSkipUnless(await index.isAvailable, "NLEmbedding English sentence model not available on this runner")
-        let v = try await index.embed("the message about the invoice being paid")
-        let hits = try await index.search(queryVector: v, appIDs: [], after: nil, before: nil)
-        XCTAssertTrue(hits.contains { $0.notificationID == 42 })   // seed 3: id 42 = "Your invoice #2231 has been settled"
-    }
-}
-```
-
-**Trigger tests** insert, update the body, soft-delete, hard-delete a row and assert `SELECT COUNT(*) FROM notifications_fts WHERE notifications_fts MATCH ?` at each step. **Cancellation tests** start a search on the 100k archive, cancel after 5 ms and assert the task finishes with `CancellationError` within 50 ms. CI runs the whole target on `macos-14`, `macos-15`, `macos-26` ([CI_CD.md](../deployment/CI_CD.md)); the perf test runs only on `macos-26` with `BG_PERF=1`.
+The FTS5 sync triggers (insert/update/soft-delete/hard-delete keeping `notifications_fts` in step) are exercised alongside the rest of the archive in `Tests/BackglanceCoreTests`, not here — they are a property of the schema, not of search. CI runs the full suite on `macos-14`, `macos-15` and `macos-26` ([CI_CD.md](../deployment/CI_CD.md)); the perf suite runs only with `BACKGLANCE_PERF=1` set.
 
 ## Next Steps
 
