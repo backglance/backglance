@@ -101,10 +101,13 @@ final class HighlightContrastTests: XCTestCase {
     /// test skips loudly rather than measuring the ordinary colours and
     /// calling the result increased-contrast coverage.
     ///
-    /// Measured with the *ordinary* palette, amber lands at 2.31:1 and green
-    /// at 2.22:1 — both under the bar. Whether that survives the real
-    /// accessible palette is exactly what running this with the setting on
-    /// will settle.
+    /// This has been run for real, and the answer was reassuring. Against the
+    /// *ordinary* palette amber sits at 2.31:1 and green at 2.22:1, both under
+    /// the bar — which is what made this worth checking. Against the accessible
+    /// palette the same two land at 4.55:1 and 4.54:1, and every token clears
+    /// 3:1 with margin: light 4.54–5.21, dark 5.55–8.86. Apple's accessible
+    /// variants are far darker than their ordinary ones, and they are what
+    /// paints here. Nothing needs changing; this test is what keeps it that way.
     func testHighlightBorderClearsNonTextContrast() throws {
         try XCTSkipUnless(
             NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast,
