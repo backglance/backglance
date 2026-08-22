@@ -1,5 +1,8 @@
+import AppKit
 import BackglanceCapture
+import BackglanceCore
 import BackglanceUI
+import UniformTypeIdentifiers
 
 // MARK: - AppDelegate + capture status
 
@@ -60,6 +63,69 @@ extension AppDelegate {
 
         case .stopped:
             .stopped
+        }
+    }
+
+    /// The Status pane's model.
+    ///
+    /// Everything it shows about capture comes through one mirror of the engine's status and
+    /// metrics, and everything it shows about the archive comes from the archive — which is
+    /// exactly the split ``BackglanceCore/DiagnosticsExport`` uses, so what the user reads
+    /// here is what the maintainer receives.
+    func makeStatusModel(archive: Archive) -> StatusSettingsModel {
+        StatusSettingsModel(
+            archive: archive,
+            readCaptureHealth: { [weak self] in
+                guard let engine = await MainActor.run(body: { self?.engine }) else {
+                    return CaptureHealth()
+                }
+                let metrics = await engine.metrics
+                let adapterID = await engine.adapterID
+                let fingerprint = try? archive.captureState(.fingerprint)
+                return await CaptureHealth(
+                    status: Self.timelineState(for: engine.status),
+                    adapterID: adapterID,
+                    fingerprint: fingerprint.map { String($0.prefix(16)) },
+                    lastTickAt: metrics.lastTickAt,
+                    lastTickRecords: metrics.totals.read
+                )
+            },
+            readFullDiskAccess: { [weak self] in
+                MainActor.assumeIsolated { Self.displayState(self?.monitor?.state ?? .denied) }
+            },
+            saveDiagnostics: { [weak self] options in
+                await MainActor.run { self?.saveDiagnostics(archive: archive, options: options) }
+            }
+        )
+    }
+
+    /// Builds the bundle, then asks where to put it.
+    ///
+    /// In that order deliberately: the files exist in memory before any panel appears, so the
+    /// user is choosing a destination for something already assembled rather than authorising
+    /// a build they cannot inspect. Nothing is written until they pick.
+    @MainActor
+    private func saveDiagnostics(archive: Archive, options: DiagnosticsExport.Options) -> URL? {
+        do {
+            let files = try DiagnosticsExport.build(archive: archive, options: options)
+            let panel = NSSavePanel()
+            panel.nameFieldStringValue = "Backglance-Diagnostics.zip"
+            panel.allowedContentTypes = [UTType.zip]
+            panel.message = String(localized: "A zip of versions, capture state and counts. No notification text.")
+            guard panel.runModal() == .OK, let destination = panel.url else {
+                return nil
+            }
+            let zip = try DiagnosticsExport.write(files)
+            try? FileManager.default.removeItem(at: destination)
+            try FileManager.default.moveItem(at: zip, to: destination)
+            return destination
+        } catch {
+            // Through the redacting logger, like every other line in the app: the detail is an
+            // `ArchiveError`'s content-free description, and there is no second path that
+            // could be handed something richer.
+            let detail = (error as? ArchiveError)?.logDescription ?? ArchiveError.detail(from: error)
+            Log.archive.error("diagnostics export failed: \(detail)")
+            return nil
         }
     }
 }

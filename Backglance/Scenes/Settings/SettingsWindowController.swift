@@ -17,7 +17,8 @@ final class SettingsWindowController: NSWindowController {
         search: SearchService,
         digest: DigestSettingsModel,
         privacy: PrivacySettingsModel,
-        permissions: PermissionsSettingsModel
+        permissions: PermissionsSettingsModel,
+        status: StatusSettingsModel
     ) {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 520, height: 620),
@@ -32,7 +33,8 @@ final class SettingsWindowController: NSWindowController {
                 search: search,
                 digest: digest,
                 privacy: privacy,
-                permissions: permissions
+                permissions: permissions,
+                status: status
             )
         )
         // The window owns its size. Left to the hosting controller, the form's

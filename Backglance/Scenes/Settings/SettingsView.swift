@@ -5,14 +5,17 @@ import SwiftUI
 
 /// Settings, as far as this milestone has settings.
 ///
-/// Three tabs. General holds Search — semantic indexing is the first thing the app
+/// Four tabs. General holds Search — semantic indexing is the first thing the app
 /// does that needs the user's permission in the plain sense, since it reads every
 /// notification they have ever received and writes a vector for each one — and
 /// Digest, which owns the app's only permission prompt. Privacy holds everything
 /// that decides what Backglance keeps, assembled by `PrivacySettingsView`
 /// (docs/features/PRIVACY_CONTROLS.md#ui-components). Permissions reports what
 /// macOS has allowed, and is the one place that can reopen setup
-/// (docs/features/PERMISSIONS_PRIVACY.md#ui-components).
+/// (docs/features/PERMISSIONS_PRIVACY.md#ui-components). Status answers the one
+/// question capture cannot answer for itself — is it working — because capture
+/// fails silently and the timeline simply stops growing
+/// (docs/operations/MONITORING_LOGGING.md#health-indicators-in-the-ui).
 ///
 /// The split is the one the docs called for once the Privacy pane existed. General
 /// gains its own controls — launch at login, the hotkey, updates — in Phase 4.3.
@@ -27,6 +30,8 @@ struct SettingsView: View {
 
     let permissions: PermissionsSettingsModel
 
+    let status: StatusSettingsModel
+
     var body: some View {
         TabView {
             general
@@ -40,6 +45,10 @@ struct SettingsView: View {
             PermissionsSettingsView(model: permissions)
                 .tabItem { Label(String(localized: "Permissions"), systemImage: "lock.shield") }
                 .accessibilityIdentifier("settings.tab.permissions")
+
+            StatusSettingsView(model: status)
+                .tabItem { Label(String(localized: "Status"), systemImage: "waveform.path.ecg") }
+                .accessibilityIdentifier("settings.tab.status")
         }
         .frame(minWidth: 480, minHeight: 420)
     }

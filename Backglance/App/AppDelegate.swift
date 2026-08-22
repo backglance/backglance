@@ -192,7 +192,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             search: search,
             digest: Self.digestSettings(),
             privacy: privacy,
-            permissions: makePermissionsModel()
+            permissions: makePermissionsModel(),
+            status: makeStatusModel(archive: archive)
         )
     }
 
