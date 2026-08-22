@@ -421,233 +421,50 @@ Settings ▸ Advanced ▸ **Export Diagnostics…** writes a zip to a location t
 
 ### The Code That Builds It
 
+`DiagnosticsExport.build(archive:options:environment:statusHistory:logDirectory:now:)` returns
+the bundle as `[String: Data]` — file name to bytes — and `write(_:named:)` stages those to a
+directory and zips it. Returning the bytes rather than writing them straight out is what lets
+`DiagnosticsExportTests` read *every byte that would ship* without going near a file system,
+and it lets the pane list the files before the user picks a destination.
+
 ```swift
-// BackglanceCore/Diagnostics/DiagnosticsExporter.swift
-import Foundation
-import GRDB
-
-public struct DiagnosticsOptions: Sendable {
-    public var includeBundleIDs = false
-    public init() {}
-}
-
-public enum DiagnosticsError: Error {
-    case archiveUnavailable
-    case zipFailed(Int32)
-}
-
-public struct DiagnosticsExporter {
-    let archive: Archive
-    let statusHistory: [CaptureStatusEntry]
-    let settings: SettingsSnapshot
-    let logDirectory: URL
-    let appVersion: String
-    let buildNumber: String
-
-    public func export(to destination: URL, options: DiagnosticsOptions) throws {
-        let fm = FileManager.default
-        let staging = fm.temporaryDirectory.appendingPathComponent("bg-diag-\(UUID().uuidString)")
-        try fm.createDirectory(at: staging, withIntermediateDirectories: true)
-        defer { try? fm.removeItem(at: staging) }
-
-        try writeJSON(manifest(options), to: staging.appendingPathComponent("manifest.json"))
-        try writeJSON(adapterInfo(), to: staging.appendingPathComponent("adapter.json"))
-        try writeJSON(statusHistory.suffix(200), to: staging.appendingPathComponent("capture_status_history.json"))
-        try writeJSON(appCounts(includeBundleIDs: options.includeBundleIDs),
-                      to: staging.appendingPathComponent("app_counts.json"))
-        try writeJSON(archiveStats(), to: staging.appendingPathComponent("archive_stats.json"))
-        try logTail(lines: 500).write(to: staging.appendingPathComponent("log_tail.txt"),
-                                      atomically: true, encoding: .utf8)
-        try writeJSON(settings, to: staging.appendingPathComponent("settings_snapshot.json"))
-
-        try zip(directory: staging, to: destination)
+public enum DiagnosticsExport {
+    public struct Options: Sendable, Equatable {
+        public var includeAppIdentifiers: Bool   // default false
+        public var logTailLines: Int             // default 500
     }
 
-    // MARK: - Sections
+    /// Facts about this Mac that do not come from the archive. A value rather than inline
+    /// reads of `Bundle.main` and `ProcessInfo`, so a test asserts on a known environment
+    /// instead of on whatever machine it runs on.
+    public struct Environment: Sendable { … }
 
-    private func manifest(_ options: DiagnosticsOptions) -> [String: String] {
-        let os = ProcessInfo.processInfo.operatingSystemVersion
-        return [
-            "app_version": appVersion,
-            "build": buildNumber,
-            "macos": "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)",
-            "arch": archName(),
-            "exported_at": ISO8601DateFormatter().string(from: Date()),
-            "contains_app_names": options.includeBundleIDs ? "true" : "false"
-        ]
-    }
-
-    private func adapterInfo() throws -> [String: String] {
-        try archive.read { db in
-            let rows = try Row.fetchAll(db, sql: "SELECT key, value FROM capture_state WHERE key IN ('adapter_id','fingerprint')")
-            var out: [String: String] = [:]
-            for row in rows {
-                let key: String = row["key"]
-                let value: String = row["value"]
-                // fingerprint is stored as JSON of StoreFingerprint; only the hash prefix is exported
-                out[key] = key == "fingerprint" ? String(value.prefix(16)) : value
-            }
-            return out
-        }
-    }
-
-    private struct AppCount: Codable { let app: String; let count: Int }
-
-    private func appCounts(includeBundleIDs: Bool) throws -> [AppCount] {
-        try archive.read { db in
-            let rows = try Row.fetchAll(db, sql: """
-                SELECT bundle_id, notification_count FROM apps ORDER BY notification_count DESC
-                """)
-            return rows.enumerated().map { index, row in
-                let bundleID: String = row["bundle_id"]
-                let label = includeBundleIDs ? bundleID : String(format: "app-%02d", index + 1)
-                return AppCount(app: label, count: row["notification_count"])
-            }
-        }
-    }
-
-    private struct ArchiveStats: Codable {
-        let fileSizeBytes: Int
-        let pageCount: Int
-        let freelistCount: Int
-        let integrityCheck: String
-        let archiveVersion: String
-        let rowCounts: [String: Int]
-    }
-
-    private func archiveStats() throws -> ArchiveStats {
-        let size = (try? FileManager.default.attributesOfItem(atPath: archive.path)[.size] as? Int) ?? 0
-        return try archive.read { db in
-            let pageCount = try Int.fetchOne(db, sql: "PRAGMA page_count") ?? 0
-            let freelist = try Int.fetchOne(db, sql: "PRAGMA freelist_count") ?? 0
-            let integrity = try String.fetchOne(db, sql: "PRAGMA integrity_check") ?? "unknown"
-            let version = try String.fetchOne(db, sql: "SELECT value FROM schema_meta WHERE key = 'archive_version'") ?? "unknown"
-            var counts: [String: Int] = [:]
-            // COUNT(*) only — no text column is ever selected here.
-            for table in ["apps", "notifications", "rules", "away_sessions", "digests", "redactions"] {
-                counts[table] = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM \(table)") ?? 0
-            }
-            return ArchiveStats(fileSizeBytes: size, pageCount: pageCount, freelistCount: freelist,
-                                integrityCheck: integrity, archiveVersion: version, rowCounts: counts)
-        }
-    }
-
-    private func logTail(lines: Int) -> String {
-        let url = logDirectory.appendingPathComponent("backglance.log")
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return "(no file log)\n" }
-        return text.split(separator: "\n", omittingEmptySubsequences: false).suffix(lines).joined(separator: "\n")
-    }
-
-    // MARK: - Helpers
-
-    private func writeJSON<T: Encodable>(_ value: T, to url: URL) throws {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(value).write(to: url, options: .atomic)
-    }
-
-    private func zip(directory: URL, to destination: URL) throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-        process.arguments = ["-c", "-k", "--sequesterRsrc", directory.path, destination.path]
-        try process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else { throw DiagnosticsError.zipFailed(process.terminationStatus) }
-    }
-
-    private func archName() -> String {
-        #if arch(arm64)
-        return "arm64"
-        #else
-        return "x86_64"
-        #endif
-    }
+    public static func build(…) throws -> [String: Data]
+    public static func write(_ files: [String: Data], named: String) throws -> URL
 }
 ```
 
-### The Test That Guards It
+Three implementation notes, each of which is the reason a guarantee holds:
 
-The test seeds an in-memory archive with distinctive synthetic strings in every text column, exports, unzips, and asserts none of the strings appear anywhere in the zip contents.
+- **No `SELECT` reaches a text column.** `archive_stats.json` is `COUNT(*)` and `PRAGMA`;
+  `app_counts.json` reads `apps`, never `notifications`. The exclusion is a property of the
+  code rather than a promise about it, which is what `testTheExportContainsNoArchiveText`
+  turns into a standing check: it seeds a title, a body, a sender and a code, then asserts
+  none of them appears in any file.
+- **Settings are an allow-list, never a dump of the suite.** `UserDefaults` accumulates keys
+  from every part of the app and from macOS itself, so a future setting holding a saved search
+  or a rule pattern would otherwise be exported the day it was added, by code nobody
+  revisited. `exportableSettingKeys` is the whole list, and a test asserts no key in it looks
+  like one that could carry text.
+- **The zip is `NSFileCoordinator`'s `.forUploading`.** Foundation has no archiver, and
+  shelling out to `/usr/bin/zip` from a signed app is a subprocess Backglance has no other
+  reason to have.
 
-```swift
-// Tests/BackglanceCoreTests/DiagnosticsExportTests.swift
-import XCTest
-@testable import BackglanceCore
-
-final class DiagnosticsExportTests: XCTestCase {
-
-    /// Every text column gets a unique sentinel. If any leaks, the test names which one.
-    private let sentinels: [String: String] = [
-        "title":     "SENTINEL-TITLE-7f3a9c",
-        "subtitle":  "SENTINEL-SUBTITLE-2b8e41",
-        "body":      "SENTINEL-BODY-c91d5e",
-        "sender":    "SENTINEL-SENDER-4a6f02",
-        "thread_id": "SENTINEL-THREAD-e0b7d3",
-        "deep_link": "backglance-test://SENTINEL-LINK-58c2aa",
-        "bundle_id": "com.example.SENTINEL-APP-1d9f6b",
-        "rule":      "SENTINEL-RULE-a3c8e7"
-    ]
-
-    func testExportContainsNoArchiveText() throws {
-        let archive = try Archive(inMemory: true)
-        try archive.write { db in
-            try db.execute(sql: """
-                INSERT INTO apps (bundle_id, first_seen_at, last_seen_at, notification_count)
-                VALUES (?, 0, 0, 1)
-                """, arguments: [sentinels["bundle_id"]!])
-            try db.execute(sql: """
-                INSERT INTO notifications (uuid, app_id, title, subtitle, body, sender, thread_id,
-                    delivered_at, captured_at, deep_link)
-                VALUES ('00000000-0000-0000-0000-000000000001', 1, ?, ?, ?, ?, ?, 0, 0, ?)
-                """, arguments: [sentinels["title"]!, sentinels["subtitle"]!, sentinels["body"]!,
-                                 sentinels["sender"]!, sentinels["thread_id"]!, sentinels["deep_link"]!])
-            try db.execute(sql: """
-                INSERT INTO rules (kind, pattern, created_at) VALUES ('highlight', ?, 0)
-                """, arguments: [sentinels["rule"]!])
-        }
-
-        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("diag-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: tmp) }
-        let zipURL = tmp.appendingPathComponent("diag.zip")
-
-        let exporter = DiagnosticsExporter(
-            archive: archive,
-            statusHistory: [],
-            settings: SettingsSnapshot.empty,
-            logDirectory: tmp,          // no log file present -> "(no file log)"
-            appVersion: "1.0.0", buildNumber: "1")
-
-        // Default options: bundle IDs NOT included.
-        try exporter.export(to: zipURL, options: DiagnosticsOptions())
-
-        let unzipDir = tmp.appendingPathComponent("unzipped")
-        let unzip = Process()
-        unzip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-        unzip.arguments = ["-x", "-k", zipURL.path, unzipDir.path]
-        try unzip.run(); unzip.waitUntilExit()
-        XCTAssertEqual(unzip.terminationStatus, 0)
-
-        // Concatenate every file in the export and search for each sentinel.
-        var blob = ""
-        let files = try FileManager.default.contentsOfDirectory(at: unzipDir, includingPropertiesForKeys: nil)
-        XCTAssertFalse(files.isEmpty, "export produced no files")
-        for file in files {
-            blob += (try? String(contentsOf: file, encoding: .utf8)) ?? ""
-        }
-        for (column, sentinel) in sentinels {
-            XCTAssertFalse(blob.contains(sentinel), "diagnostics export leaked archive column '\(column)'")
-        }
-    }
-
-    func testOptInIncludesBundleIDsOnly() throws {
-        // Same setup, options.includeBundleIDs = true: bundle ID may appear, content still may not.
-        // Elided for brevity in docs; identical structure, asserting bundle_id present and others absent.
-    }
-}
-```
-
-The `apps` table's `display_name` column is deliberately not read even with opt-in; the export shows bundle IDs only, because display names are user-visible strings that can be localized or edited.
+App identities are anonymised by default and sorted loudest-first, so `app-01` is the noisiest.
+"Which apps notify you" is itself personal — a dating app, a psychiatrist's booking system, a
+union's messenger — and the anonymised form still answers the question a "why is Backglance
+slow" report is asking. `manifest.json` records `contains_app_names`, so a reader never has to
+guess whether `app-01` is a label or an app literally called that.
 
 ### Reviewing the Zip Before Sending
 
