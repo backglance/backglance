@@ -219,58 +219,33 @@ After a reset, Backglance's next probe returns `.denied` and the onboarding re-e
 Detection is an attempt to open the store read-only. `FileManager.isReadableFile(atPath:)` is *not* reliable for TCC-protected paths (it can return `true` because it consults `access(2)`, which reflects POSIX permissions, not TCC), so the probe uses `open(2)` and inspects `errno`.
 
 ```swift
-import Foundation
-import Darwin
-
 /// Result of probing whether this process can read the system store.
 public enum FullDiskAccessState: Equatable, Sendable {
-    /// The store file opened read-only. FDA is granted (or the file is somehow world-readable).
-    case granted
-    /// open(2) failed with EPERM/EACCES: TCC is blocking us. FDA is not granted.
-    case denied
-    /// The store path does not exist. Either macOS layout changed or Notification Center has
-    /// never run for this user. This is NOT a permission problem.
-    case storeMissing
+    case granted        // the store opened read-only
+    case denied         // open(2) refused: TCC is blocking us
+    case storeMissing   // the store is not there, and we can see that it is not there
 }
 
 public struct FullDiskAccessProbe: Sendable {
-    public init() {}
+    /// - Parameter storeLocation: injected so a test can point the probe at a file it controls.
+    public init(storeLocation: @escaping @Sendable () throws -> URL = { StoreLocation.expected() })
 
-    /// Synchronous, cheap (one open/close). Safe to call from any thread.
-    public func probe(storeURL: URL? = nil) -> FullDiskAccessState {
-        let url: URL
-        do {
-            url = try storeURL ?? StoreLocation.current()
-        } catch {
-            return .storeMissing
-        }
-        // Use the parent directory as a second signal: if we can't even list the
-        // container directory, TCC is denying us regardless of the file's existence.
-        let path = url.path
-        let fd = open(path, O_RDONLY | O_NONBLOCK)
-        if fd >= 0 {
-            close(fd)
-            return .granted
-        }
-        switch errno {
-        case EPERM, EACCES:
-            return .denied
-        case ENOENT:
-            // File missing. Distinguish "no FDA, so we cannot even see it" from "truly absent"
-            // by attempting the directory. Without FDA, opendir on the group container also fails EPERM.
-            let dirFD = open(url.deletingLastPathComponent().path, O_RDONLY | O_DIRECTORY)
-            if dirFD >= 0 {
-                close(dirFD)
-                return .storeMissing
-            }
-            return errno == EPERM || errno == EACCES ? .denied : .storeMissing
-        default:
-            // EBUSY/EINTR/etc. — treat as denied for UI purposes; the capture engine will retry.
-            return .denied
-        }
-    }
+    /// Synchronous, one open/close, no cached answer — a cache is what would break
+    /// "grant it and come back".
+    public func probe() -> FullDiskAccessState
+    public static func probe(at url: URL) -> FullDiskAccessState
 }
 ```
+
+How each `errno` is read:
+
+| Result of `open(path, O_RDONLY \| O_NONBLOCK)` | State | Why |
+|---|---|---|
+| succeeds | `.granted` | Nothing else needs asking |
+| `EPERM`, `EACCES` | `.denied` | TCC is refusing |
+| `ENOTDIR` | `.storeMissing` | A component of the path is not a directory, so nothing can exist there. Nobody is being denied anything |
+| `ENOENT` | the container decides | Ambiguous: a denied process is told the file is *absent* rather than that it may not look. Opening the group container settles it — `EPERM`/`EACCES` there means `.denied`, success means the store genuinely is not there |
+| anything else | `.denied` | `EINTR`, `EBUSY`, a full descriptor table. Not an answer, and reporting `.granted` on a maybe would start capture into a store it cannot read. Every caller retries |
 
 Usage with both outcomes handled:
 
@@ -287,11 +262,24 @@ case .storeMissing:
 }
 ```
 
+`FullDiskAccessMonitor` (`@MainActor @Observable`) owns the cadence and holds the last answer.
+Every route — activation, a poll tick, **Check again** — goes through its `checkNow()`, so there
+is one place where the answer is decided, and its `onChange` fires only when the answer actually
+changed: a poll that confirms what was already true must not restart capture every thirty
+seconds.
+
 The probe is invoked:
 
 - on app launch, before `CaptureEngine.start()`;
-- on `NSApplication.didBecomeActiveNotification` (user came back from System Settings);
-- every 30 seconds while any onboarding screen is visible;
+- on `NSApplication.didBecomeActiveNotification` — pushed in by the app shell through
+  `applicationDidBecomeActive()`, since `BackglanceCapture` does not import AppKit. This one
+  event catches the overwhelming majority of real grants;
+- every 30 seconds between `startPolling()` and `stopPolling()`, which bracket onboarding being
+  visible and nothing else. The timer is the fallback for the case activation misses — someone
+  reading the onboarding screen on a second display while System Settings has focus on the
+  first, who never "returns" to anything. Outside that window there is no timer at all: a menu
+  bar app waking every thirty seconds forever to ask a question nobody is waiting on is a
+  battery bug;
 - when the user clicks **Check again** in the banner or Settings;
 - from `StoreWatcher` when a read fails with `EPERM` mid-run (FDA revoked → degrade).
 
