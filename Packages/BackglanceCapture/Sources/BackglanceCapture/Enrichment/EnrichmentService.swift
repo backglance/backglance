@@ -21,9 +21,11 @@ public actor EnrichmentService: NotificationEnricher {
 
     public init(
         icons: AppIconCache = AppIconCache(),
+        names: any AppNameSource = WorkspaceAppNameSource(),
         deepLinks: DeepLinkResolverRegistry = .default
     ) {
         self.icons = icons
+        self.names = names
         self.deepLinks = deepLinks
     }
 
@@ -49,6 +51,22 @@ public actor EnrichmentService: NotificationEnricher {
         return enriched
     }
 
+    /// What the app calls itself, so the timeline and Settings can say "Messages"
+    /// instead of `com.apple.MobileSMS`.
+    ///
+    /// Memoized for the life of the process — including the misses. Resolving a name is a
+    /// Launch Services round trip through the file system, and capture asks once per
+    /// archived notification; an app that is not installed any more would otherwise pay
+    /// that cost on every record it ever sent, forever, to be told `nil` again.
+    public func displayName(forBundleID bundleID: String) -> String? {
+        if let cached = resolvedNames[bundleID] {
+            return cached
+        }
+        let name = names.name(forBundleID: bundleID)
+        resolvedNames[bundleID] = .some(name)
+        return name
+    }
+
     /// Where the cached icon for `bundleID` is, if there is one.
     public func iconURL(forBundleID bundleID: String) -> URL? {
         icons.cachedURL(forBundleID: bundleID)
@@ -57,5 +75,10 @@ public actor EnrichmentService: NotificationEnricher {
     // MARK: Private
 
     private let icons: AppIconCache
+    private let names: any AppNameSource
     private let deepLinks: DeepLinkResolverRegistry
+
+    /// Bundle id → the answer Launch Services gave, `nil` answers included. The double
+    /// optional is the point: "asked, and there is no name" is not "never asked".
+    private var resolvedNames: [String: String?] = [:]
 }

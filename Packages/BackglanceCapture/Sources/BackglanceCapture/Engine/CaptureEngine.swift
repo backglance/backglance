@@ -143,6 +143,21 @@ public actor CaptureEngine {
 
     let archive: Archive
 
+    /// Resolves what the store does not carry — the app's icon, its name, and where
+    /// "Open" should go. Internal because ``recordDisplayName(for:)`` lives in
+    /// `CaptureEngine+AppNames.swift`.
+    let enrichment: any NotificationEnricher
+
+    /// The apps the user has told Backglance never to read. Checked before a payload is
+    /// decoded (Privacy Invariant #3).
+    let exclusions: any AppExclusionList
+
+    /// Replaces one-time codes in memory, before anything is written.
+    let redactor: any NotificationRedactor
+
+    /// Decodes one store row into a ``ParsedNotification``.
+    let parser = RecordParser()
+
     /// Where the pause state is persisted. See ``BackglanceCore/PauseSettings``.
     let defaults: UserDefaults
 
@@ -298,94 +313,9 @@ public actor CaptureEngine {
         Log.capture.debug("status: \(newStatus.logDescription)")
     }
 
-    /// Parse, exclude, redact, enrich, insert — for one record.
-    ///
-    /// The order is the privacy model, not a preference:
-    ///
-    /// 1. **Exclusion first, on the raw row.** `RawStoreRecord.appIdentifier` comes from
-    ///    the store's own `app` table, so an excluded app's payload is never decoded into
-    ///    objects at all. A password manager's notification does not become a `String` in
-    ///    this process.
-    /// 2. **Then parse**, and check exclusion *again* against the parsed bundle id: the
-    ///    payload's own `app` key can differ from the joined row for helper processes and
-    ///    iPhone Mirroring, and the app the user excluded is the one the payload names.
-    /// 3. **Upsert the app row**, which carries the per-app `redact_otp` the next step
-    ///    is gated on. A bundle id, and nothing the user typed or received.
-    /// 4. **Redact before any content is written**, in memory and irreversibly.
-    /// 5. **Enrich**, then insert the notification.
-    ///
-    /// One record's failure never stops the batch, and never reaches the user: it is
-    /// counted, and logged by `rec_id` and a fixed reason.
-    func archiveOne(_ raw: RawStoreRecord, source: ArchivedNotification.Source) async -> ArchiveOutcome {
-        guard exclusions.allows(raw.appIdentifier) else {
-            return .excluded
-        }
-
-        do {
-            let parsed = try parser.parse(raw)
-            guard exclusions.allows(parsed.bundleID) else {
-                return .excluded
-            }
-
-            // The app row first, because it carries `redact_otp` — the per-app half of
-            // whether the next line runs at all. It holds no notification content, so
-            // writing it before the redaction is not a violation of "redact before
-            // anything is written": what that rule is about is the *text*, and the text
-            // is still only in memory here.
-            let now = Date()
-            let app = try archive.upsertApp(bundleID: parsed.bundleID, now: now)
-            guard let appID = app.id else {
-                Log.capture.error("archive rec \(raw.recID): app row has no id")
-                return .failed
-            }
-
-            let (redacted, redaction) = redactor.redact(parsed, appRedactsOTP: app.redactOtp)
-            let enriched = await enrichment.enrich(redacted)
-
-            let outcome = try archive.insertOrUpdate(
-                ArchivedNotification(
-                    parsed: enriched,
-                    appID: appID,
-                    storeRecID: raw.recID,
-                    source: source,
-                    capturedAt: now
-                ),
-                redaction: redaction
-            )
-
-            switch outcome {
-            case .inserted:
-                return .archived
-
-            case .updated:
-                return .updated
-
-            case .duplicate:
-                return .duplicate
-            }
-        } catch ArchiveError.duplicate {
-            // The import and live capture overlapping. Expected, and not worth a line.
-            return .duplicate
-        } catch let error as CaptureError {
-            Log.capture.error("skip rec \(raw.recID): \(error.logDescription)")
-            return .failed
-        } catch let error as ArchiveError {
-            Log.capture.error("archive rec \(raw.recID): \(error.logDescription)")
-            return .failed
-        } catch {
-            Log.capture
-                .error("rec \(raw.recID): \(String(describing: type(of: error)))")
-            return .failed
-        }
-    }
-
     // MARK: Private
 
-    private let exclusions: any AppExclusionList
-    private let redactor: any NotificationRedactor
-    private let enrichment: any NotificationEnricher
     private let storeLocation: @Sendable () throws -> URL
-    private let parser = RecordParser()
     private let watcher: StoreWatcher
     private let statusContinuation: AsyncStream<CaptureStatus>.Continuation
 

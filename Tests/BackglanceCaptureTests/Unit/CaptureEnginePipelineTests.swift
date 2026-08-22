@@ -245,6 +245,67 @@ final class CaptureEnginePipelineTests: XCTestCase {
         XCTAssertEqual(apps.map(\.bundleId), ["com.example.chat"])
     }
 
+    // MARK: - App names
+
+    /// The bug this test exists for: `apps.display_name` stayed `nil` forever, so every
+    /// app in the timeline and in Settings showed as a bundle identifier.
+    func testTheAppRowLearnsItsDisplayName() async throws {
+        let archive = try XCTUnwrap(archive)
+        try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: [
+            MiniatureStore.notification(recID: 1, bundleID: "com.example.chat", title: "Ada", body: "Landing at six"),
+        ])
+        let engine = try makeEngine(enrichment: NamingEnricher(name: "Chatter"))
+
+        try archive.captureFromTheStartOfTheStore()
+
+        await engine.start()
+        await engine.tick(reason: .manual)
+
+        let apps = try await archive.pool.read { db in try AppRecord.fetchAll(db) }
+        XCTAssertEqual(apps.map(\.displayName), ["Chatter"])
+    }
+
+    /// An enricher that cannot resolve a name is the uninstalled-app case, and it must
+    /// not cost the notification: the row is archived, and the UI keeps the bundle id.
+    func testAnUnresolvableNameLeavesTheRowArchivedAndUnnamed() async throws {
+        let archive = try XCTUnwrap(archive)
+        try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: [
+            MiniatureStore.notification(recID: 1, bundleID: "com.example.gone", title: "Ada", body: "Landing at six"),
+        ])
+        let engine = try makeEngine(enrichment: NoEnrichment())
+
+        try archive.captureFromTheStartOfTheStore()
+
+        await engine.start()
+        await engine.tick(reason: .manual)
+
+        let apps = try await archive.pool.read { db in try AppRecord.fetchAll(db) }
+        XCTAssertEqual(apps.map(\.bundleId), ["com.example.gone"])
+        XCTAssertNil(apps.first?.displayName)
+        let archived = await engine.recordsArchived
+        XCTAssertEqual(archived, 1)
+    }
+
+    /// A rename — the app updated, or the user switched their system language — is picked
+    /// up on the next notification rather than being frozen at first sight.
+    func testARenamedAppIsRenamedInTheArchive() async throws {
+        let archive = try XCTUnwrap(archive)
+        try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: [
+            MiniatureStore.notification(recID: 1, bundleID: "com.example.chat", title: "Ada", body: "Landing at six"),
+        ])
+        _ = try archive.upsertApp(bundleID: "com.example.chat", now: Date())
+        try archive.setDisplayName("Chatter", bundleID: "com.example.chat")
+        let engine = try makeEngine(enrichment: NamingEnricher(name: "Chatter 2"))
+
+        try archive.captureFromTheStartOfTheStore()
+
+        await engine.start()
+        await engine.tick(reason: .manual)
+
+        let apps = try await archive.pool.read { db in try AppRecord.fetchAll(db) }
+        XCTAssertEqual(apps.map(\.displayName), ["Chatter 2"])
+    }
+
     // MARK: Private
 
     private var archive: Archive?
@@ -311,5 +372,24 @@ private struct StubEnricher: NotificationEnricher {
         var enriched = notification
         enriched.deepLink = URL(string: "messages://open?id=9")
         return enriched
+    }
+
+    func displayName(forBundleID _: String) async -> String? {
+        nil
+    }
+}
+
+// MARK: - NamingEnricher
+
+/// An enricher that knows exactly one thing: what the app is called.
+private struct NamingEnricher: NotificationEnricher {
+    let name: String
+
+    func enrich(_ notification: ParsedNotification) async -> ParsedNotification {
+        notification
+    }
+
+    func displayName(forBundleID _: String) async -> String? {
+        name
     }
 }

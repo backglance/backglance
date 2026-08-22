@@ -75,7 +75,7 @@ Capture is a background loop with a small footprint (idle CPU under 0.1 %, poll 
    │ 6. RecordParser.parse(raw)      bplist → ParsedNotification (tolerant keys)                   │
    │ 7. OTPRedactor.redact(parsed)   in memory; digits never reach disk                            │
    │ 8. RulesEngine.evaluate(…)      triage (highlight / pin / mute) — visual only                 │
-   │ 9. EnrichmentService.enrich(…)  app icon cache · deep link                                    │
+   │ 9. EnrichmentService.enrich(…)  app icon cache · deep link · apps.display_name                │
    │10. Archive.insertOrUpdate(…)    dedupe on store_rec_id, then uuid (update, not insert)        │
    │11. cursor = adapter.cursor(for: last); Archive.saveCursor  →  capture_state['cursor']         │
    │12. snapshot.discard()                                                                         │
@@ -720,6 +720,7 @@ private func archiveOne(_ raw: RawStoreRecord, source: ArchivedNotification.Sour
 - **`OTPRedactor.redact(_:)`** — on by default for `com.apple.MobileSMS` and `com.apple.mail`; replaces matched codes with `[code redacted]` and returns a `RedactionEvent` (`kind = 'otp'`, `pattern_id`). Runs before any write. Details in [PRIVACY_CONTROLS.md](./PRIVACY_CONTROLS.md).
 - **`RulesEngine.evaluate(_:rules:)`** — capture does *not* store triage. Triage is computed at read time by the timeline from the current rules, so editing a rule re-triages history for free. Rules are visual only; they never change what the system delivers ([RULES.md](./RULES.md)).
 - **`EnrichmentService.enrich(_:)`** — an actor. Resolves the app icon via `NSWorkspace.shared.urlForApplication(withBundleIdentifier:)` → `icon(forFile:)`, caches PNGs in `~/Library/Application Support/Backglance/icons/<bundle_id>.png`, and resolves a deep link from URL-ish `userInfo` values plus per-app resolvers (Messages `sms:`/`imessage:` thread, Mail `message://`, Slack/Discord where a URL is present). Enrichment failures are non-fatal: a missing icon falls back to a generic glyph, a missing deep link leaves `deep_link` NULL ([ACTIONS.md](./ACTIONS.md)).
+- **`EnrichmentService.displayName(forBundleID:)`** — the app's name, which Apple's store does not carry: the bundle's localized `CFBundleDisplayName` / `CFBundleName`, else Finder's display name, else nothing. `CaptureEngine.recordDisplayName(for:)` writes it to `apps.display_name` through `Archive.setDisplayName(_:bundleID:)`, which updates only when the name has changed — so first sight costs one lookup and one write, a rename is picked up on the next notification, and every other record costs a comparison. The lookup is memoized per bundle id *including its misses*, so an uninstalled app is asked about once per launch rather than once per record. Unresolvable is normal and non-fatal: the row keeps `NULL` and the UI falls back to the bundle id.
 
 ### Dedupe and thread updates
 

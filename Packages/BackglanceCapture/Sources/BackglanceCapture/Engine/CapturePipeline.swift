@@ -206,6 +206,19 @@ public struct PerAppOTPRedaction: NotificationRedactor {
 /// is an actor: enrichment must not block the tick that is holding it.
 public protocol NotificationEnricher: Sendable {
     func enrich(_ notification: ParsedNotification) async -> ParsedNotification
+
+    /// What the app calls itself, or `nil` when it cannot be resolved.
+    ///
+    /// Separate from ``enrich(_:)`` because it belongs to the app row rather than to the
+    /// notification: `apps.display_name` is written once per app, not once per record.
+    ///
+    /// > Note: deliberately *not* given a default implementation in a protocol extension.
+    /// > `EnrichmentService` is an actor, and where an actor-isolated method and a
+    /// > nonisolated protocol-extension method of the same name both apply, the
+    /// > nonisolated one wins overload resolution — so a defaulted `nil` here silently
+    /// > shadowed the real lookup at the concrete call site. Four lines of conformance in
+    /// > a stub are cheaper than that bug.
+    func displayName(forBundleID bundleID: String) async -> String?
 }
 
 // MARK: - NoEnrichment
@@ -220,6 +233,12 @@ public struct NoEnrichment: NotificationEnricher {
 
     public func enrich(_ notification: ParsedNotification) async -> ParsedNotification {
         notification
+    }
+
+    /// No lookup, so no name: the app row keeps whatever it had, and the UI falls back to
+    /// the bundle id.
+    public func displayName(forBundleID _: String) async -> String? {
+        nil
     }
 }
 

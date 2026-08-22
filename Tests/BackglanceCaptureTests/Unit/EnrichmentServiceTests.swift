@@ -75,6 +75,42 @@ final class EnrichmentServiceTests: XCTestCase {
         XCTAssertEqual(enriched, notification)
     }
 
+    // MARK: - App names
+
+    /// The timeline says "Messages", not `com.apple.MobileSMS` — but only because
+    /// something asks Launch Services, since Apple's store does not carry the name.
+    func testAnAppsDisplayNameIsResolved() async throws {
+        let names = StubNameSource(names: ["com.example.chat": "Chatter"])
+        let service = try EnrichmentService(icons: makeCache(source: StubIconSource(installed: [])), names: names)
+
+        let resolved = await service.displayName(forBundleID: "com.example.chat")
+
+        XCTAssertEqual(resolved, "Chatter")
+    }
+
+    func testAnUninstalledAppHasNoDisplayName() async throws {
+        let names = StubNameSource(names: [:])
+        let service = try EnrichmentService(icons: makeCache(source: StubIconSource(installed: [])), names: names)
+
+        let resolved = await service.displayName(forBundleID: "com.example.gone")
+
+        XCTAssertNil(resolved)
+    }
+
+    /// Capture asks once per archived notification. Without memoized *misses*, an app the
+    /// user uninstalled would pay a file-system round trip for every record it ever sent.
+    func testTheNameSourceIsAskedOnlyOncePerAppEvenWhenItComesBackEmpty() async throws {
+        let names = StubNameSource(names: ["com.example.chat": "Chatter"])
+        let service = try EnrichmentService(icons: makeCache(source: StubIconSource(installed: [])), names: names)
+
+        for _ in 0 ..< 3 {
+            _ = await service.displayName(forBundleID: "com.example.chat")
+            _ = await service.displayName(forBundleID: "com.example.gone")
+        }
+
+        XCTAssertEqual(names.requests.sorted(), ["com.example.chat", "com.example.gone"])
+    }
+
     // MARK: - The cache's file names
 
     /// ⚠️ The bundle id comes from Apple's store, so it is not ours to trust: one
@@ -144,5 +180,32 @@ private final class StubIconSource: AppIconSource, @unchecked Sendable {
     // MARK: Private
 
     private let installed: Set<String>
+    private let lock = NSLock()
+}
+
+// MARK: - StubNameSource
+
+/// Stands in for Launch Services' side of the name lookup, and counts what it was asked.
+private final class StubNameSource: AppNameSource, @unchecked Sendable {
+    // MARK: Lifecycle
+
+    init(names: [String: String]) {
+        self.names = names
+    }
+
+    // MARK: Internal
+
+    private(set) var requests: [String] = []
+
+    func name(forBundleID bundleID: String) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        requests.append(bundleID)
+        return names[bundleID]
+    }
+
+    // MARK: Private
+
+    private let names: [String: String]
     private let lock = NSLock()
 }

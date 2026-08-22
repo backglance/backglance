@@ -21,6 +21,41 @@ public extension Archive {
         }
     }
 
+    /// Records what the app calls itself, so the UI can stop showing bundle identifiers.
+    ///
+    /// Capture resolves the name (Launch Services knows it; Apple's store does not carry
+    /// it) and hands it here on first sight, and again whenever it has changed — an app
+    /// that was renamed, or a user who switched their system language. The write is
+    /// skipped when the name already matches, which is the normal case for every
+    /// notification after the first.
+    ///
+    /// Deliberately does *not* create the row: a name is not a reason to believe an app
+    /// exists. A bundle id with no row has nothing to name yet, and says so by returning
+    /// `false` rather than by inventing one.
+    ///
+    /// - Returns: whether a row was actually updated.
+    @discardableResult
+    func setDisplayName(_ name: String, bundleID: String) throws -> Bool {
+        do {
+            return try pool.write { db in
+                guard
+                    var app = try AppRecord.filter(Column("bundle_id") == bundleID).fetchOne(db),
+                    app.displayName != name
+                else {
+                    return false
+                }
+                app.displayName = name
+                try app.update(db)
+                return true
+            }
+        } catch {
+            throw ArchiveError.writeFailed(
+                table: AppRecord.databaseTableName,
+                underlying: ArchiveError.detail(from: error)
+            )
+        }
+    }
+
     /// Recomputes every app's denormalized `notification_count` from the rows it owns.
     ///
     /// `apps.notification_count` is maintained incrementally by the insert and prune
