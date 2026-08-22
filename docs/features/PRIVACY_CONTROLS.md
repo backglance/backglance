@@ -686,85 +686,61 @@ extension PanicWipe {
 
 ### PanicWipe.execute()
 
+`PanicWipe` lives in `BackglanceCore`, which cannot see `BackglanceCapture`
+([the dependency graph](../architecture/ARCHITECTURE.md#dependency-graph)). Stopping the
+writers is therefore the *caller's* job, and the sheet does it in this order: pause capture,
+stop the semantic indexer, call `execute`, then resume capture. That split is deliberate
+beyond the dependency rule — a function that asks its own questions and restarts its own
+services cannot be driven from a test, a URL scheme, or a future App Intent.
+
 ```swift
-import Foundation
-import GRDB
-import os
-
 public enum PanicWipe {
-    public struct Options: Sendable {
-        public var forgetPerAppSettings = false
-        public init(forgetPerAppSettings: Bool = false) { self.forgetPerAppSettings = forgetPerAppSettings }
+    public struct Options: Sendable, Equatable {
+        /// Whether excluded apps, retention overrides and redaction toggles go with the
+        /// notifications. Off by default: those rows are bundle identifiers and flags, not
+        /// content, and an exclusion that silently disappears is how the next notification
+        /// from a password manager ends up archived.
+        public var forgetPerAppSettings: Bool
+        public init(forgetPerAppSettings: Bool = false)
     }
 
-    private static let log = Logger(subsystem: "app.backglance.Backglance", category: "wipe")
-
-    /// Order matters: stop writers → zero pages → unlink → recreate → restart.
-    /// Call `confirm(typed:)` first; this method assumes consent.
-    public static func execute(archive: Archive,
-                               capture: CaptureEngine,
-                               semantic: SemanticIndex?,
-                               paths: ArchivePaths = .default,
-                               options: Options = Options()) async throws {
-        log.notice("panic wipe: begin")
-
-        // 1. Stop every writer. Retention job checks `archive.isOpen` and no-ops while closed.
-        await capture.pause(until: nil)
-        semantic?.dropInMemoryCache()
-
-        // 2. Remember per-app privacy settings (bundle ids + flags only) unless told to forget them.
-        let preserved: [AppPrivacySetting] = options.forgetPerAppSettings ? [] : try await archive.perAppPrivacySettings()
-
-        // 3. Zero the pages before unlinking: DELETE with secure_delete overwrites freed content,
-        //    the checkpoint folds the WAL back into the main file, VACUUM rewrites it compactly.
-        try await archive.write { db in
-            try db.execute(sql: "PRAGMA secure_delete = ON")
-            for table in ["digest_items", "digests", "redactions", "embeddings", "snoozes",
-                          "saved_searches", "notifications", "away_sessions", "rules", "apps", "capture_state"] {
-                if try db.tableExists(table) { try db.execute(sql: "DELETE FROM \(table)") }
-            }
-        }
-        try await archive.writeWithoutTransaction { db in
-            try db.execute(sql: "PRAGMA wal_checkpoint(TRUNCATE)")
-            try db.execute(sql: "VACUUM")
-        }
-
-        // 4. Close the pool and unlink everything Backglance owns.
-        await archive.close()
-        let victims: [URL] = [
-            paths.archive, paths.archive.appendingPathExtension("wal").standardized,
-            paths.archiveWAL, paths.archiveSHM,
-            paths.icons, paths.tmp
-        ]
-        for url in victims {
-            do {
-                try FileManager.default.removeItem(at: url)
-            } catch CocoaError.fileNoSuchFile {
-                continue                                          // already gone: fine
-            } catch {
-                log.error("wipe: could not remove \(url.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)")
-                throw PanicWipeError.fileRemovalFailed(url, underlying: error)
-            }
-        }
-
-        // 5. Recreate an empty archive (migrations run, seed exclusion list is re-inserted).
-        do {
-            try await archive.reopen()
-            try await archive.restorePerAppPrivacySettings(preserved)
-        } catch {
-            throw PanicWipeError.reopenFailed(underlying: error)     // capture stays paused; UI tells the user
-        }
-
-        // 6. Restart capture from the store's *current* head so the wipe is not undone by a re-import
-        //    of whatever Apple's store still holds. "Import existing" in settings is available if wanted.
-        try await capture.skipToStoreHead()
-        await capture.resume()
-        log.notice("panic wipe: done")
+    /// File *names*, never paths — this reaches the log and the diagnostics export.
+    public struct Report: Sendable, Equatable {
+        public var removed: [String]
+        public var failed: [String]
     }
+
+    /// Order matters: read the settings worth keeping → zero the pages → swap the writer →
+    /// unlink → recreate → put the settings back.
+    /// Assumes consent: the typed "wipe" and the optional Touch ID are the sheet's.
+    @MainActor
+    @discardableResult
+    public static func execute(archive: Archive, options: Options = Options()) async throws -> Report
 }
 ```
 
-`ArchivePaths.default` resolves to `~/Library/Application Support/Backglance/` with `archive.sqlite`, `archive.sqlite-wal`, `archive.sqlite-shm`, `icons/` and `tmp/`. The `embeddings` table lives inside the archive file, so it goes with it; `SemanticIndex.dropInMemoryCache()` clears the vectors currently held in memory.
+The `Archive` passed in is the same object afterwards — its writer is swapped, not its
+identity — so the timeline store, search and the digest presenter keep the reference they
+were handed at launch. There is no reopening to coordinate, and no component left holding
+the deleted file open. During the unlink they read an empty, migrated in-memory database, so
+a `ValueObservation` that fires mid-wipe redraws an empty timeline rather than surfacing an
+error nobody can act on.
+
+The steps, and why each is where it is:
+
+| Step | Why |
+|---|---|
+| Read the per-app settings worth keeping | While the rows still exist. Only rows that differ from a *fresh* row are kept, so the app list — "which apps notify you", which is itself the sort of thing a wipe is for — does not come back |
+| `PRAGMA secure_delete = ON`, `DELETE FROM` every table | 🔒 Zeroing before unlinking is the whole guarantee. Unlink first and every notification's text is still sitting in the blocks the file used to occupy. Tables are read from `sqlite_master` rather than listed in code, so a migration that adds one cannot leave its contents behind |
+| Skip `notifications_fts*` | The `notifications_ad` trigger is the only supported way to take a row out of an FTS5 index; deleting from a shadow table directly corrupts it and would abort the wipe partway through |
+| `wal_checkpoint(TRUNCATE)` then `VACUUM` | The WAL holds the old pages until it is folded back in; the vacuum rewrites what is left. Both are what make the unlink release zeros |
+| Swap in an empty in-memory writer, close the old one | Nothing may hold the file open when it is unlinked, and every existing reader still needs something valid to read |
+| Unlink `archive.sqlite`, `-wal`, `-shm`, `icons/`, `tmp/` | Derived from *this* archive's path, not from `ArchivePaths`, so a test wipes its own temporary file. Files that were already absent are not reported as removed |
+| Recreate and put the settings back | Migrations run, the support directory goes back to `0700` and the database files to `0600` |
+
+`ArchivePaths.archiveURL` resolves to `~/Library/Application Support/Backglance/archive.sqlite` with `icons/` and `tmp/` beside it. The `embeddings` table lives inside the archive file, so it goes with it.
+
+Anything that could not be removed is reported as `ArchiveError.wipeIncomplete(remaining:)` — but only after the empty archive is back, because a Mac whose `icons/` directory survived should still have a working Backglance rather than none. The alert says "Some files couldn't be removed. See the log for details."; the names are in the log, not in the alert.
 
 Timing: on a 100k-notification archive (~150 MB) the whole sequence takes 2–4 s on Apple silicon; the DELETE + VACUUM is most of it. The sheet shows a progress indicator and disables the window until `execute` returns.
 

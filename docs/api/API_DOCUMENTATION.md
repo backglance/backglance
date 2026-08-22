@@ -679,19 +679,27 @@ do {
 
 ```swift
 public enum PanicWipe {
-    public struct Report: Sendable { public var removed: [String]; public var failed: [String] }
-    /// Closes the pool, secure-deletes archive + -wal + -shm, icons/, tmp/, embeddings; recreates an empty archive.
-    /// The caller is responsible for the typed "wipe" confirmation and Touch ID (LAContext); this function does not ask.
+    public struct Options: Sendable, Equatable {
+        public var forgetPerAppSettings: Bool          // default false: exclusions and overrides survive
+        public init(forgetPerAppSettings: Bool = false)
+    }
+    public struct Report: Sendable, Equatable { public var removed: [String]; public var failed: [String] }
+    /// Secure-deletes every table, unlinks archive + -wal + -shm, icons/, tmp/; recreates an empty archive
+    /// at the same path and swaps it in behind the same `Archive` object — references stay valid.
+    /// The caller is responsible for pausing capture, the typed "wipe" confirmation and Touch ID (LAContext).
     @MainActor
-    public static func execute(archive: Archive) async throws -> Report
+    @discardableResult
+    public static func execute(archive: Archive, options: Options = Options()) async throws -> Report
 }
 ```
 
-**Isolation.** `@MainActor` because it tears down `Archive.shared` and every observer must stop first. **Errors.** `ArchiveError.wipeIncomplete(remaining:)` when any file could not be removed; the archive is still recreated so the app stays usable.
+**Isolation.** `@MainActor` because it replaces the writer behind `Archive.shared` and every writer must be stopped first — pausing capture is the caller's, since `BackglanceCore` cannot see `BackglanceCapture`. **Errors.** `ArchiveError.wipeIncomplete(remaining:)` when any file could not be removed; the archive is still recreated first, so the app stays usable.
 
 ```swift
 do {
+    await capture.pause()                                  // the caller stops the writers
     let report = try await PanicWipe.execute(archive: .shared)
+    await capture.resume()
     logger.notice("wipe removed \(report.removed.count, privacy: .public) paths")
 } catch ArchiveError.wipeIncomplete(let remaining) {
     presentAlert("Some files couldn't be removed. See the log for details.")   // remaining is in the log, not the alert
