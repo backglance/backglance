@@ -305,7 +305,9 @@ Banner wording (exact):
 > Your existing archive still works. Backglance can only guide you to the setting — macOS has no prompt for this permission.
 > [Open System Settings] [Check again] [Learn why]
 
-The banner is dismissible per session with the small × (it comes back on next launch — that is deliberate, since capture is silently off). "Learn why" opens onboarding screen 2 in a sheet.
+The banner is dismissible per session with the small × (it comes back on next launch — that is deliberate, since capture is silently off, and a dismissal that persisted would leave someone with an app that has quietly archived nothing for months). One `CaptureBannerModel` is shared by the popover and the window, so dismissing it in one dismisses it in both: it is the same banner about the same condition, and having to close it twice would read as it not having been closed.
+
+"Learn why" reopens setup rather than showing a sheet, and `OnboardingModel.startingStep` lands it on screen 2 — the one that explains the permission — because someone whose banner is still there has already read the welcome. A sheet would have meant a second copy of the same screen presented from an `NSPopover`, which is not a surface that hosts sheets well.
 
 > ❌ **Don't:** Never re-prompt with a modal, never post a local notification about FDA, never bounce the Dock icon (there is no Dock icon — `LSUIElement = YES`), never gate unrelated features behind FDA to pressure the user.
 

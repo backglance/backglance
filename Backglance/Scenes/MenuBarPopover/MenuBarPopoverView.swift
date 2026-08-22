@@ -37,10 +37,10 @@ struct MenuBarPopoverView: View {
 
             // Only when capture is not simply running: a permanent status strip
             // in a 520-point-tall popover is 6% of the timeline spent saying
-            // "everything is fine".
-            if store.captureState.needsAttention {
-                Divider()
-                CaptureStatusBanner(state: store.captureState)
+            // "everything is fine". The strip itself decides which banner that
+            // is, so the popover and the window cannot disagree.
+            if let banners {
+                CaptureBannerStrip(state: store.captureState, model: banners)
             }
         }
         .frame(width: BackglanceUI.popoverSize.width, height: BackglanceUI.popoverSize.height)
@@ -64,6 +64,11 @@ struct MenuBarPopoverView: View {
     /// simply renders the timeline.
     @Environment(DigestPresenter.self)
     private var presenter: DigestPresenter?
+
+    /// Present only in the app; a preview leaves it nil and shows no banner —
+    /// there is no capture engine behind one to act on.
+    @Environment(CaptureBannerModel.self)
+    private var banners: CaptureBannerModel?
 
     /// Present only in the app; a preview leaves it nil and simply shows no
     /// indexing progress.

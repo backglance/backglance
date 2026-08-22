@@ -21,7 +21,7 @@ import SwiftUI
 final class TimelineWindowController: NSWindowController {
     // MARK: Lifecycle
 
-    convenience init(store: TimelineStore) {
+    convenience init(store: TimelineStore, banners: CaptureBannerModel? = nil) {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 720, height: 640),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
@@ -34,8 +34,9 @@ final class TimelineWindowController: NSWindowController {
         // The window has no popover to close and no window to open, so it
         // supplies neither verb: Esc and ⌘↩ fall through instead of pretending.
         let hosting = NSHostingController(
-            rootView: TimelineView()
+            rootView: TimelineWindowContent()
                 .environment(store)
+                .environment(banners)
                 .environment(\.timelineActions, TimelineActions())
         )
         // The window's size is the window's business. Left to its default, the
@@ -66,4 +67,34 @@ final class TimelineWindowController: NSWindowController {
     // MARK: Private
 
     private var store: TimelineStore?
+}
+
+// MARK: - TimelineWindowContent
+
+/// The window's timeline, with the same capture banner the popover shows.
+///
+/// A view rather than a modifier chain at the call site because the banner has to react to
+/// `TimelineStore`, and the store only becomes observable inside a `View` body — building the
+/// strip where the window is constructed would freeze it at whatever the state was at launch.
+private struct TimelineWindowContent: View {
+    // MARK: Internal
+
+    var body: some View {
+        VStack(spacing: 0) {
+            TimelineView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            if let banners {
+                CaptureBannerStrip(state: store.captureState, model: banners)
+            }
+        }
+    }
+
+    // MARK: Private
+
+    @Environment(TimelineStore.self)
+    private var store
+
+    @Environment(CaptureBannerModel.self)
+    private var banners: CaptureBannerModel?
 }

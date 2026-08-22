@@ -26,12 +26,14 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         search: SearchViewModel,
         searchService: SearchService,
         digests: DigestPresenter?,
+        banners: CaptureBannerModel?,
         menuActions: MenuActions
     ) {
         self.store = store
         self.search = search
         self.searchService = searchService
         self.digests = digests
+        self.banners = banners
         self.menuActions = menuActions
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
@@ -50,6 +52,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
                 .environment(store)
                 .environment(search)
                 .environment(digests)
+                .environment(banners)
                 .environment(\.searchService, searchService)
                 .environment(\.timelineActions, actions)
         )
@@ -159,6 +162,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     /// `nil` when the app has no archive, which is the same condition that leaves the
     /// timeline empty — there is nothing to look a digest up in.
     private let digests: DigestPresenter?
+
+    /// `nil` in a preview and in any host with no capture engine to act on a banner's
+    /// buttons, which is the same condition that leaves the timeline read-only.
+    private let banners: CaptureBannerModel?
 
     private let store: TimelineStore
     private let search: SearchViewModel

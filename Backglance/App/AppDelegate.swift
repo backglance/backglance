@@ -28,8 +28,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     /// one type. Each is retained for the app's lifetime for the reason below.
     var engine: CaptureEngine?
     var monitor: FullDiskAccessMonitor?
+    var banners: CaptureBannerModel?
     var onboarding: OnboardingWindowController?
     var activationObserver: (any NSObjectProtocol)?
+
+    /// Internal so the mirror can live in `AppDelegate+CaptureStatus.swift`.
+    var statusMirror: Task<Void, Never>?
 
     func applicationDidFinishLaunching(_: Notification) {
         // LSUIElement already does this at launch. Setting it again is what keeps the app
@@ -141,26 +145,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var statusItem: StatusItemController?
     private var hotKeys: HotKeyCenter?
     private var window: TimelineWindowController?
-    private var statusMirror: Task<Void, Never>?
-
-    private static func timelineState(for status: CaptureStatus) -> TimelineCaptureState {
-        switch status {
-        case .running:
-            .running
-
-        case let .paused(until):
-            .paused(until: until)
-
-        case .degraded(.noFullDiskAccess):
-            .noFullDiskAccess
-
-        case let .degraded(reason):
-            .degraded(message: reason.userMessage)
-
-        case .stopped:
-            .stopped
-        }
-    }
 
     /// The Digest pane's model, and the only place in Backglance that can cause a
     /// permission prompt — and only when the user switches banners on.
@@ -403,7 +387,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
 
         let store = TimelineStore(archive: archive, host: .popover)
-        let window = TimelineWindowController(store: store)
+        let banners = makeBannerModel()
+        self.banners = banners
+        let window = TimelineWindowController(store: store, banners: banners)
         // Search owns the semantic model and the background indexer, both of
         // which stay asleep until the user turns the setting on.
         let search = SearchService(archive: archive)
@@ -427,6 +413,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             search: searchModel,
             searchService: search,
             digests: digests,
+            banners: banners,
             menuActions: .init(
                 openWindow: { window.show() },
                 pause: { [weak self] choice in
@@ -458,26 +445,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         self.statusItem = statusItem
         self.hotKeys = hotKeys
         mirrorCaptureStatus(into: store)
-    }
-
-    /// Pushes the engine's status into the store as the UI's own value type.
-    ///
-    /// The UI never imports `BackglanceCapture`
-    /// (docs/getting-started/DEVELOPMENT_GUIDE.md#dependency-direction), so the
-    /// translation happens here, in the one place that already knows both
-    /// sides. It is a small enum-to-enum map rather than a shared type because
-    /// the views need far less than the engine publishes: enough to pick an
-    /// icon, an empty state and one sentence.
-    private func mirrorCaptureStatus(into store: TimelineStore) {
-        guard let engine else {
-            return
-        }
-        statusMirror?.cancel()
-        let stream = engine.statusStream
-        statusMirror = Task { @MainActor in
-            for await status in stream {
-                store.captureState = Self.timelineState(for: status)
-            }
-        }
     }
 }

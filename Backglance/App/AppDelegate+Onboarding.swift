@@ -36,4 +36,20 @@ extension AppDelegate {
         self.onboarding = onboarding
         onboarding.show()
     }
+
+    /// Reopens setup, from wherever it makes sense to resume.
+    ///
+    /// Behind the banner's "Learn why" and, later, Settings ▸ Permissions ▸ "Show setup
+    /// again". `OnboardingModel.startingStep` picks the screen: someone whose banner is still
+    /// there gets the one that explains the permission, not the welcome they have already
+    /// read. The window is rebuilt each time so that step is recomputed rather than frozen at
+    /// whatever it was the first time.
+    func showOnboarding() {
+        guard let monitor else {
+            return
+        }
+        let onboarding = OnboardingWindowController(monitor: monitor, engine: engine)
+        self.onboarding = onboarding
+        onboarding.show()
+    }
 }
