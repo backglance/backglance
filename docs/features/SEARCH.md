@@ -639,7 +639,9 @@ public actor HybridSearch {
 
 A `from:`/`app:` term that matches no known app is a deliberate zero results, not a dropped filter — showing everything when a filter matched nothing is the failure that makes people stop trusting a search box. The structured filters (`after`, `before`, `sender`, `thread`, flags) ride inside the same FTS statement rather than a second pass over the candidate ids — built by `HybridSearch+Filters.swift`, which exposes `filterSQL`, `filterFragment` and `fuzzyCandidateSQL` as pure `(sql, arguments)` builders. The semantic branch never throws: a failure there costs the hit its `.semantic` source, never the whole search.
 
-`AppResolver.resolve(_:)` unions two passes: an exact match against every id in `bundleIDs`, and a case-insensitive substring match of `appNameContains` against `apps.display_name` OR `apps.bundle_id` — so `from:mail` returns both Mail and Airmail; users disambiguate with the bundle id.
+`AppResolver.resolve(_:)` unions two passes: an exact match against every id in `bundleIDs`, and a substring match of `appNameContains` against `apps.display_name_key` OR `lower(apps.bundle_id)` — so `from:mail` returns both Mail and Airmail; users disambiguate with the bundle id.
+
+The name half compares against `display_name_key`, not `lower(display_name)`, and folds the needle with the same `String.matchKey`. SQLite's `lower()` folds A–Z only unless ICU is compiled in, so a Swift-folded needle matched against it missed every non-ASCII name: `from:isbank` did not find "İŞBANK". `sender:` compares against `notifications.sender_key` for the same reason. Bundle identifiers stay on `lower()` — Apple's own rules keep them ASCII. See [DATABASE_SCHEMA.md](../architecture/DATABASE_SCHEMA.md#canonical-ddl) for the columns and [INTERNATIONALIZATION.md](../reference/INTERNATIONALIZATION.md#the-turkish-locale-rule) for the folding rule.
 
 The merge loop and the SQL builders are deliberately not reproduced here; `HybridSearchTests.swift` pins the fusion arithmetic (weights, rank order, tie-breaking) and `HybridSearch.swift` is short enough to read directly.
 

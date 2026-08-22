@@ -101,7 +101,7 @@ What it does **not** protect against:
 
 ## Archive Tables Involved
 
-Migration `v5_sync_metadata` (in `ArchiveMigrations.swift`) adds:
+Migration `v6_sync_metadata` (in `ArchiveMigrations.swift`) adds:
 
 ```sql
 ALTER TABLE notifications ADD COLUMN sync_record_name TEXT;      -- NULL until first upload
@@ -417,7 +417,7 @@ Settings ▸ Sync (`SyncSettingsView` in `BackglanceUI`):
 ## Testing Approach
 
 - **Unit (no network):** `SyncEngineProtocol` wraps the small surface Backglance uses (`state.add`, `sendChanges`, `fetchChanges`); `InMemorySyncEngine` records pending changes and lets tests inject `CKSyncEngine.Event` values built with `CKRecord`s (constructing `CKRecord`, setting `encryptedValues` and reading them back works without a container). Tests cover: mapper round-trip (row → record → row) for every field, LWW flag merge in both directions, delete-wins, tombstone application, backfill boundary at `sync_opt_in_at`, `serverRecordChanged` merge, zone-deleted-remotely disables sync.
-- **Migration:** `v5_sync_metadata` applied on top of a v4 fixture archive; assert columns and index exist and old rows have `sync_record_name IS NULL`.
+- **Migration:** `v6_sync_metadata` applied on top of a v5 fixture archive; assert columns and index exist and old rows have `sync_record_name IS NULL`.
 - **Manual two-Mac checklist (release blocker for the sync milestone):**
   1. Enable on A; capture 20 notifications; enable on B; all 20 appear within 60 s, redacted rows still show `[code redacted]`.
   2. Mark read on A → B updates; pin on B → A updates; delete on A while pinning on B → deleted on both.
@@ -433,7 +433,7 @@ Settings ▸ Sync (`SyncSettingsView` in `BackglanceUI`):
 - [SECURITY.md](../security/SECURITY.md) — threat model, what encryption covers
 - [PERMISSIONS_PRIVACY.md](./PERMISSIONS_PRIVACY.md) — network access guarantee
 - [PRIVACY_CONTROLS.md](./PRIVACY_CONTROLS.md) — retention, panic wipe, redaction
-- [DATABASE_SCHEMA.md](../architecture/DATABASE_SCHEMA.md) — `v5_sync_metadata`
+- [DATABASE_SCHEMA.md](../architecture/DATABASE_SCHEMA.md) — `v6_sync_metadata`
 - [ARCHITECTURE.md](../architecture/ARCHITECTURE.md)
 - [PACKAGING_NOTARIZATION.md](../deployment/PACKAGING_NOTARIZATION.md) — iCloud entitlement, embedded provisioning profile
 - [TESTING.md](../testing/TESTING.md)

@@ -36,8 +36,24 @@ public struct AppRecord: Codable, FetchableRecord, MutablePersistableRecord, Ide
     public var bundleId: String
 
     /// Localized app name resolved by `EnrichmentService` at first sight and
-    /// refreshed lazily; `nil` until then.
-    public var displayName: String?
+    /// refreshed lazily; `nil` until then. Assigning it re-derives
+    /// ``displayNameKey``.
+    public var displayName: String? {
+        didSet {
+            displayNameKey = displayName?.matchKey
+        }
+    }
+
+    /// ``displayName`` folded by ``Swift/String/matchKey`` — what `from:`
+    /// compares against.
+    ///
+    /// SQLite's `lower()` folds A–Z and nothing else, so matching a
+    /// Swift-folded needle against `lower(display_name)` missed every
+    /// non-ASCII name: `from:isbank` did not find "İŞBANK". Both sides now
+    /// fold the same way, in Swift.
+    ///
+    /// Derived, never passed in — see ``ArchivedNotification/senderKey``.
+    public private(set) var displayNameKey: String?
 
     /// `.inherit` defers to the global default retention policy.
     public var retention: AppRetention = .inherit

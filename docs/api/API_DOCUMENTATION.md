@@ -432,7 +432,7 @@ Models, the archive, migrations, retention, redaction, rules, digests, away sess
 
 ### `Archive`
 
-**Purpose.** The one door to `archive.sqlite`. Wraps a GRDB `DatabaseWriter` — a `DatabasePool` on disk (WAL, `0600`, directory `0700`), a `DatabaseQueue` in memory for tests — runs migrations `v1_initial` … `v5_sync_metadata`, and offers typed reads/writes. **Stability: Stable** for `read`/`write`/`insert`/`upsertApp`/lookup methods; `pool` **Evolving** (exposed for `ValueObservation` and streaming reads).
+**Purpose.** The one door to `archive.sqlite`. Wraps a GRDB `DatabaseWriter` — a `DatabasePool` on disk (WAL, `0600`, directory `0700`), a `DatabaseQueue` in memory for tests — runs migrations `v1_initial` … `v6_sync_metadata`, and offers typed reads/writes. **Stability: Stable** for `read`/`write`/`insert`/`upsertApp`/lookup methods; `pool` **Evolving** (exposed for `ValueObservation` and streaming reads).
 
 ```swift
 public final class Archive: Sendable {
@@ -828,7 +828,7 @@ The four packages are versioned **together, and independently from the app**. Th
 | App version does not imply package version | App `1.0.3` may ship packages `0.3.1`. The relation is recorded per release in `CHANGELOG.md`. |
 | Deprecation before removal | Anything Stable is marked `@available(*, deprecated, message:)` for at least one minor before removal, with the replacement named in the message. |
 | Adapters are exempt from the freeze | `StoreAdapterV14/15/26` follow Apple, not semver. Adding, retiring or rewriting an adapter is a patch or minor change and is documented in [OS_COMPATIBILITY_PLAYBOOK.md](../architecture/OS_COMPATIBILITY_PLAYBOOK.md). |
-| Archive schema is versioned separately | `schema_meta.archive_version` advances with GRDB migrations (`v1_initial` … `v5_sync_metadata`). Migrations are forward-only; a package bump that adds a migration is a **minor**. See [DATABASE_SCHEMA.md](../architecture/DATABASE_SCHEMA.md). |
+| Archive schema is versioned separately | `schema_meta.archive_version` advances with GRDB migrations (`v1_initial` … `v6_sync_metadata`). Migrations are forward-only; a package bump that adds a migration is a **minor**. See [DATABASE_SCHEMA.md](../architecture/DATABASE_SCHEMA.md). |
 | Automation surfaces | `backglance://` routes marked Stable follow the **app** version: no route is removed or changed in meaning without an app major bump. New parameters may be added in a minor. |
 
 The stability level of each symbol is the one printed in this document; when this document and a source doc-comment disagree, the source wins and this file has a bug — open an issue.

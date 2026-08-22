@@ -31,7 +31,7 @@ enum ArchiveMigrations {
     ///
     /// Bumped by the last migration registered below, and mirrored by
     /// ``BackglanceCore/archiveSchemaVersion``.
-    static let currentArchiveVersion = 2
+    static let currentArchiveVersion = 3
 
     /// The migrator applied by `Archive` when it opens a database.
     ///
@@ -70,6 +70,12 @@ enum ArchiveMigrations {
             try setArchiveVersion(db, 2)
         }
 
+        migrator.registerMigration("v3_match_keys") { db in
+            try db.execute(sql: matchKeysSQL)
+            try backfillMatchKeys(db)
+            try setArchiveVersion(db, 3)
+        }
+
         return migrator
     }
 
@@ -85,6 +91,40 @@ enum ArchiveMigrations {
                 "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             arguments: [String(version)]
         )
+    }
+
+    /// Fills the two match-key columns from the text they mirror.
+    ///
+    /// In Swift rather than in SQL because that is the whole point of the columns:
+    /// SQLite's `lower()` folds A–Z and nothing else, so an `UPDATE ... SET
+    /// sender_key = lower(sender)` would write exactly the ASCII-only key the columns
+    /// exist to replace. ``Swift/String/matchKey`` is the one folding rule
+    /// (docs/reference/INTERNATIONALIZATION.md#the-turkish-locale-rule).
+    ///
+    /// Row by row, and only for rows that have text to fold. On a large archive this is
+    /// the slowest migration Backglance has; it runs once, inside the migration's own
+    /// transaction, and a 100k-row archive is a few seconds of first launch after an
+    /// update.
+    ///
+    /// > Note: writing `sender_key` does not disturb `notifications_fts` — the update
+    /// > trigger fires only on `title`, `subtitle`, `body` and `sender`.
+    static func backfillMatchKeys(_ db: Database) throws {
+        for (table, source, target) in [
+            ("apps", "display_name", "display_name_key"),
+            ("notifications", "sender", "sender_key"),
+        ] {
+            let rows = try Row.fetchAll(
+                db,
+                sql: "SELECT id, \(source) AS text FROM \(table) WHERE \(source) IS NOT NULL"
+            )
+            for row in rows {
+                let text: String = row["text"]
+                try db.execute(
+                    sql: "UPDATE \(table) SET \(target) = ? WHERE id = ?",
+                    arguments: [text.matchKey, row["id"] as Int64]
+                )
+            }
+        }
     }
 
     // MARK: Private
@@ -110,6 +150,23 @@ enum ArchiveMigrations {
       vector BLOB NOT NULL,
       created_at REAL NOT NULL
     );
+    """
+
+    /// The match-key columns: what `from:` and `sender:` actually compare against.
+    ///
+    /// Both searches fold the needle in Swift — full Unicode, locale-neutral — and used
+    /// to compare it against SQL `lower()`, which folds A–Z only unless SQLite was built
+    /// with ICU. The two sides disagreed for every non-ASCII name: `from:isbank` did not
+    /// find "İŞBANK", `sender:ayse` did not find "AYŞE". Only non-English users ever hit
+    /// it, which is exactly the kind of bug that survives.
+    ///
+    /// Stored rather than computed at query time so the comparison stays a plain string
+    /// scan: a custom SQLite function would put a Swift call on every row of a
+    /// hundred-thousand-row filter. Nullable because the text they mirror is nullable,
+    /// and a `NULL` key simply matches nothing.
+    private static let matchKeysSQL = """
+    ALTER TABLE apps ADD COLUMN display_name_key TEXT;
+    ALTER TABLE notifications ADD COLUMN sender_key TEXT;
     """
 
     /// The v1.0 schema: every table, index and constraint the archive ships with,

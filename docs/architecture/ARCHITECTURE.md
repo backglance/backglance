@@ -114,7 +114,7 @@ Responsibilities:
 Responsibilities:
 
 - `Archive` — `final class` wrapping a GRDB `DatabasePool` at `~/Library/Application Support/Backglance/archive.sqlite` (WAL mode, file `0600`, directory `0700`). `Archive.shared` in the app, `Archive(inMemory: true)` in tests.
-- `ArchiveMigrations` — `DatabaseMigrator` with `v1_initial`, `v1_fts`, `v2_embeddings`, then v1.x migrations (`v3_saved_searches`, `v4_snoozes`, `v5_sync_metadata`). `eraseDatabaseOnSchemaChange = true` only in DEBUG.
+- `ArchiveMigrations` — `DatabaseMigrator` with `v1_initial`, `v1_fts`, `v2_embeddings`, `v3_match_keys`, then v1.x migrations (`v4_saved_searches`, `v5_snoozes`, `v6_sync_metadata`). `eraseDatabaseOnSchemaChange = true` only in DEBUG.
 - Models — `ArchivedNotification`, `AppRecord`, `Rule`, `Digest`, `DigestItem`, `RedactionEvent`, `AwaySession`, `CaptureState`, and v1.x `SavedSearch`, `Snooze`, `Embedding`. All are `Codable, FetchableRecord, PersistableRecord`.
 - `OTPRedactor` — runs in memory before insert; on by default for `com.apple.MobileSMS` and `com.apple.mail`.
 - `ExclusionList` — bundle IDs that are never stored (password managers, `com.apple.Passwords`, Backglance itself).

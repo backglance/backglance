@@ -43,10 +43,16 @@ public struct AppResolver: Sendable {
                     ids.formUnion(apps.compactMap(\.id))
                 }
 
-                if let needle = query.appNameContains?.lowercased(), !needle.isEmpty {
+                // 🔒 Both sides fold the same way. `display_name_key` is
+                // `String.matchKey` written at insert time, and the needle is folded
+                // here — SQLite's `lower()` folds A–Z only, so comparing against
+                // `lower(display_name)` used to miss every non-ASCII name
+                // (`from:isbank` did not find "İŞBANK"). Bundle identifiers are ASCII
+                // by Apple's own rules, so `lower()` is still right for that half.
+                if let needle = query.appNameContains?.matchKey, !needle.isEmpty {
                     let sql = """
                     SELECT id FROM apps
-                    WHERE lower(display_name) LIKE ? ESCAPE '\\'
+                    WHERE display_name_key LIKE ? ESCAPE '\\'
                        OR lower(bundle_id) LIKE ? ESCAPE '\\'
                     """
                     let pattern = "%\(Self.escapingWildcards(needle))%"

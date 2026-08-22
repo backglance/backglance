@@ -152,6 +152,7 @@ CREATE TABLE apps (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   bundle_id TEXT NOT NULL UNIQUE,
   display_name TEXT,
+  display_name_key TEXT,                       -- display_name folded by String.matchKey; what from: compares against
   retention TEXT NOT NULL DEFAULT 'inherit',   -- '24h','7d','30d','forever','never','inherit'
   is_excluded INTEGER NOT NULL DEFAULT 0,      -- never store (exclusion list)
   is_muted INTEGER NOT NULL DEFAULT 0,         -- timeline de-prioritize (visual only)
@@ -166,6 +167,7 @@ CREATE TABLE notifications (
   app_id INTEGER NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
   title TEXT, subtitle TEXT, body TEXT,
   sender TEXT, thread_id TEXT, category TEXT,
+  sender_key TEXT,                             -- sender folded by String.matchKey; what sender: compares against
   delivered_at REAL NOT NULL,
   captured_at REAL NOT NULL,
   source TEXT NOT NULL DEFAULT 'live',         -- 'live' | 'import'
@@ -327,7 +329,7 @@ One row per bundle identifier ever seen. Also carries per-app settings so a user
 | `capture_state.fingerprint` | JSON of the last `StoreFingerprint` seen |
 | `capture_state.adapter_id` | e.g. `"v26"` |
 | `capture_state.last_import_at` | Unix seconds of the last `importExisting()` |
-| `schema_meta.archive_version` | Integer string mirrored from the last applied migration (`"5"` after `v5_sync_metadata`); informational — GRDB's migrator is authoritative |
+| `schema_meta.archive_version` | Integer string mirrored from the last applied migration (`"6"` after `v6_sync_metadata`); informational — GRDB's migrator is authoritative |
 
 #### v1.x tables
 
@@ -336,7 +338,7 @@ One row per bundle identifier ever seen. Also carries per-app settings so a user
 | `saved_searches` | Named `QueryParser` strings; `is_smart_folder = 1` shows in the sidebar |
 | `snoozes` | Local reminders scheduled by `SnoozeScheduler`; `reminders_identifier` links an optional EventKit reminder |
 | `embeddings` | 512-dim `Float32` little-endian vector as BLOB (2048 bytes); `model` = `"nl.sentence.en.v1"`; only present when "Semantic search" is on |
-| `sync_metadata` | CloudKit bookkeeping (see `v5_sync_metadata`); only populated when sync is opted in |
+| `sync_metadata` | CloudKit bookkeeping (see `v6_sync_metadata`); only populated when sync is opted in |
 
 ### Indexes and why each exists
 
@@ -740,7 +742,16 @@ enum ArchiveMigrations {
             try setArchiveVersion(db, 2)
         }
 
-        migrator.registerMigration("v3_saved_searches") { db in
+        migrator.registerMigration("v3_match_keys") { db in
+            try db.execute(sql: """
+                ALTER TABLE apps ADD COLUMN display_name_key TEXT;
+                ALTER TABLE notifications ADD COLUMN sender_key TEXT;
+                """)
+            try backfillMatchKeys(db)           // folds in Swift: SQLite's lower() is ASCII-only
+            try setArchiveVersion(db, 3)
+        }
+
+        migrator.registerMigration("v4_saved_searches") { db in
             try db.execute(sql: """
                 CREATE TABLE saved_searches (
                   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -754,7 +765,7 @@ enum ArchiveMigrations {
             try setArchiveVersion(db, 3)
         }
 
-        migrator.registerMigration("v4_snoozes") { db in
+        migrator.registerMigration("v5_snoozes") { db in
             try db.execute(sql: """
                 CREATE TABLE snoozes (
                   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -768,7 +779,7 @@ enum ArchiveMigrations {
             try setArchiveVersion(db, 4)
         }
 
-        migrator.registerMigration("v5_sync_metadata") { db in
+        migrator.registerMigration("v6_sync_metadata") { db in
             // CloudKit bookkeeping (opt-in, v1.x). One row per synced local row.
             try db.execute(sql: """
                 CREATE TABLE sync_metadata (
@@ -834,7 +845,7 @@ public final class Archive: Sendable {
 
 > ℹ️ **Info:** `pool` is typed `any DatabaseWriter` so the in-memory `DatabaseQueue` and the on-disk `DatabasePool` share one code path. All `Archive` methods use `pool.read { }` / `pool.write { }`, which both types provide.
 
-Migrations are numbered in **ship order**, which is not the order the features were designed in: `v2_embeddings` ships with semantic search in `0.3.0`, ahead of saved searches and snoozes, so it takes the number that follows `v1_fts`. This is not cosmetic — migration ordering is guaranteed by registration order, and a migration can never be slipped in front of one that has already been applied on someone's Mac. A new migration is always *appended*, and takes the next number when it does. Migration ordering is guaranteed by registration order. A `0.2.0` archive has `v1_initial` and `v1_fts` applied; upgrading applies `v2_…` through `v5_…` on first launch, in one transaction each. Downgrading is not supported (GRDB will refuse to open an archive with unknown migrations applied); the app shows a plain dialog explaining that.
+Migrations are numbered in **ship order**, which is not the order the features were designed in: `v2_embeddings` ships with semantic search in `0.3.0`, ahead of saved searches and snoozes, so it takes the number that follows `v1_fts`. This is not cosmetic — migration ordering is guaranteed by registration order, and a migration can never be slipped in front of one that has already been applied on someone's Mac. A new migration is always *appended*, and takes the next number when it does. Migration ordering is guaranteed by registration order. A `0.2.0` archive has `v1_initial` and `v1_fts` applied; upgrading applies `v2_…` through `v6_…` on first launch, in one transaction each. Downgrading is not supported (GRDB will refuse to open an archive with unknown migrations applied); the app shows a plain dialog explaining that.
 
 ### Rules for writing migrations
 
@@ -854,7 +865,7 @@ Migrations are numbered in **ship order**, which is not the order the features w
 Batching pattern for a hypothetical future backfill:
 
 ```swift
-migrator.registerMigration("v6_example_backfill") { db in
+migrator.registerMigration("v7_example_backfill") { db in
     try db.execute(sql: "ALTER TABLE notifications ADD COLUMN example_col TEXT")
     var lastID: Int64 = 0
     while true {

@@ -64,6 +64,7 @@ public struct ArchivedNotification: Codable, FetchableRecord, MutablePersistable
         self.subtitle = subtitle
         self.body = body
         self.sender = sender
+        senderKey = sender?.matchKey
         self.threadId = threadId
         self.category = category
         self.deliveredAt = deliveredAt
@@ -133,8 +134,17 @@ public struct ArchivedNotification: Codable, FetchableRecord, MutablePersistable
     public var subtitle: String?
     public var body: String?
 
-    /// Best-effort sender (Messages contact/handle, Mail from-name).
-    public var sender: String?
+    /// ``sender`` folded by ``Swift/String/matchKey`` — what `sender:` compares against.
+    ///
+    /// Stored rather than folded at query time because SQLite's `lower()` is ASCII-only:
+    /// comparing a Swift-folded needle against `lower(sender)` silently missed every
+    /// non-ASCII name, so `sender:ayse` did not find "AYŞE". Both sides now fold the same
+    /// way, in Swift.
+    ///
+    /// Derived, never passed in: the initializer sets it from `sender`, `didSet` keeps it
+    /// current, and decoding a row reads the stored column. It carries no information the
+    /// row does not already hold, so it lives and dies with the row it belongs to.
+    public private(set) var senderKey: String?
 
     /// The store's `thre` key; groups conversation threads in the timeline.
     public var threadId: String?
@@ -182,6 +192,16 @@ public struct ArchivedNotification: Codable, FetchableRecord, MutablePersistable
     /// The store's `record.rec_id`, when known. Unique where non-null
     /// (`idx_notifications_store_rec`), so a re-import cannot duplicate a row.
     public var storeRecId: Int64?
+
+    /// Best-effort sender (Messages contact/handle, Mail from-name).
+    ///
+    /// Assigning it re-derives ``senderKey``, which is the only thing keeping the two in
+    /// step on the thread-update path.
+    public var sender: String? {
+        didSet {
+            senderKey = sender?.matchKey
+        }
+    }
 
     public mutating func didInsert(_ inserted: InsertionSuccess) {
         id = inserted.rowID

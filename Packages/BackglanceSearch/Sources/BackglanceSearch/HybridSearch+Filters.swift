@@ -106,8 +106,11 @@ extension HybridSearch {
             arguments += [before.timeIntervalSince1970]
         }
         if let sender = parsed.sender, !sender.isEmpty {
-            sql += " AND lower(\(prefix)sender) LIKE ? ESCAPE '\\'"
-            arguments += ["%\(AppResolver.escapingWildcards(sender.lowercased()))%"]
+            // 🔒 `sender_key` is the sender folded by `String.matchKey` at insert
+            // time, and the needle is folded the same way here. `lower(sender)` folded
+            // A–Z only, so `sender:ayse` never found "AYŞE".
+            sql += " AND \(prefix)sender_key LIKE ? ESCAPE '\\'"
+            arguments += ["%\(AppResolver.escapingWildcards(sender.matchKey))%"]
         }
         if let thread = parsed.threadID, !thread.isEmpty {
             sql += " AND \(prefix)thread_id = ?"

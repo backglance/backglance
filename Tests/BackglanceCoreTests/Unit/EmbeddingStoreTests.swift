@@ -152,7 +152,11 @@ final class EmbeddingStoreTests: XCTestCase {
         }
 
         XCTAssertTrue(exists, "the migration runs unconditionally; the table is simply empty while the feature is off")
-        XCTAssertEqual(BackglanceCore.archiveSchemaVersion, 2)
+        XCTAssertGreaterThanOrEqual(
+            BackglanceCore.archiveSchemaVersion,
+            2,
+            "embeddings arrived in v2; every version after it keeps the table"
+        )
     }
 
     // MARK: Private

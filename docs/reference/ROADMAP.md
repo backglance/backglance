@@ -169,7 +169,7 @@ Each v1.x item ships as a minor release (`1.1.0`, `1.2.0`, …) with its own arc
 | 5 | **At-rest encryption** — GRDB SQLCipher build, key in Keychain, migration tool from plain archive | 1.3 | in-place re-encryption | [SECURITY.md](../security/SECURITY.md) |
 | 6 | **Touch ID lock** — `LAContext` gate on popover/window open, optional, timeout configurable | 1.3 | none | [PRIVACY_CONTROLS.md](../features/PRIVACY_CONTROLS.md) |
 | 7 | **Widgets** — WidgetKit extension (`BackglanceWidgets`): unread count, last digest, pinned | 1.4 | none | [WIDGETS.md](../features/WIDGETS.md) |
-| 8 | **CloudKit sync** — opt-in, off by default, end-to-end encrypted content, `v5_sync_metadata` | 1.5 | `v5_sync_metadata` | [CLOUDKIT_SYNC.md](../features/CLOUDKIT_SYNC.md) |
+| 8 | **CloudKit sync** — opt-in, off by default, end-to-end encrypted content, `v6_sync_metadata` | 1.5 | `v6_sync_metadata` | [CLOUDKIT_SYNC.md](../features/CLOUDKIT_SYNC.md) |
 
 ### Ordering and rationale
 
