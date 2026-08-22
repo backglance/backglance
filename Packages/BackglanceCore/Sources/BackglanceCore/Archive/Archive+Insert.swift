@@ -38,24 +38,7 @@ public extension Archive {
     @discardableResult
     func repairCounts() throws -> Int {
         try pool.write { db in
-            try db.execute(
-                sql: """
-                UPDATE apps
-                   SET notification_count = (
-                         SELECT COUNT(*)
-                           FROM notifications
-                          WHERE notifications.app_id = apps.id
-                            AND notifications.is_deleted = 0
-                       )
-                 WHERE notification_count <> (
-                         SELECT COUNT(*)
-                           FROM notifications
-                          WHERE notifications.app_id = apps.id
-                            AND notifications.is_deleted = 0
-                       )
-                """
-            )
-            return db.changesCount
+            try Self.recountApps(db)
         }
     }
 
@@ -154,6 +137,36 @@ extension Archive {
         )
         try app.insert(db)
         return app
+    }
+
+    /// The recount itself, scoped to an existing transaction.
+    ///
+    /// Internal and `db`-taking because two callers need it and only one of them owns a
+    /// transaction: ``Archive/repairCounts()`` opens its own, while a prune and
+    /// ``Archive/forgetHistory(bundleID:)`` are already inside one and would deadlock on a
+    /// nested write.
+    ///
+    /// - Returns: how many app rows had a count that was wrong.
+    @discardableResult
+    static func recountApps(_ db: Database) throws -> Int {
+        try db.execute(
+            sql: """
+            UPDATE apps
+               SET notification_count = (
+                     SELECT COUNT(*)
+                       FROM notifications
+                      WHERE notifications.app_id = apps.id
+                        AND notifications.is_deleted = 0
+                   )
+             WHERE notification_count <> (
+                     SELECT COUNT(*)
+                       FROM notifications
+                      WHERE notifications.app_id = apps.id
+                        AND notifications.is_deleted = 0
+                   )
+            """
+        )
+        return db.changesCount
     }
 
     /// Widens the app's seen-at window and increments its denormalized count.

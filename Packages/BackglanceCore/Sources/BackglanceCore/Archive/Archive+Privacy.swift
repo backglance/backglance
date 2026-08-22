@@ -204,3 +204,47 @@ public extension Archive {
         }
     }
 }
+
+// MARK: - Forgetting one app's history
+
+public extension Archive {
+    /// Marks every notification from `bundleID` deleted.
+    ///
+    /// The other half of "Never store": excluding an app stops the next notification, and
+    /// this is what answers "and the ones you already have". Kept separate from
+    /// ``setRetention(_:bundleID:now:)`` on purpose — the pane asks before calling it, and
+    /// a method that did both would make a picker silently destructive.
+    ///
+    /// A *soft* delete, so it goes through the same two-phase path as everything else:
+    /// invisible immediately, removed for real by the next `RetentionJob` pass, which is
+    /// also what fires the FTS trigger and the cascades. Pinned rows are taken too — this
+    /// is the user saying "forget this app", which outranks a pin on one of its
+    /// notifications in a way an expiry window does not.
+    ///
+    /// - Returns: how many rows were flagged.
+    @discardableResult
+    func forgetHistory(bundleID: String) throws -> Int {
+        do {
+            return try pool.write { db in
+                try db.execute(
+                    sql: """
+                    UPDATE notifications SET is_deleted = 1
+                     WHERE is_deleted = 0
+                       AND app_id IN (SELECT id FROM apps WHERE bundle_id = ?)
+                    """,
+                    arguments: [bundleID]
+                )
+                let changed = db.changesCount
+                if changed > 0 {
+                    try Archive.recountApps(db)
+                }
+                return changed
+            }
+        } catch {
+            throw ArchiveError.writeFailed(
+                table: ArchivedNotification.databaseTableName,
+                underlying: ArchiveError.detail(from: error)
+            )
+        }
+    }
+}

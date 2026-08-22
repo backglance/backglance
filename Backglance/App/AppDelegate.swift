@@ -32,8 +32,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
         startCapture()
         startAwayTracking()
-        startInterface()
+        // Before startInterface(): the settings window built there needs a `RetentionJob`
+        // reference for the Retention pane's "Run cleanup now" button. Moving this call
+        // earlier does not cost the popover anything — `RetentionJob.start()` only spins up
+        // an async `Task` that sleeps for its launch delay before doing real work, so the
+        // "painted popover first" ordering `startRetention()`'s own doc comment describes is
+        // about when a *pass* runs, not about when this method is called.
         startRetention()
+        startInterface()
         // Setting a delegate neither requests authorization nor shows anything; it is
         // only how a tap on a banner we may never post finds its way back here.
         UNUserNotificationCenter.current().delegate = self
@@ -164,11 +170,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     /// Each pane's model is built here rather than inside the window controller, because
     /// the archive and the search service are the app shell's to hand out — `BackglanceUI`
     /// is given what it reads, and does not go looking for it.
-    private static func settingsWindow(search: SearchService, archive: Archive) -> SettingsWindowController {
+    ///
+    /// - Parameter retention: `nil` when `startRetention()` could not build one (no
+    ///   archive). `RetentionSettingsModel` treats that the same way every other pane treats
+    ///   a `nil` archive: "Run cleanup now" disables itself rather than pressing a button
+    ///   that quietly does nothing.
+    private static func settingsWindow(
+        search: SearchService,
+        archive: Archive,
+        retention: RetentionJob?
+    ) -> SettingsWindowController {
         SettingsWindowController(
             search: search,
             digest: digestSettings(),
             redaction: CodeRedactionSettingsModel(archive: archive),
+            retention: RetentionSettingsModel(archive: archive, job: retention),
             exclusions: ExcludedAppsSettingsModel(archive: archive)
         )
     }
@@ -334,11 +350,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     /// Starts the prune loop.
     ///
-    /// Last of the four, and thirty seconds behind even that: it is the only subsystem
-    /// with no deadline, and the writer it wants during a pass is the one capture and the
-    /// popover are competing for at launch. Ordered after `startInterface()` so that a
-    /// build which somehow made a prune expensive shows a painted popover first and a slow
-    /// one second, rather than no popover at all.
+    /// Third of the four, ahead of `startInterface()`, because that method builds the
+    /// settings window and the Retention pane's model needs a `RetentionJob` reference to
+    /// hand its "Run cleanup now" button. That ordering does not cost the popover anything:
+    /// this method only constructs the actor and fires `Task { await job.start() }`, and
+    /// `start()` itself does no real work until its launch delay elapses — thirty seconds
+    /// behind even a build that called it first, so the writer capture and the popover want
+    /// at launch is still free until well after both have painted.
     ///
     /// No archive means nothing to prune, which is the same reason `startInterface()`
     /// gives up early.
@@ -368,7 +386,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // which stay asleep until the user turns the setting on.
         let search = SearchService(archive: archive)
         search.start()
-        let settings = Self.settingsWindow(search: search, archive: archive)
+        let settings = Self.settingsWindow(search: search, archive: archive, retention: retention)
         // The field's own state: what was typed, what came back, what is still
         // in flight. It asks `search` its questions through `SearchRunning`.
         // Read per call rather than captured once: the toggle can change

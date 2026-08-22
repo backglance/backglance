@@ -180,6 +180,66 @@ final class RetentionSettingsTests: XCTestCase {
         XCTAssertEqual(remaining, 1)
     }
 
+    // MARK: - Forgetting one app's history
+
+    /// The other half of "Never store". Excluding an app stops the next notification;
+    /// this answers "and the ones you already have".
+    func testForgettingAnAppsHistoryFlagsEveryOneOfItsNotifications() throws {
+        let archive = try XCTUnwrap(archive)
+        try seed(bundleID: "com.example.bank", count: 3)
+        try seed(bundleID: "com.example.chat", count: 2)
+
+        let flagged = try archive.forgetHistory(bundleID: "com.example.bank")
+
+        XCTAssertEqual(flagged, 3)
+        XCTAssertEqual(try liveCount(in: archive), 2, "the other app is untouched")
+    }
+
+    /// 🔒 A *soft* delete, so it goes down the same two-phase path as everything else —
+    /// invisible at once, removed for real by the next pass, which is what fires the FTS
+    /// trigger and the cascades. A hard delete here would bypass all of that.
+    func testForgettingAnAppsHistoryIsASoftDelete() throws {
+        let archive = try XCTUnwrap(archive)
+        try seed(bundleID: "com.example.bank", count: 2)
+
+        try archive.forgetHistory(bundleID: "com.example.bank")
+
+        XCTAssertEqual(try count(in: archive), 2, "still on disk for the prune to take properly")
+        XCTAssertEqual(try liveCount(in: archive), 0)
+    }
+
+    /// Pinned rows go too. "Forget this app" is a stronger statement than an expiry
+    /// window, and it is one the user made about the app rather than about the policy.
+    func testForgettingAnAppsHistoryTakesPinnedRowsAsWell() throws {
+        let archive = try XCTUnwrap(archive)
+        try seed(bundleID: "com.example.bank", count: 1)
+        try archive.pool.write { db in
+            try db.execute(sql: "UPDATE notifications SET is_pinned = 1")
+        }
+
+        try archive.forgetHistory(bundleID: "com.example.bank")
+
+        XCTAssertEqual(try liveCount(in: archive), 0)
+    }
+
+    func testForgettingTheHistoryOfAnAppWithNoneChangesNothing() throws {
+        let archive = try XCTUnwrap(archive)
+
+        XCTAssertEqual(try archive.forgetHistory(bundleID: "com.example.nothing"), 0)
+    }
+
+    /// The counter the panes read follows it, in the same transaction — otherwise the
+    /// pane would show a count for rows it has just made invisible.
+    func testForgettingAnAppsHistoryUpdatesItsCounter() throws {
+        let archive = try XCTUnwrap(archive)
+        try seed(bundleID: "com.example.bank", count: 3)
+
+        try archive.forgetHistory(bundleID: "com.example.bank")
+
+        let app = try archive.allApps().first { $0.bundleId == "com.example.bank" }
+        XCTAssertEqual(app?.notificationCount, 0)
+    }
+
     // MARK: Private
 
     private static let now = Date(timeIntervalSince1970: 1_787_236_200)
@@ -200,6 +260,31 @@ final class RetentionSettingsTests: XCTestCase {
             lastSeenAt: UnixDate(now),
             notificationCount: 0
         )
+    }
+
+    private func seed(bundleID: String, count: Int) throws {
+        let archive = try XCTUnwrap(archive)
+        let app = try archive.upsertApp(bundleID: bundleID, now: Self.old)
+        let appID = try XCTUnwrap(app.id)
+        for _ in 0 ..< count {
+            try archive.insertOrUpdate(ArchivedNotification(
+                uuid: UUID().uuidString,
+                appId: appID,
+                title: "Fixture",
+                deliveredAt: UnixDate(Self.old),
+                capturedAt: UnixDate(Self.old)
+            ))
+        }
+    }
+
+    private func count(in archive: Archive) throws -> Int {
+        try archive.pool.read { db in try ArchivedNotification.fetchCount(db) }
+    }
+
+    private func liveCount(in archive: Archive) throws -> Int {
+        try archive.pool.read { db in
+            try Int.fetchOne(db, sql: "SELECT count(*) FROM notifications WHERE is_deleted = 0") ?? 0
+        }
     }
 
     private func throwawayDefaults() throws -> UserDefaults {
