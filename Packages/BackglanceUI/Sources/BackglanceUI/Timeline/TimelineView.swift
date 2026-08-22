@@ -1,3 +1,4 @@
+import BackglanceCore
 import Foundation
 import SwiftUI
 
@@ -40,50 +41,60 @@ public struct TimelineView: View {
                 timeline
             }
         }
-        .onKeyPress(.upArrow) {
-            store.moveSelection(-1)
-            return .handled
-        }
-        .onKeyPress(.downArrow) {
-            store.moveSelection(1)
-            return .handled
-        }
-        .onKeyPress(.return) {
-            guard let id = store.selectedID else {
-                return .ignored
-            }
-            store.open(id)
-            return .handled
-        }
-        // Space peeks: the selected row expands to detailed and back, without
-        // changing what the surface remembers for next time.
-        .onKeyPress(.space) {
-            store.viewMode = store.viewMode == .compact ? .detailed : .compact
-            return .handled
-        }
-        .onKeyPress(.escape) {
-            guard let dismiss = actions.dismiss else {
-                return .ignored
-            }
-            dismiss()
-            return .handled
-        }
-        .onKeyPress(.return, phases: .down) { press in
-            // ⌘↩ hands the timeline to the full window. Checked here rather
-            // than as a `keyboardShortcut` so the plain Return above keeps
-            // working when there is no window to open.
-            guard press.modifiers.contains(.command), let openWindow = actions.openWindow else {
-                return .ignored
-            }
-            openWindow()
-            return .handled
-        }
+        // Every other shortcut in docs/features/ACTIONS.md's table and
+        // docs/features/TIMELINE.md's own — see `TimelineKeyboardShortcuts`'
+        // doc comment (`TimelineView+Keyboard.swift`) for why this is a
+        // `ViewModifier` in its own file rather than a longer `.onKeyPress`
+        // chain here.
+        .modifier(TimelineKeyboardShortcuts(exportIDs: $exportIDs, actionError: $actionError))
         .focusable()
         .focusEffectDisabled()
         .task(id: store.sections.count) {
             // The popover opens straight into the list with the first unread
             // row selected, so ↓ moves rather than merely starting.
             store.selectFirstUnreadIfNeeded()
+        }
+        // Clears itself a few seconds after it last changed — a fresh error
+        // restarts the clock rather than racing the one already running,
+        // which is exactly what keying this `.task` on `actionError` buys:
+        // SwiftUI cancels and restarts the task whenever its `id` changes,
+        // the same trick `NotificationActionHandler`'s undo toast expiry
+        // implements by hand with a `Task` it cancels itself.
+        .task(id: actionError) {
+            guard actionError != nil else {
+                return
+            }
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else {
+                return
+            }
+            actionError = nil
+        }
+        .sheet(isPresented: isExportSheetPresented) {
+            if let ids = exportIDs {
+                exportSheet(for: ids)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            // Order matters only in that both can be on screen together —
+            // an export failure right after a delete would otherwise have
+            // nowhere to land while the toast is still counting down. The
+            // error sits above the toast so a fresh one is never hidden
+            // behind it.
+            VStack(spacing: 8) {
+                if let message = actionError?.userMessage {
+                    ActionErrorBanner(message: message)
+                }
+                if let handler = actionDispatcher as? NotificationActionHandler, !handler.pendingUndo.isEmpty {
+                    UndoToastView(count: handler.pendingUndo.count) {
+                        ActionDispatchRouting.run {
+                            try handler.undoDelete()
+                        } onError: {
+                            actionError = $0
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -95,22 +106,45 @@ public struct TimelineView: View {
     @Environment(\.timelineActions)
     private var actions
 
+    /// Read by the undo toast overlay below, the same downcast
+    /// `NotificationRow+ContextMenu`'s `canActivateApp` already uses to
+    /// reach `pendingUndo` — see `TimelineKeyboardShortcuts.handleUndo(_:)`
+    /// for the other place this same downcast happens, for ⌘Z.
+    @Environment(\.actionDispatcher)
+    private var actionDispatcher
+
     /// Which days' collapsed "Muted (n)" group is currently expanded. Keyed
     /// by `TimelineSection.Model.id` (the day), not by any one notification,
     /// so scrolling a muted row off screen and back does not re-collapse it.
     @State private var expandedMutedDays: Set<Date> = []
 
-    /// The most recent context-menu dispatch failure a row reported through
-    /// `onActionError`, if any is still worth showing.
-    ///
-    /// BACKGLANCE-203 part 2: this is where the inline error message
-    /// (docs/features/ACTIONS.md's error table — "Couldn't open ‹App›",
-    /// "Export failed: …", and so on) gets presented. Nothing reads this
-    /// property yet; it exists now so `NotificationRow`'s `onActionError`
-    /// closure has somewhere real to write to rather than a `_ = error`
-    /// thrown away, and so part 2 can wire the presentation without also
-    /// having to thread a new closure back down through `TimelineSectionSlots`.
+    /// The ids `ExportSheet` is open for, or `nil` when it is not presented.
+    /// Set by ⌘E (`TimelineKeyboardShortcuts`) and by the row context menu's
+    /// "Export Selection…" (`onRequestExport` below) — both funnel through
+    /// this one property so there is exactly one sheet to reason about
+    /// regardless of which of the two ways it was opened.
+    @State private var exportIDs: [Int64]?
+
+    /// The most recent dispatch failure worth showing inline —
+    /// docs/features/ACTIONS.md's error table ("Couldn't open ‹App›",
+    /// "Export failed: …", and so on), rendered by ``ActionErrorBanner``
+    /// below and cleared automatically a few seconds after it last changed.
+    /// Written by `NotificationRow`'s `onActionError` (a context-menu
+    /// dispatch failure) and by `TimelineKeyboardShortcuts` (a keyboard
+    /// dispatch failure) — the same property either way, since the error
+    /// this view shows should not depend on which of the two ways the
+    /// action was triggered.
     @State private var actionError: ActionError?
+
+    /// Drives `.sheet(isPresented:)`: presented exactly while `exportIDs` is
+    /// non-`nil`, and dismissing the sheet any other way (the system's own
+    /// swipe/click-outside dismissal, not just `onCancel`) clears it back to
+    /// `nil` through this same `Binding` rather than leaving it stale.
+    private var isExportSheetPresented: Binding<Bool> {
+        Binding(get: { exportIDs != nil }, set: { if !$0 {
+            exportIDs = nil
+        } })
+    }
 
     private var timeline: some View {
         ScrollViewReader { proxy in
@@ -130,9 +164,7 @@ public struct TimelineView: View {
                                 onRowDisappear: { store.rowBecameHidden($0) },
                                 onToggleSelect: { store.toggleSelection($0) },
                                 onExtendSelect: { store.extendSelection(to: $0) },
-                                // BACKGLANCE-203 part 2 presents `ExportSheet` here and
-                                // calls `exportSelection(_:format:)` with the chosen format.
-                                onRequestExport: { _ in },
+                                onRequestExport: { exportIDs = $0 },
                                 onActionError: { actionError = $0 }
                             )
                         } header: {
@@ -154,6 +186,30 @@ public struct TimelineView: View {
                 }
             }
         }
+    }
+
+    /// docs/features/ACTIONS.md#select-and-export: the sheet only reports which
+    /// format was chosen — running the save panel and the export itself is
+    /// ``NotificationActionHandler/exportSelection(_:format:)``'s job, dispatched here
+    /// through ``ActionDispatchRouting/runAsync(_:onError:)`` the same way
+    /// `NotificationRow+ContextMenu`'s `.exportSelection` branch dispatches
+    /// ``ActionDispatching/openNotification(id:)``.
+    private func exportSheet(for ids: [Int64]) -> some View {
+        ExportSheet(
+            selectionCount: ids.count,
+            onExport: { format in
+                exportIDs = nil
+                if let dispatcher = actionDispatcher {
+                    ActionDispatchRouting.runAsync {
+                        try await dispatcher.exportSelection(ids, format: format)
+                    }
+                    onError: {
+                        actionError = $0
+                    }
+                }
+            },
+            onCancel: { exportIDs = nil }
+        )
     }
 
     /// Passed by name rather than as a closure literal: SwiftLint reads a
@@ -266,6 +322,36 @@ private struct PageLoadingSentinel: View {
             .controlSize(.small)
             .frame(maxWidth: .infinity)
             .frame(height: 24)
+    }
+}
+
+// MARK: - ActionErrorBanner
+
+/// The inline, non-modal message for a dispatch failure worth showing —
+/// docs/features/ACTIONS.md's error table asks for exactly that, "never an
+/// alert", the same instruction ``NotificationActionHandler``'s own doc
+/// comment already follows for where the error is *thrown*; this is where it
+/// finally becomes text. Styled after ``UndoToastView``, which is what the
+/// two look like sitting in the same bottom overlay in `TimelineView.body`,
+/// but with no button of its own — there is nothing here to undo, only to
+/// read and then stop reading a few seconds later once `TimelineView`'s
+/// `actionError` clears itself.
+private struct ActionErrorBanner: View {
+    let message: String
+
+    var body: some View {
+        Label(message, systemImage: "exclamationmark.triangle")
+            .font(.callout)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(.separator)
+            )
+            .padding(.horizontal, 12)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("timeline.actionError")
     }
 }
 

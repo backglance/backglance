@@ -1,4 +1,3 @@
-import AppKit
 import BackglanceCore
 import SwiftUI
 
@@ -128,44 +127,33 @@ extension NotificationRow {
         }
     }
 
-    /// Runs a synchronous dispatch call, routing a thrown ``ActionError`` to
-    /// ``handle(_:)``. Shared by every non-`async` branch in ``perform(_:dispatcher:)``
-    /// so each one is a single line instead of repeating the same `do`/`catch`.
+    /// Runs a synchronous dispatch call through ``ActionDispatchRouting/run(_:onError:)``,
+    /// routing a thrown ``ActionError`` to ``handle(_:)``. Shared by every non-`async`
+    /// branch in ``perform(_:dispatcher:)`` so each one is a single line instead of
+    /// repeating the same `do`/`catch`.
     private func dispatchThrowing(_ action: () throws -> Void) {
-        do {
-            try action()
-        } catch let error as ActionError {
-            handle(error)
-        } catch {}
+        ActionDispatchRouting.run(action, onError: handle)
     }
 
     /// The `async` counterpart to ``dispatchThrowing(_:)``, for
     /// ``ActionDispatching/openNotification(id:)`` and
     /// ``ActionDispatching/exportSelection(_:format:)`` — the two branches in
-    /// ``perform(_:dispatcher:)`` that need a `Task` at all. Splitting this out
-    /// (rather than inlining `Task { do { ... } catch { ... } }` twice) is what
-    /// keeps `perform(_:dispatcher:)`'s `switch` at one branch per menu kind
-    /// instead of one branch per menu kind *plus* a nested `catch`.
+    /// ``perform(_:dispatcher:)`` that need a `Task` at all.
+    /// ``ActionDispatchRouting/runAsync(_:onError:)`` is what actually builds that
+    /// `Task`, shared with `TimelineView.swift`'s `ExportSheet` dispatch and
+    /// `TimelineView+Keyboard.swift`'s ⌘↩ (BACKGLANCE-203 part 2) rather than a
+    /// second copy here.
     private func dispatchAsync(_ action: @escaping () async throws -> Void) {
-        Task {
-            do {
-                try await action()
-            } catch let error as ActionError {
-                handle(error)
-            } catch {}
-        }
+        ActionDispatchRouting.runAsync(action, onError: handle)
     }
 
-    /// Routes a dispatch failure per docs/features/ACTIONS.md's error table:
-    /// `.deepLinkUnresolvable` is the one case whose ``ActionError/userMessage``
-    /// is `nil` by design, mapped to a system beep instead of text; every
-    /// other case is handed to ``onActionError`` for the caller to show —
-    /// this row never builds its own alert.
+    /// Routes a dispatch failure to ``onActionError`` for the caller to show — this
+    /// row never builds its own alert. The beep for ``ActionError/deepLinkUnresolvable``
+    /// (whose ``ActionError/userMessage`` is `nil` by design, per
+    /// docs/features/ACTIONS.md's error table) happens inside
+    /// ``ActionDispatchRouting/route(_:onError:)`` itself before this is ever called —
+    /// `handle(_:)` only ever receives an error that already has text to show.
     private func handle(_ error: ActionError) {
-        if error.userMessage == nil {
-            NSSound.beep()
-        } else {
-            onActionError?(error)
-        }
+        onActionError?(error)
     }
 }

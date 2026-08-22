@@ -131,7 +131,7 @@ Shortcuts are active whenever a row is focused in the popover or the window. The
 | Keys | Action | Notes |
 |---|---|---|
 | ↩ | Open | marks read |
-| ⌘↩ | Open Link only | no app fallback; beeps if no deep link |
+| ⌘↩ | Open Link only | no app fallback; beeps if no deep link (the full window's own binding — the popover binds ⌘↩ to "Open the full window" per [TIMELINE.md](./TIMELINE.md#keyboard-navigation)) |
 | ⌘C | Copy | plain "Title — Body" |
 | ⌥⌘C | Copy with App and Time | |
 | ⌫ / ⌦ | Delete | soft delete, undo toast |
