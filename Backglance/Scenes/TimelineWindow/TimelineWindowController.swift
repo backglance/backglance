@@ -21,7 +21,11 @@ import SwiftUI
 final class TimelineWindowController: NSWindowController {
     // MARK: Lifecycle
 
-    convenience init(store: TimelineStore, banners: CaptureBannerModel? = nil) {
+    convenience init(
+        store: TimelineStore,
+        banners: CaptureBannerModel? = nil,
+        actions dispatcher: (any ActionDispatching)? = nil
+    ) {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 720, height: 640),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
@@ -38,6 +42,9 @@ final class TimelineWindowController: NSWindowController {
                 .environment(store)
                 .environment(banners)
                 .environment(\.timelineActions, TimelineActions())
+                // Shared with the popover's, so a delete in either surface offers its undo
+                // in both — see `AppDelegate.startInterface()` (BACKGLANCE-242).
+                .environment(\.actionDispatcher, dispatcher)
         )
         // The window's size is the window's business. Left to its default, the
         // hosting controller propagates SwiftUI's fitting size and an empty

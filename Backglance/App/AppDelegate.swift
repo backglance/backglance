@@ -35,6 +35,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     /// Internal so the mirror can live in `AppDelegate+CaptureStatus.swift`.
     var statusMirror: Task<Void, Never>?
 
+    /// Retained for the lifetime of the app. The engine is the only reader of Apple's
+    /// store, and the watcher is the only thing that wakes it; a local would deallocate
+    /// both at the end of launch and capture would silently never run.
+    var archive: Archive?
+    /// The one notification-action coordinator, shared by the popover and the window so
+    /// the two can never disagree about what is pending undo. Retained for the same reason
+    /// every other model on this delegate is: a local would deallocate at the end of
+    /// launch and take every row action with it.
+    var actionHandler: NotificationActionHandler?
+
+    /// The away model. The tracker is the state machine; the bridge is the only thing
+    /// holding its OS observers, and both die with the app.
+    /// The prune loop. Retained for the same reason as the engine: a local would
+    /// deallocate it at the end of launch and nothing would ever expire.
+    var retention: RetentionJob?
+
+    /// The interface, retained for the same reason: a status item whose
+    /// controller is deallocated stays in the menu bar and stops responding.
+    var store: TimelineStore?
+    var digests: DigestPresenter?
+    var search: SearchService?
+    var searchModel: SearchViewModel?
+    var settings: SettingsWindowController?
+    var statusItem: StatusItemController?
+    var hotKeys: HotKeyCenter?
+    var window: TimelineWindowController?
+
+    /// `rulesEngine`, or ``NoTriage`` when it has not been built — which only happens when
+    /// `startCapture()` itself found no archive, the same state every `guard let archive`
+    /// below already treats as "nothing to build". Every triage-consuming type default-
+    /// initializes to `NoTriage()` on its own, so this exists only to give every call site
+    /// below the same one instance instead of each falling back to its own separate no-op.
+    var triage: any TriageEvaluating {
+        if let rulesEngine {
+            return rulesEngine
+        }
+        return NoTriage()
+    }
+
     func applicationDidFinishLaunching(_: Notification) {
         // LSUIElement already does this at launch. Setting it again is what keeps the app
         // an agent if it is ever launched in a way that bypasses the Info.plist key, and
@@ -118,69 +157,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         completionHandler([.banner, .list])
     }
 
-    // MARK: Private
-
-    private let logger = Logger(subsystem: "app.backglance.Backglance", category: "ui")
-
-    /// Retained for the lifetime of the app. The engine is the only reader of Apple's
-    /// store, and the watcher is the only thing that wakes it; a local would deallocate
-    /// both at the end of launch and capture would silently never run.
-    private var archive: Archive?
-    private var watcher: StoreWatcher?
-
-    /// One instance for the whole app, built right after `archive` and started before
-    /// anything that needs to triage a row hands it out — see `startRules()`. Never one
-    /// engine per surface: the popover and the window would otherwise be able to disagree
-    /// about a rule, and the triage cache would be duplicated instead of shared.
-    private var rulesEngine: RulesEngine?
-
-    /// The away model. The tracker is the state machine; the bridge is the only thing
-    /// holding its OS observers, and both die with the app.
-    /// The prune loop. Retained for the same reason as the engine: a local would
-    /// deallocate it at the end of launch and nothing would ever expire.
-    private var retention: RetentionJob?
-
-    private var awayTracker: AwaySessionTracker?
-    private var awayBridge: AwayEventBridge?
-    private var focusWatcher: FocusAssertionWatcher?
-    private var presentationDetector: PresentationDetector?
-
-    /// The interface, retained for the same reason: a status item whose
-    /// controller is deallocated stays in the menu bar and stops responding.
-    private var store: TimelineStore?
-    private var digests: DigestPresenter?
-    private var search: SearchService?
-    private var searchModel: SearchViewModel?
-    private var settings: SettingsWindowController?
-    private var statusItem: StatusItemController?
-    private var hotKeys: HotKeyCenter?
-    private var window: TimelineWindowController?
-
-    /// `rulesEngine`, or ``NoTriage`` when it has not been built — which only happens when
-    /// `startCapture()` itself found no archive, the same state every `guard let archive`
-    /// below already treats as "nothing to build". Every triage-consuming type default-
-    /// initializes to `NoTriage()` on its own, so this exists only to give every call site
-    /// below the same one instance instead of each falling back to its own separate no-op.
-    private var triage: any TriageEvaluating {
-        if let rulesEngine {
-            return rulesEngine
-        }
-        return NoTriage()
-    }
-
-    /// The Digest pane's model, and the only place in Backglance that can cause a
-    /// permission prompt — and only when the user switches banners on.
-    ///
-    /// Both closures are `UserNotifications` calls, which `BackglanceUI` cannot make
-    /// itself: passing them in is what keeps that framework's one import in the app target,
-    /// and what makes the single trigger for the request visible at a call site.
-    private static func digestSettings() -> DigestSettingsModel {
-        DigestSettingsModel(authorization: BannerAuthorizing(
-            read: { await LocalNotificationAuthorizer.status().bannerAuthorization },
-            request: { await LocalNotificationAuthorizer.requestIfNeeded().bannerAuthorization }
-        ))
-    }
-
     /// The settings window and the models its panes read.
     ///
     /// Each pane's model is built here rather than inside the window controller, because
@@ -191,7 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     ///   archive). `RetentionSettingsModel` treats that the same way every other pane treats
     ///   a `nil` archive: "Run cleanup now" disables itself rather than pressing a button
     ///   that quietly does nothing.
-    private func settingsWindow(
+    func settingsWindow(
         search: SearchService,
         archive: Archive,
         retention: RetentionJob?
@@ -217,6 +193,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             permissions: makePermissionsModel(),
             status: makeStatusModel(archive: archive)
         )
+    }
+
+    // The members below are `internal`, not `private`, because
+    // `AppDelegate+Interface.swift` composes the interface out of them and Swift's
+    // `private` does not reach across files even for an extension of the same type —
+    // the same reason `AppDelegate+CaptureStatus.swift`'s `makeBannerModel()` is
+    // internal. They are still owned here: nothing outside this target sets them.
+
+    // MARK: Private
+
+    private let logger = Logger(subsystem: "app.backglance.Backglance", category: "ui")
+
+    private var watcher: StoreWatcher?
+
+    /// One instance for the whole app, built right after `archive` and started before
+    /// anything that needs to triage a row hands it out — see `startRules()`. Never one
+    /// engine per surface: the popover and the window would otherwise be able to disagree
+    /// about a rule, and the triage cache would be duplicated instead of shared.
+    private var rulesEngine: RulesEngine?
+
+    private var awayTracker: AwaySessionTracker?
+    private var awayBridge: AwayEventBridge?
+    private var focusWatcher: FocusAssertionWatcher?
+    private var presentationDetector: PresentationDetector?
+
+    /// The Digest pane's model, and the only place in Backglance that can cause a
+    /// permission prompt — and only when the user switches banners on.
+    ///
+    /// Both closures are `UserNotifications` calls, which `BackglanceUI` cannot make
+    /// itself: passing them in is what keeps that framework's one import in the app target,
+    /// and what makes the single trigger for the request visible at a call site.
+    private static func digestSettings() -> DigestSettingsModel {
+        DigestSettingsModel(authorization: BannerAuthorizing(
+            read: { await LocalNotificationAuthorizer.status().bannerAuthorization },
+            request: { await LocalNotificationAuthorizer.requestIfNeeded().bannerAuthorization }
+        ))
     }
 
     /// Offers the freshly built digest to the banner.
@@ -419,77 +431,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let job = RetentionJob(archive: archive)
         retention = job
         Task { await job.start() }
-    }
-
-    /// Builds the timeline and everything that shows it.
-    ///
-    /// Without an archive there is nothing to show, so the interface is simply
-    /// not built — the alternative, a status item whose popover explains that
-    /// the database could not be opened, is a window's worth of apology that
-    /// onboarding will do properly (docs/features/PERMISSIONS_PRIVACY.md).
-    private func startInterface() {
-        guard let archive else {
-            return
-        }
-
-        let store = TimelineStore(archive: archive, triage: triage, host: .popover)
-        let banners = makeBannerModel()
-        self.banners = banners
-        let window = TimelineWindowController(store: store, banners: banners)
-        // Search owns the semantic model and the background indexer, both of
-        // which stay asleep until the user turns the setting on.
-        let search = SearchService(archive: archive)
-        search.start()
-        let settings = settingsWindow(search: search, archive: archive, retention: retention)
-        // The field's own state: what was typed, what came back, what is still
-        // in flight. It asks `search` its questions through `SearchRunning`.
-        // Read per call rather than captured once: the toggle can change
-        // between one keystroke and the next.
-        let semanticEnabled: @Sendable () -> Bool = { [weak search] in
-            MainActor.assumeIsolated { search?.semanticEnabled ?? false }
-        }
-        let searchModel = SearchViewModel(search: search, semanticEnabled: semanticEnabled)
-        // Holds whichever digest is waiting to be seen. It reads the archive only when
-        // the popover is about to open, so an app that never comes back from an away
-        // session never asks the question.
-        let digests = DigestPresenter(archive: archive)
-        digests.onOpenTimeline = { _ in window.show() }
-        let statusItem = StatusItemController(
-            store: store,
-            search: searchModel,
-            searchService: search,
-            digests: digests,
-            banners: banners,
-            menuActions: .init(
-                openWindow: { window.show() },
-                pause: { [weak self] choice in
-                    guard let engine = self?.engine else {
-                        return
-                    }
-                    Task { await engine.pause(choice) }
-                },
-                resume: { [weak self] in
-                    guard let engine = self?.engine else {
-                        return
-                    }
-                    Task { await engine.resume() }
-                },
-                openSettings: { settings.show() }
-            )
-        )
-        // Registration fails when another app already owns ⌃⌥N. That is a note
-        // in Settings, not a failure to launch: the status item still works.
-        let hotKeys = HotKeyCenter { [weak statusItem] in statusItem?.togglePopover() }
-        hotKeys.register()
-
-        self.store = store
-        self.search = search
-        self.searchModel = searchModel
-        self.digests = digests
-        self.settings = settings
-        self.window = window
-        self.statusItem = statusItem
-        self.hotKeys = hotKeys
-        mirrorCaptureStatus(into: store)
     }
 }

@@ -27,6 +27,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         searchService: SearchService,
         digests: DigestPresenter?,
         banners: CaptureBannerModel?,
+        actions dispatcher: (any ActionDispatching)?,
         menuActions: MenuActions
     ) {
         self.store = store
@@ -55,6 +56,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
                 .environment(banners)
                 .environment(\.searchService, searchService)
                 .environment(\.timelineActions, actions)
+                // The row context menu and every keyboard shortcut dispatch through this.
+                // `nil` only in a host that has no archive to act on; the rows then render
+                // with no menu rather than one whose items would throw (BACKGLANCE-242).
+                .environment(\.actionDispatcher, dispatcher)
         )
         // We own the size; letting the hosting view drive it makes the popover
         // resize itself as rows load, which reads as a flicker on every open.
