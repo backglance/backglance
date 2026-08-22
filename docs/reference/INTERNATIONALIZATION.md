@@ -214,7 +214,9 @@ func sortedForDisplay(_ apps: [AppRecord]) -> [AppRecord] {
 
 ### Unit tests
 
-`BackglanceCoreTests/LocaleNeutralityTests.swift` pins the behavior; these tests run in CI on every PR:
+`BackglanceCoreTests/LocaleNeutralityTests.swift` pins the behavior; these tests run in CI on every PR.
+
+> ℹ️ **Note:** the sketch below predates the code. `ruleMatches` and `sameApp` were never free functions — the shipped primitive is `String.matchKey` (`BackglanceCore/Redaction/MatchKey.swift`), and the tests assert against the real call sites that use it: `OTPRedactor`'s keyword matching and `PresentationPolicy`'s window-title prefix. The query grammar's half lives in `BackglanceSearchTests/QueryParserLocaleTests.swift`, because `QueryParser` is in another module. The rules engine row in the table above is still aspirational: only the `Rule` model and `Triage` exist so far, so there is no matching path to audit yet.
 
 ```swift
 import XCTest
@@ -255,7 +257,15 @@ final class LocaleNeutralityTests: XCTestCase {
 }
 ```
 
-Additionally, code review (and a SwiftLint custom rule, tracked in the [ROADMAP.md](./ROADMAP.md) technical debt register) flags any new `lowercased(with:` / `localizedCaseInsensitiveCompare` outside `*ForDisplay` functions.
+### The SwiftLint rule
+
+`no_locale_sensitive_case_folding` in `.swiftlint.yml` is `severity: error` and rejects `lowercased(with:)`, `uppercased(with:)`, `localizedLowercase`, `localizedUppercase`, `localizedCaseInsensitiveCompare` and `localizedStandardContains` anywhere outside the test targets.
+
+`localizedStandardCompare` and `compare(_:options:range:locale:)` are deliberately **not** in the list. Locale-aware sorting is correct and wanted, so a rule that banned it would only teach people to silence the rule.
+
+The rule is verified to fire rather than assumed to: a rule whose regex matches nothing lints clean and enforces nothing, which is how the first version of the logging rule in the same file went unenforced. If you change the pattern, check it against a file that actually contains each forbidden spelling before trusting a green run.
+
+There is one thing the linter cannot see. `String.lowercased()` is locale-neutral, but SQLite's `lower()` folds only `A`–`Z` unless ICU is compiled in, so a Swift-side fold compared against a SQL-side `lower()` disagrees for any non-ASCII text — a separate bug from this rule, and one the linter will never catch.
 
 ## FTS5 tokenizer and case folding
 

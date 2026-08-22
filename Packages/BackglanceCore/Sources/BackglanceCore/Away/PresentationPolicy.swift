@@ -178,9 +178,12 @@ public struct PresentationPolicy: Sendable, Equatable {
                         return false
                     }
                     // Turkish-locale rule: case folding for matching is always
-                    // locale-independent (docs/reference/INTERNATIONALIZATION.md).
-                    return name.lowercased(with: Locale(identifier: "en_US_POSIX"))
-                        .hasPrefix(namePrefix.lowercased(with: Locale(identifier: "en_US_POSIX")))
+                    // locale-independent, and `matchKey` is the one primitive that does
+                    // it. Pinning `lowercased(with:)` to a POSIX locale was equally
+                    // correct and is what stood here before, but it spelled the operation
+                    // the rule forbids — so every reader had to re-derive that this one
+                    // was the safe use (docs/reference/INTERNATIONALIZATION.md#the-rule).
+                    return name.matchKey.hasPrefix(namePrefix.matchKey)
                 }
             }
         }

@@ -187,6 +187,26 @@ custom_rules:
     message: "Notification content must never be logged. Log a NotificationLogRef (id, bundleID, length) instead."
     severity: error
 
+  # The Turkish locale rule, from docs/reference/INTERNATIONALIZATION.md#the-rule.
+  #
+  # `"TITLE".lowercased(with: Locale(identifier: "tr"))` is "tıtle", with a dotless ı, so
+  # any equality, prefix or containment check built on a locale-sensitive case operation
+  # silently stops matching on a Turkish-locale Mac — which is the maintainer's own. The
+  # failure is invisible everywhere else, which is exactly why a linter has to catch it
+  # rather than a reviewer.
+  #
+  # `String.matchKey` is the sanctioned primitive for every internal comparison.
+  # Locale-aware *sorting* is still correct and still wanted, so `localizedStandardCompare`
+  # and `compare(_:options:range:locale:)` are deliberately absent from this list: they
+  # belong in display order, where Finder-like ordering is what the user expects.
+  no_locale_sensitive_case_folding:
+    name: "No Locale-Sensitive Case Folding"
+    included: ".*\\.swift"
+    excluded: ".*Tests.*"
+    regex: '\.(lowercased|uppercased)\s*\(\s*with:|\.localized(Lowercase|Uppercase|CaseInsensitiveCompare|StandardContains)\b'
+    message: "Locale-sensitive case folding breaks matching in a Turkish locale. Use String.matchKey (or bare lowercased()) for internal comparisons; keep locale-aware operations for display sort only."
+    severity: error
+
   no_string_describing_notification:
     name: "No String(describing:) on Notifications"
     included: ".*\\.swift"
