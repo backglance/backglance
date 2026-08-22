@@ -41,6 +41,10 @@ public enum ArchiveError: Error, Sendable {
     case writeFailed(table: String, underlying: String)
 
     /// A `PRAGMA integrity_check` (or equivalent) turned up a problem.
+    /// A `VACUUM` was declined because the volume does not hold a second copy of the
+    /// archive. Rewriting the file needs room for both until it finishes.
+    case insufficientDiskSpace(needed: Int64, available: Int64)
+
     case integrityCheckFailed(String)
 
     /// A `ValueObservation`/`DatabaseRegionObservation` stopped delivering updates.
@@ -76,6 +80,9 @@ public enum ArchiveError: Error, Sendable {
         case let .writeFailed(table, underlying):
             "write to \(table) failed: \(underlying)"
 
+        case let .insufficientDiskSpace(needed, available):
+            "insufficientDiskSpace(needed: \(needed), available: \(available))"
+
         case let .integrityCheckFailed(detail):
             "integrity: \(detail)"
 
@@ -107,6 +114,9 @@ public enum ArchiveError: Error, Sendable {
 
         case .writeFailed:
             "Backglance couldn't save a change to its archive."
+
+        case .insufficientDiskSpace:
+            "There isn't enough free disk space to compact the archive. Nothing was changed."
 
         case .integrityCheckFailed:
             "The archive failed an integrity check."

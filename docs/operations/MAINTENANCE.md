@@ -123,12 +123,20 @@ The 6-hour timer is a `DispatchSourceTimer` on a utility queue with 10 % leeway;
 
 ### Vacuum Policy
 
-The archive is created with `PRAGMA auto_vacuum = INCREMENTAL` (must be set before the first table exists — it is in migration `v1_initial`) and `PRAGMA secure_delete = ON` (set on every connection open, so deleted content is overwritten with zeros rather than left in free pages).
+The archive is created with `PRAGMA auto_vacuum = INCREMENTAL` and `PRAGMA secure_delete = ON` (the latter on every connection open, so deleted content is overwritten with zeros rather than left in free pages).
+
+`auto_vacuum` is set by `Archive.enableIncrementalAutoVacuum`, between opening the writer and migrating it — **not** in `v1_initial`, and not in `prepareDatabase`. It cannot go in a migration: the pragma only takes on a database with no tables yet, and migrations both run later and run inside a transaction. It cannot go in `prepareDatabase` either, because a `DatabasePool` runs that closure on its read-only connections too, where a write pragma fails every one of them — which is exactly how the first attempt broke every read in the app.
+
+There is one more wrinkle worth writing down, because it fails silently. The pragma sets the *connection's* intent; the file header only records it when the database is next rewritten, and by the time the first `CREATE TABLE` arrives the header is already written. So the helper follows the pragma with a `VACUUM`, guarded on the database having no tables — free on an empty file, and never an expensive repack of a real archive at open time.
+
+An archive created before any of this is converted the documented way instead: `Archive.vacuum()` issues the pragma immediately before its `VACUUM`, so the rewrite records it and the cheap incremental path works from then on. `Archive.supportsIncrementalVacuum()` is what tells the two apart — worth asking rather than assuming, since `PRAGMA incremental_vacuum` on an unconverted file succeeds, reclaims nothing, and would otherwise be reported as work done.
 
 | Operation | When | Cost | Why |
 |---|---|---|---|
 | `PRAGMA incremental_vacuum(N)` | After every hard-delete phase, `N = 256` pages per run | Milliseconds; no exclusive lock beyond a normal write | Keeps free pages from accumulating without ever blocking the UI |
-| `VACUUM` | Monthly, **or** when `freelist_count / page_count > 0.20`, only on `trigger == .launch` or `.manual` | Rewrites the file; needs 2× free disk; takes seconds at 100k rows | Defragments and shrinks the file; incremental vacuum reclaims pages but does not repack |
+| `VACUUM` | Monthly, **or** when `freelist_count / page_count > 0.20`, **or** when the archive has never been repacked — only on `trigger == .launch` or `.manual` | Rewrites the file; needs a second copy's worth of free disk; takes seconds at 100k rows | Defragments and shrinks the file; incremental vacuum reclaims pages but does not repack |
+
+> ℹ️ **Note:** the sketch below is close to what shipped. The differences: `Archive.vacuum()` checks free space itself and throws `ArchiveError.insufficientDiskSpace(needed:available:)` before writing anything, rather than the policy checking separately; a volume it cannot measure — an in-memory archive has none — reads as "go ahead" rather than "refuse", because a maintenance routine that failed closed on an unknown would never run; `isFullVacuumDue(space:lastVacuumAt:now:)` is pure and separately tested, and treats "never vacuumed" as due so an archive predating this policy gets its first repack rather than waiting a month; and `apply(to:hardDeleted:trigger:now:)` never throws, since every operation here is housekeeping and the only thing a caller could do with a failure is what it already does — log it and try again next pass.
 
 ```swift
 // BackglanceCore/Retention/VacuumPolicy.swift
@@ -190,7 +198,7 @@ Every hard-delete phase and every import (`CaptureEngine.importExisting()`) leav
 INSERT INTO notifications_fts(notifications_fts) VALUES('optimize');
 ```
 
-This merges segments and keeps `FTS p95 < 50 ms` at 100k notifications (see [`../deployment/PERFORMANCE_GUIDE.md`](../deployment/PERFORMANCE_GUIDE.md)). It runs in the same write transaction as the hard delete so a crash between the two leaves nothing half-done. Once a month, alongside `VACUUM`, the job also runs `INSERT INTO notifications_fts(notifications_fts) VALUES('rebuild')` if `PRAGMA integrity_check` on the FTS table (`INSERT INTO notifications_fts(notifications_fts) VALUES('integrity-check')`) reports a problem.
+This merges segments and keeps `FTS p95 < 50 ms` at 100k notifications (see [`../deployment/PERFORMANCE_GUIDE.md`](../deployment/PERFORMANCE_GUIDE.md)). It runs once after the hard-delete phase rather than inside each batch's transaction: `optimize` is idempotent maintenance with nothing to leave half-done, and folding it into every 500-row batch would pay for it dozens of times per pass. Once a month, alongside `VACUUM`, the job also runs `INSERT INTO notifications_fts(notifications_fts) VALUES('rebuild')` if `PRAGMA integrity_check` on the FTS table (`INSERT INTO notifications_fts(notifications_fts) VALUES('integrity-check')`) reports a problem.
 
 ## Routine Health Checks
 

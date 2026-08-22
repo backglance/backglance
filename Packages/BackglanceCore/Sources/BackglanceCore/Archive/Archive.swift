@@ -49,6 +49,7 @@ public final class Archive: Sendable {
         } catch {
             throw ArchiveError.openFailed(path: ":memory:", underlying: ArchiveError.detail(from: error))
         }
+        Self.enableIncrementalAutoVacuum(queue)
         try Self.migrate(queue)
         self.init(writer: queue)
     }
@@ -61,6 +62,7 @@ public final class Archive: Sendable {
     /// necessarily inside the support directory.
     public convenience init(path: String) throws {
         let pool = try Self.makePool(path: path)
+        Self.enableIncrementalAutoVacuum(pool)
         try Self.migrate(pool)
         self.init(writer: pool)
     }
@@ -108,6 +110,7 @@ public final class Archive: Sendable {
         try ArchivePaths.prepare()
         let path = ArchivePaths.archiveURL.path
         let pool = try makePool(path: path)
+        enableIncrementalAutoVacuum(pool)
         try migrate(pool)
         try? ArchivePaths.prepare()
         return Archive(writer: pool)
@@ -152,6 +155,37 @@ public final class Archive: Sendable {
             config.publicStatementArguments = true
         #endif
         return config
+    }
+
+    /// Asks for incremental auto-vacuum, before anything creates a table.
+    ///
+    /// `auto_vacuum` can only be changed on a database with no tables yet, so this runs
+    /// between opening the writer and migrating it — not in a migration, which would be
+    /// too late and would also be inside a transaction, and *not* in `prepareDatabase`,
+    /// which the pool runs on its read-only connections too and where a write pragma fails
+    /// every one of them.
+    ///
+    /// A no-op on an archive that already has tables. Those are converted by a full
+    /// `VACUUM` instead, which is what ``vacuum()`` does first
+    /// (docs/operations/MAINTENANCE.md#vacuum-policy).
+    static func enableIncrementalAutoVacuum(_ writer: any DatabaseWriter) {
+        try? writer.writeWithoutTransaction { db in
+            let tables = try Int.fetchOne(
+                db,
+                sql: "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+            ) ?? 0
+            guard tables == 0 else {
+                return
+            }
+            try db.execute(sql: "PRAGMA auto_vacuum = INCREMENTAL")
+            // The pragma sets the *connection's* intent; the file header only records it
+            // when the database is next rewritten. On an empty file that costs nothing,
+            // and skipping it is why the setting silently failed to stick — the header was
+            // already written by the time the first `CREATE TABLE` arrived. Guarded on
+            // there being no tables precisely so this can never be an expensive `VACUUM`
+            // of a real archive at open time.
+            try db.execute(sql: "VACUUM")
+        }
     }
 
     // MARK: Private

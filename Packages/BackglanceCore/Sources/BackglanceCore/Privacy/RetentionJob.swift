@@ -35,18 +35,21 @@ public actor RetentionJob {
     ///   - schedule: when passes happen. Injectable so a test can drive the loop without
     ///     waiting six hours for the second one.
     ///   - protectedIDs: notification ids that must not be hard-deleted yet.
+    ///   - vacuum: what to do about the space a prune leaves behind.
     ///   - now: the clock. Injectable so a test can age rows rather than sleep.
     public init(
         archive: Archive,
         defaults: UserDefaults = .standard,
         schedule: Schedule = .shipped,
         protectedIDs: @escaping @Sendable () async -> Set<Int64> = { [] },
+        vacuum: VacuumPolicy = .default,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.archive = archive
         self.defaults = defaults
         self.schedule = schedule
         self.protectedIDs = protectedIDs
+        self.vacuum = vacuum
         self.now = now
     }
 
@@ -80,6 +83,26 @@ public actor RetentionJob {
         public let interval: TimeInterval
     }
 
+    // MARK: - Trigger
+
+    /// What asked for a pass, which is the only input to whether a full `VACUUM` may run.
+    ///
+    /// A repack briefly blocks writers, so it is allowed exactly where a pause is
+    /// explainable: at launch, before the user is doing anything with the app, or because
+    /// they pressed a button and are watching a spinner. From the six-hourly timer it
+    /// would be an unexplained freeze in the middle of somebody's afternoon.
+    public enum Trigger: Sendable, Equatable {
+        case launch
+        case timer
+        case manual
+
+        // MARK: Public
+
+        public var allowsFullVacuum: Bool {
+            self != .timer
+        }
+    }
+
     // MARK: - Report
 
     /// What one pass did. Counts only, which is what lets it be logged.
@@ -110,8 +133,13 @@ public actor RetentionJob {
                 return
             }
             try? await Task.sleep(for: .seconds(schedule.launchDelay))
+            // The first pass of a launch is the one allowed to repack: the user has just
+            // started the app and is not yet doing anything with it. Every pass after it
+            // is a timer tick in the middle of their day.
+            var trigger = Trigger.launch
             while !Task.isCancelled {
-                await self?.runOnce()
+                await self?.runOnce(trigger: trigger)
+                trigger = .timer
                 try? await Task.sleep(for: .seconds(schedule.interval))
             }
         }
@@ -130,9 +158,9 @@ public actor RetentionJob {
     /// wipe each needed their own answer to "what does a failed prune mean", and the
     /// answer is the same in all three: try again later, delete nothing in the meantime.
     @discardableResult
-    public func runOnce() async -> Report {
+    public func runOnce(trigger: Trigger = .manual) async -> Report {
         do {
-            let report = try await prune()
+            let report = try await prune(trigger: trigger)
             if !report.isEmpty {
                 Log.archive.info("retention pass: \(report.logDescription)")
             }
@@ -146,8 +174,8 @@ public actor RetentionJob {
 
     // MARK: Internal
 
-    /// One pass, as the thing that can throw. `runOnce()` is the one that cannot.
-    func prune() async throws -> Report {
+    /// One pass, as the thing that can throw. `runOnce(trigger:)` is the one that cannot.
+    func prune(trigger: Trigger = .manual) async throws -> Report {
         let settings = RetentionSettings(defaults: defaults)
         let protected = await protectedIDs()
         var report = Report()
@@ -174,6 +202,19 @@ public actor RetentionJob {
             // reason about keeping incrementally correct across two delete phases.
             try archive.repairCounts()
         }
+
+        // Housekeeping last, and never allowed to fail the pass: the rows are already
+        // gone, and whether their pages came back to the filesystem is a separate question
+        // from whether the prune worked.
+        let maintenance = vacuum.apply(
+            to: archive,
+            hardDeleted: report.hardDeleted > 0,
+            trigger: trigger,
+            now: moment
+        )
+        if maintenance != VacuumPolicy.Outcome() {
+            Log.archive.info("retention maintenance: \(maintenance.logDescription)")
+        }
         return report
     }
 
@@ -183,6 +224,7 @@ public actor RetentionJob {
     private let defaults: UserDefaults
     private let schedule: Schedule
     private let protectedIDs: @Sendable () async -> Set<Int64>
+    private let vacuum: VacuumPolicy
     private let now: @Sendable () -> Date
 
     private var loop: Task<Void, Never>?
