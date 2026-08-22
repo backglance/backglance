@@ -253,7 +253,7 @@ One row per bundle identifier ever seen. Also carries per-app settings so a user
 | `retention` | TEXT | Per-app override of `RetentionPolicy`; `'inherit'` means use the global default (30 days) |
 | `is_excluded` | INTEGER | `1` = never store (default exclusion list: password managers, `com.apple.Passwords`, Backglance itself). Existing rows are hard-deleted when this flips to `1` |
 | `is_muted` | INTEGER | Timeline de-prioritization only; capture continues |
-| `redact_otp` | INTEGER | Run `OTPRedactor` on this app; `1` by default for `com.apple.MobileSMS`, `com.apple.mail` |
+| `redact_otp` | INTEGER | Run `OTPRedactor` on this app; `1` by default for `com.apple.MobileSMS`, `com.apple.mail` — applied by `Archive.upsertApp` from `RedactionPolicy.defaultBundleIDs` when the row is created, not seeded by a migration |
 | `first_seen_at` | REAL | Unix seconds of the first captured notification |
 | `last_seen_at` | REAL | Unix seconds of the most recent captured notification |
 | `notification_count` | INTEGER | Denormalized live count (maintained by the insert/prune paths; recomputed by `Archive.repairCounts()` if it drifts) |

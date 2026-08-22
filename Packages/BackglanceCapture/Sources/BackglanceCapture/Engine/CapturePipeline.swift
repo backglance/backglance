@@ -48,15 +48,27 @@ public struct AllowAllApps: AppExclusionList {
 /// > log (Privacy Invariant #2). The returned ``RedactionEvent`` records *that* a
 /// > redaction happened and which pattern fired — never what was redacted.
 ///
-/// `OTPRedactor` implements this in the privacy milestone.
+/// ``PerAppOTPRedaction`` is the shipped implementation.
 public protocol NotificationRedactor: Sendable {
     /// The notification as it should be archived, and the audit row to record with it.
-    func redact(_ notification: ParsedNotification) -> (ParsedNotification, RedactionEvent?)
+    ///
+    /// - Parameter appRedactsOTP: the app row's `redact_otp`. Passed in rather than
+    ///   looked up, because the engine already holds the `AppRecord` from the upsert and
+    ///   a second query per notification would buy nothing. It also keeps this protocol
+    ///   synchronous and free of the archive, which is what lets a redactor be tested
+    ///   against plain values.
+    func redact(
+        _ notification: ParsedNotification,
+        appRedactsOTP: Bool
+    ) -> (ParsedNotification, RedactionEvent?)
 }
 
 // MARK: - NoRedaction
 
-/// The placeholder redactor: archives what was parsed.
+/// The redactor that archives what was parsed.
+///
+/// Not a placeholder any more: it is what a test uses when redaction is not what it is
+/// testing, and what the engine falls back to when no redactor is injected.
 public struct NoRedaction: NotificationRedactor {
     // MARK: Lifecycle
 
@@ -64,9 +76,56 @@ public struct NoRedaction: NotificationRedactor {
 
     // MARK: Public
 
-    public func redact(_ notification: ParsedNotification) -> (ParsedNotification, RedactionEvent?) {
+    public func redact(
+        _ notification: ParsedNotification,
+        appRedactsOTP _: Bool
+    ) -> (ParsedNotification, RedactionEvent?) {
         (notification, nil)
     }
+}
+
+// MARK: - PerAppOTPRedaction
+
+/// The shipped redactor: ``OTPRedactor``, run on the apps the user has it on for.
+///
+/// > 🔒 The gate is *which* apps, never *whether* the result is written. Once the
+/// > redactor has fired, the digits are gone from the value the engine goes on to insert
+/// > — there is no branch here that keeps the original around for anything, and no
+/// > logging of what was matched (Privacy Invariant #2).
+///
+/// The policy is read per notification rather than captured at construction, so that
+/// switching "Redact codes in all apps" on takes effect on the next notification instead
+/// of the next launch. `UserDefaults.bool(forKey:)` is a cached lookup, and the redactor
+/// itself does far more work than the read that gated it.
+///
+/// See docs/features/PRIVACY_CONTROLS.md#per-app-toggle-and-redact-codes-in-all-apps.
+public struct PerAppOTPRedaction: NotificationRedactor {
+    // MARK: Lifecycle
+
+    /// - Parameters:
+    ///   - redactor: the matcher. Injectable so a test can pin one language's keywords.
+    ///   - defaults: where `privacy.redactOTPInAllApps` lives.
+    public init(redactor: OTPRedactor = .default, defaults: UserDefaults = .standard) {
+        self.redactor = redactor
+        self.defaults = defaults
+    }
+
+    // MARK: Public
+
+    public func redact(
+        _ notification: ParsedNotification,
+        appRedactsOTP: Bool
+    ) -> (ParsedNotification, RedactionEvent?) {
+        guard RedactionPolicy(defaults: defaults).redacts(appRedactsOTP: appRedactsOTP) else {
+            return (notification, nil)
+        }
+        return notification.redactingOTP(with: redactor)
+    }
+
+    // MARK: Private
+
+    private let redactor: OTPRedactor
+    private let defaults: UserDefaults
 }
 
 // MARK: - NotificationEnricher

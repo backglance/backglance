@@ -295,8 +295,10 @@ public actor CaptureEngine {
     /// 2. **Then parse**, and check exclusion *again* against the parsed bundle id: the
     ///    payload's own `app` key can differ from the joined row for helper processes and
     ///    iPhone Mirroring, and the app the user excluded is the one the payload names.
-    /// 3. **Redact before anything is written**, in memory and irreversibly.
-    /// 4. **Enrich**, then insert the app row and the notification.
+    /// 3. **Upsert the app row**, which carries the per-app `redact_otp` the next step
+    ///    is gated on. A bundle id, and nothing the user typed or received.
+    /// 4. **Redact before any content is written**, in memory and irreversibly.
+    /// 5. **Enrich**, then insert the notification.
     ///
     /// One record's failure never stops the batch, and never reaches the user: it is
     /// counted, and logged by `rec_id` and a fixed reason.
@@ -311,15 +313,20 @@ public actor CaptureEngine {
                 return .excluded
             }
 
-            let (redacted, redaction) = redactor.redact(parsed)
-            let enriched = await enrichment.enrich(redacted)
-
+            // The app row first, because it carries `redact_otp` — the per-app half of
+            // whether the next line runs at all. It holds no notification content, so
+            // writing it before the redaction is not a violation of "redact before
+            // anything is written": what that rule is about is the *text*, and the text
+            // is still only in memory here.
             let now = Date()
-            let app = try archive.upsertApp(bundleID: enriched.bundleID, now: now)
+            let app = try archive.upsertApp(bundleID: parsed.bundleID, now: now)
             guard let appID = app.id else {
                 Log.capture.error("archive rec \(raw.recID): app row has no id")
                 return .failed
             }
+
+            let (redacted, redaction) = redactor.redact(parsed, appRedactsOTP: app.redactOtp)
+            let enriched = await enrichment.enrich(redacted)
 
             let outcome = try archive.insertOrUpdate(
                 ArchivedNotification(

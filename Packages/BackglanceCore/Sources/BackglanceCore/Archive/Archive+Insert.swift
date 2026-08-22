@@ -177,8 +177,15 @@ extension Archive {
     /// Messages and Mail carry one-time codes often enough that redaction is on for
     /// them from the first notification, before the user has had a chance to look at
     /// Settings. See docs/features/PRIVACY_CONTROLS.md.
+    ///
+    /// This is the *only* place the default is applied to a row, rather than one of two:
+    /// `v1_initial` deliberately does not seed the two apps, because rows for apps that
+    /// have notified nobody would carry meaningless `first_seen_at` values and would show
+    /// up wherever the app list does. What the pane reads before a row exists is
+    /// ``Archive/redactsOTP(bundleID:)``, which answers from the same
+    /// ``RedactionPolicy/defaultBundleIDs``.
     static func redactsOTPByDefault(bundleID: String) -> Bool {
-        ["com.apple.MobileSMS", "com.apple.mail"].contains(bundleID)
+        RedactionPolicy.redactsByDefault(bundleID: bundleID)
     }
 
     /// Whether a database error is the archive saying "already have this one".

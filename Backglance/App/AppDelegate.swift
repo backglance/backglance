@@ -151,6 +151,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         ))
     }
 
+    /// The settings window and the models its panes read.
+    ///
+    /// Each pane's model is built here rather than inside the window controller, because
+    /// the archive and the search service are the app shell's to hand out — `BackglanceUI`
+    /// is given what it reads, and does not go looking for it.
+    private static func settingsWindow(search: SearchService, archive: Archive) -> SettingsWindowController {
+        SettingsWindowController(
+            search: search,
+            digest: digestSettings(),
+            redaction: CodeRedactionSettingsModel(archive: archive)
+        )
+    }
+
     /// Offers the freshly built digest to the banner.
     ///
     /// On the main actor because the one thing it needs beyond the archive — when the
@@ -199,6 +212,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let engine = CaptureEngine(
             archive: archive,
             watcher: watcher,
+            // 🔒 The real redactor, not the `NoRedaction` default. This is the only place
+            // it is installed: a build that dropped this line would archive one-time
+            // codes in plain text and nothing else would notice, because every other
+            // component would behave exactly as it does now (Privacy Invariant #2).
+            redactor: PerAppOTPRedaction(),
             // The real enrichment, not the `NoEnrichment` default: icons and deep links
             // are what make a row in the timeline actionable.
             enrichment: EnrichmentService()
@@ -318,7 +336,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // which stay asleep until the user turns the setting on.
         let search = SearchService(archive: archive)
         search.start()
-        let settings = SettingsWindowController(search: search, digest: Self.digestSettings())
+        let settings = Self.settingsWindow(search: search, archive: archive)
         // The field's own state: what was typed, what came back, what is still
         // in flight. It asks `search` its questions through `SearchRunning`.
         // Read per call rather than captured once: the toggle can change

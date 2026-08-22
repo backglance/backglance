@@ -224,6 +224,44 @@ final class CaptureEnginePipelineTests: XCTestCase {
         XCTAssertEqual(redactions.first?.notificationId, stored.id)
     }
 
+    /// 🔒 The gate is the app's own `redact_otp`, and the engine is what supplies it: an
+    /// engine that passed a constant would redact everything or nothing, and both would
+    /// pass a test that only ever looked at one app.
+    func testTheEngineGatesRedactionOnTheAppsOwnFlag() async throws {
+        let archive = try XCTUnwrap(archive)
+        try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: [
+            MiniatureStore.notification(
+                recID: 1,
+                bundleID: "com.apple.MobileSMS",
+                title: "Bank",
+                body: "Your verification code is 449021"
+            ),
+            MiniatureStore.notification(
+                recID: 2,
+                bundleID: "com.example.tickets",
+                title: "Build",
+                body: "Your verification code is 449021"
+            ),
+        ])
+        let engine = try makeEngine(redactor: PerAppOTPRedaction(defaults: throwawayDefaults()))
+
+        try archive.captureFromTheStartOfTheStore()
+
+        await engine.start()
+        await engine.tick(reason: .manual)
+
+        let bodies = try await archive.pool.read { db in
+            try ArchivedNotification.fetchAll(db)
+                .sorted { ($0.storeRecId ?? 0) < ($1.storeRecId ?? 0) }
+                .map(\.body)
+        }
+        // Messages ships with redaction on; the other app does not, and its digits are
+        // archived exactly as they arrived.
+        XCTAssertEqual(bodies, ["Your verification code is [code redacted]", "Your verification code is 449021"])
+        let redactions = try await archive.pool.read { db in try RedactionEvent.fetchCount(db) }
+        XCTAssertEqual(redactions, 1)
+    }
+
     func testEnrichmentRunsBeforeTheInsert() async throws {
         let archive = try XCTUnwrap(archive)
         try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: [MiniatureStore.notification(recID: 1)])
@@ -268,6 +306,15 @@ final class CaptureEnginePipelineTests: XCTestCase {
             .appendingPathComponent("CaptureEnginePipelineTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
+    }
+
+    private func throwawayDefaults() throws -> UserDefaults {
+        let name = "app.backglance.tests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        addTeardownBlock {
+            defaults.removePersistentDomain(forName: name)
+        }
+        return defaults
     }
 
     private func makeEngine(
@@ -320,9 +367,13 @@ private final class DenyList: AppExclusionList, @unchecked Sendable {
 
 // MARK: - StubRedactor
 
-/// Stands in for `OTPRedactor` until the privacy milestone.
+/// Redacts everything it is handed, so a test can prove *what* the engine archives is
+/// whatever came back — without depending on `OTPRedactor` finding a code.
 private struct StubRedactor: NotificationRedactor {
-    func redact(_ notification: ParsedNotification) -> (ParsedNotification, RedactionEvent?) {
+    func redact(
+        _ notification: ParsedNotification,
+        appRedactsOTP _: Bool
+    ) -> (ParsedNotification, RedactionEvent?) {
         var redacted = notification
         redacted.body = "[code redacted]"
         let event = RedactionEvent(patternId: "stub.pattern", redactedAt: UnixDate(Date()))

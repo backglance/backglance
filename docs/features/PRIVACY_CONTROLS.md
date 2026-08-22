@@ -358,10 +358,11 @@ extension CaptureEngine {
                 continue
             }
 
+            // The app row first: it carries `redact_otp`, holds no notification content,
+            // and is what `PerAppOTPRedaction` is gated on together with `redactAll`.
+            let app = try archive.upsertApp(bundleID: parsed.bundleID, now: Date())
             var event: RedactionEvent?
-            if redactAll || (try await archive.redactsOTP(bundleID: parsed.bundleID)) {
-                (parsed, event) = OTPRedactor.default.redact(parsed)   // in memory, before anything is written
-            }
+            (parsed, event) = redactor.redact(parsed, appRedactsOTP: app.redactOtp)   // in memory, before anything is written
             _ = try await archive.insert(parsed, redaction: event, source: .live)
         }
         if skipped > 0 { log.debug("skipped \(skipped) excluded records") }
@@ -535,9 +536,10 @@ GROUP BY a.id ORDER BY redactions DESC;
 
 ### Per-App Toggle and "Redact Codes in All Apps"
 
-- `apps.redact_otp` is `1` for `com.apple.MobileSMS` and `com.apple.mail` (seeded in `v1_initial`), `0` for everything else. The Code Redaction pane lists apps seen in the archive with a toggle each; adding an app that has not been seen yet is possible by bundle identifier.
+- `apps.redact_otp` is `1` for `com.apple.MobileSMS` and `com.apple.mail`, `0` for everything else. The two defaults live in one place, `RedactionPolicy.defaultBundleIDs`, and are applied by `Archive.upsertApp` when a row is first created — *not* seeded as rows by `v1_initial`, which would put two apps that have notified nobody into `apps` and therefore into the timeline's app list, with `first_seen_at` values that mean nothing. `Archive.redactsOTP(bundleID:)` answers with the shipped default for an app that has no row yet, so the first code Messages ever delivers is already covered.
+- The Code Redaction pane (`CodeRedactionSettingsView`, whose per-app rows are `RedactionAppList`) lists the apps the archive holds, noisiest first, and appends Messages and Mail if neither has notified yet — otherwise redaction would appear to be off on a Mac where it is simply idle. Adding an app that has not been seen is possible by bundle identifier: `Archive.setRedactsOTP(_:bundleID:)` creates the same row capture would have created later, so the setting is already in place when the app's first notification arrives.
 - **"Redact codes in all apps"** (`privacy.redactOTPInAllApps`) applies the redactor to every notification regardless of `apps.redact_otp`. It is off by default because the keyword rules are tuned for SMS/e-mail phrasing, and running them over Slack or a build server produces more false positives (ticket numbers next to the word "login", for instance). The pane says exactly that under the toggle.
-- Turning redaction off for Messages or Mail shows a one-line warning ("Future codes from this app will be stored in plain text in your archive.") — once, not on every toggle.
+- Turning redaction off for Messages or Mail warns that future codes from that app will be archived as they arrive — once, not on every toggle, and not for an app the user switched on themselves. The "shown" flag is a preference (`privacy.redactionPlainTextWarningShown`), because having been told is a fact about the user rather than about this launch.
 
 ### False Negatives and False Positives
 
@@ -808,8 +810,7 @@ struct PrivacySettingsView: View {
             }
 
             Section {
-                Toggle("Redact codes in all apps", isOn: $redactAll)
-                RedactionAppList(model: model)             // per-app toggles; Messages and Mail on by default
+                CodeRedactionSettingsView(model: model.redaction)   // the all-apps toggle + RedactionAppList
                 RedactionActivityTable(model: model)       // counts by app, last 30 days; no content
             } header: {
                 Text("One-time code redaction")
