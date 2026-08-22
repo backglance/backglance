@@ -160,7 +160,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         SettingsWindowController(
             search: search,
             digest: digestSettings(),
-            redaction: CodeRedactionSettingsModel(archive: archive)
+            redaction: CodeRedactionSettingsModel(archive: archive),
+            exclusions: ExcludedAppsSettingsModel(archive: archive)
         )
     }
 

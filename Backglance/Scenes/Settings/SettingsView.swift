@@ -5,15 +5,17 @@ import SwiftUI
 
 /// Settings, as far as this milestone has settings.
 ///
-/// Three sections today. Search, because semantic indexing is the first thing
+/// Four sections today. Search, because semantic indexing is the first thing
 /// the app does that needs the user's permission in the plain sense: it reads
 /// every notification they have ever received and writes a vector for each one.
 /// Digest, which owns the app's only permission prompt — switching banners on is
 /// what asks for Notifications authorization, and nothing else in Backglance
-/// asks for anything. And one-time code redaction, which is on before the user
-/// gets here and so has to be findable. The rest of the privacy controls join it
-/// in a Privacy pane in the same milestone, at which point this becomes a
-/// `TabView` (docs/getting-started/DEVELOPMENT_GUIDE.md#backglanceui).
+/// asks for anything. One-time code redaction, which is on before the user
+/// gets here and so has to be findable. And excluded apps, which is the one
+/// control that removes a notification before it is ever stored. The rest of
+/// the privacy controls join them in a Privacy pane in the same milestone, at
+/// which point this becomes a `TabView`
+/// (docs/getting-started/DEVELOPMENT_GUIDE.md#backglanceui).
 struct SettingsView: View {
     // MARK: Internal
 
@@ -22,6 +24,8 @@ struct SettingsView: View {
     let digest: DigestSettingsModel
 
     let redaction: CodeRedactionSettingsModel
+
+    let exclusions: ExcludedAppsSettingsModel
 
     var body: some View {
         Form {
@@ -49,6 +53,8 @@ struct SettingsView: View {
             DigestSettingsView(model: digest)
 
             CodeRedactionSettingsView(model: redaction)
+
+            ExcludedAppsSettingsView(model: exclusions)
         }
         .formStyle(.grouped)
         .frame(minWidth: 460, minHeight: 260)

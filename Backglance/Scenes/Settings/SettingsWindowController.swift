@@ -16,7 +16,8 @@ final class SettingsWindowController: NSWindowController {
     convenience init(
         search: SearchService,
         digest: DigestSettingsModel,
-        redaction: CodeRedactionSettingsModel
+        redaction: CodeRedactionSettingsModel,
+        exclusions: ExcludedAppsSettingsModel
     ) {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 460, height: 520),
@@ -26,7 +27,9 @@ final class SettingsWindowController: NSWindowController {
         )
         window.title = String(localized: "Backglance Settings")
         window.setFrameAutosaveName("SettingsWindow")
-        let hosting = NSHostingController(rootView: SettingsView(search: search, digest: digest, redaction: redaction))
+        let hosting = NSHostingController(
+            rootView: SettingsView(search: search, digest: digest, redaction: redaction, exclusions: exclusions)
+        )
         // The window owns its size. Left to the hosting controller, the form's
         // fitting size came back zero-width — measured, not guessed: the
         // autosaved frame was "0 260 0 32".

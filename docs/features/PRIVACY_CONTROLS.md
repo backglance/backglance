@@ -809,15 +809,7 @@ struct PrivacySettingsView: View {
                     .disabled(model.isBusy)
             }
 
-            Section {
-                ExcludedAppsList(model: model)
-                Button("Add app…") { showExclusionPicker = true }
-                Button("Restore defaults") { Task { await model.restoreDefaultExclusions() } }
-            } header: {
-                Text("Excluded apps")
-            } footer: {
-                Text("Notifications from these apps are never stored. Backglance cannot tell which apps are sensitive — add your bank, brokerage or health apps here.")
-            }
+            ExcludedAppsSettingsView(model: model.exclusions)   // the list + add-by-bundle-id + Restore defaults
 
             Section {
                 CodeRedactionSettingsView(model: model.redaction)   // the all-apps toggle + RedactionAppList
@@ -854,6 +846,10 @@ struct PrivacySettingsView: View {
     }
 }
 ```
+
+Each privacy control ships as a `Section`-returning view with its own `@Observable` model (`CodeRedactionSettingsView`/`CodeRedactionSettingsModel`, `ExcludedAppsSettingsView`/`ExcludedAppsSettingsModel`), so `PrivacySettingsView` composes them rather than owning their state. They live in the Settings form directly until that pane exists.
+
+The Excluded Apps rows carry a **Remove** button rather than a toggle. The pane is a membership list — a row is on it exactly when the app is excluded — so an app the user has not excluded never appears asking to be switched off, and "off" is not a state a row can be in while still being shown. Each shipped default also states *why* it is there ("Password manager", "Backglance's own notifications"), because a list a user cannot audit is a list they have to trust.
 
 `WipeConfirmationSheet` is the only view that can call `PanicWipe.execute()`. It calls `PanicWipe.confirm(typed:)` first; a thrown `PanicWipeError` is shown inline and nothing else happens.
 
