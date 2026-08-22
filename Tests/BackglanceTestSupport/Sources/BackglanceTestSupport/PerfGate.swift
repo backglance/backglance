@@ -6,8 +6,21 @@ import Foundation
 /// test scope. Wall-clock budgets are measured against a machine, and a shared
 /// runner's variance is larger than the budgets themselves
 /// (docs/deployment/PERFORMANCE_GUIDE.md#regression-budgets-and-ci-policy): pull
-/// requests skip these, the nightly job on a quiet runner sets the variable, and
-/// so does a developer checking a hot path before a release.
+/// requests skip these, and the nightly job on a quiet runner measures them.
+///
+/// **The one way to set it is the test plan's `Performance` configuration**:
+///
+///     xcodebuild test -scheme Backglance -testPlan Backglance \
+///       -only-test-configuration Performance \
+///       -only-testing:BackglanceSearchTests/SearchLatencyTests
+///
+/// `env BACKGLANCE_PERF=1 xcodebuild test …` does *not* work — xcodebuild does not
+/// forward the invoking shell's environment into the test host process, so the
+/// variable never arrives and every budget quietly skips. That is not theoretical:
+/// it is how three milestones were closed against budgets nothing had measured
+/// (BACKGLANCE-194). `.github/workflows/perf.yml` runs the configuration nightly and
+/// fails if any of its tests were *skipped* rather than run, so a gate that stops
+/// working is a red build rather than a green one.
 ///
 /// A performance test that fails because the machine was compiling something
 /// else teaches everyone to ignore performance tests, which is worse than not

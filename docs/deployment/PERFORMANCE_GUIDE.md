@@ -646,7 +646,15 @@ The Energy Log template (`--template 'Energy Log'`) is the one to use before a r
 
 ### XCTMetric performance tests
 
-Performance tests live next to the code they measure and are skipped unless `BACKGLANCE_PERF=1` is set (see policy below):
+Performance tests live next to the code they measure and are skipped unless `BACKGLANCE_PERF=1` is set — which **only the test plan's `Performance` configuration does**:
+
+```bash
+xcodebuild test -scheme Backglance -testPlan Backglance \
+  -only-test-configuration Performance \
+  -only-testing:BackglanceSearchTests/SearchLatencyTests
+```
+
+`env BACKGLANCE_PERF=1 xcodebuild test …` does not work: xcodebuild does not forward the invoking shell's environment into the test host, so the variable never arrives and every budget skips silently. Gate the suite with `PerfGate.isEnabled` (`BackglanceTestSupport`) rather than reading the variable directly:
 
 ```swift
 // Tests/BackglanceSearchTests/SearchLatencyTests.swift
@@ -660,8 +668,8 @@ final class SearchLatencyTests: XCTestCase {
     var search: HybridSearch!
 
     override func setUpWithError() throws {
-        try XCTSkipUnless(ProcessInfo.processInfo.environment["BACKGLANCE_PERF"] == "1",
-                          "perf tests run only with BACKGLANCE_PERF=1")
+        try XCTSkipUnless(PerfGate.isEnabled,
+                          "set BACKGLANCE_PERF=1 to measure; runner variance exceeds these budgets")
         archive = try Archive(fixtureNamed: "archive-100k")     // copies Tests/Fixtures/Archive/archive-100k.sqlite to tmp
         search = HybridSearch(archive: archive, semantic: nil)
     }
@@ -713,15 +721,16 @@ final class SearchLatencyTests: XCTestCase {
 
 Policy:
 
-- **Pull requests** run the functional test plan only. Perf tests are skipped (`BACKGLANCE_PERF` unset) because GitHub-hosted runner variance is larger than the budgets.
-- **Nightly** (`schedule:` job in `.github/workflows/ci.yml`, `macos-26` runner) runs the perf tests with `BACKGLANCE_PERF=1` against the checked-in baselines with the +50 % failure thresholds above. A failure opens an issue labelled `perf-regression`; it does not block merges but does block the next release until triaged.
+- **Pull requests** run the functional test plan only: `ci.yml` and `fixtures.yml` pass `-skip-test-configuration Performance`, so `BACKGLANCE_PERF` is unset and every budget skips. GitHub-hosted runner variance is larger than the budgets, and a perf test that fails because the machine was busy teaches everyone to ignore perf tests.
+- **Nightly** (`.github/workflows/perf.yml`, `macos-26`) runs `-only-test-configuration Performance`, which is the only thing that sets `BACKGLANCE_PERF=1`, with the +50 % failure thresholds above. A failure opens an issue labelled `perf`; it does not block merges but does block the next release until triaged.
+- **The gate is checked, not assumed.** `perf.yml` fails if any test in that run was *skipped* rather than executed. A budget that is never measured passes forever, which is exactly how these budgets went unmeasured through two milestones (BACKGLANCE-194) — so "the suite was green" now means "the suite ran".
 - **Release** builds run the full perf suite locally on the developer's Mac (release checklist in [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)) and the Energy Log check.
-- Any PR that changes a hot path (`StoreWatcher`, `Archive+Timeline`, `FTSIndex`, `HybridSearch`, `SemanticIndex`, `TimelineView`) must paste `EXPLAIN QUERY PLAN` output for changed queries and a before/after number from a local `BACKGLANCE_PERF=1` run in its description.
+- Any PR that changes a hot path (`StoreWatcher`, `Archive+Timeline`, `FTSIndex`, `HybridSearch`, `SemanticIndex`, `TimelineView`) must paste `EXPLAIN QUERY PLAN` output for changed queries and a before/after number from a local `-only-test-configuration Performance` run in its description.
 - Budgets in this table are the same numbers as in [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) and [SEARCH.md](../features/SEARCH.md). Change them here first, then everywhere else, in one PR.
 
 ## Next Steps
 
-- Run the perf suite locally: `BACKGLANCE_PERF=1 xcodebuild test -scheme Backglance -only-testing:BackglanceSearchTests/SearchLatencyTests`.
+- Run the perf suite locally: `xcodebuild test -scheme Backglance -testPlan Backglance -only-test-configuration Performance -only-testing:BackglanceSearchTests/SearchLatencyTests`.
 - Record an Energy Log trace of the idle app for 10 minutes and confirm wakeups/s < 1 before tagging a release.
 - Read [MONITORING_LOGGING.md](../operations/MONITORING_LOGGING.md) for the `capture` log category that shows tick triggers.
 

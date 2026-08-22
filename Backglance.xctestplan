@@ -31,6 +31,26 @@
           }
         ]
       }
+    },
+    {
+      "id": "945E1444-C9CA-498D-A8DD-49D2DB4384D7",
+      "name": "Performance",
+      "options": {
+        "environmentVariableEntries": [
+          {
+            "key": "BACKGLANCE_TEST_SCOPE",
+            "value": "full"
+          },
+          {
+            "key": "BACKGLANCE_PERF",
+            "value": "1"
+          },
+          {
+            "key": "BACKGLANCE_LOG_DIR",
+            "value": "$(TMPDIR)/BackglanceTestLogs"
+          }
+        ]
+      }
     }
   ],
   "defaultOptions": {

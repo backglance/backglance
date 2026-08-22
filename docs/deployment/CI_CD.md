@@ -34,6 +34,7 @@ This document is the complete GitHub Actions setup for Backglance: the four work
 | `ci.yml` → `ci-complete` | PR, push to `main` | `ubuntu-latest` | Aggregates the three above into one required check that always reports | Yes | No |
 | `fixtures.yml` | PR touching capture code or fixtures, nightly `schedule`, `workflow_dispatch` | `macos-14`, `macos-15`, `macos-26` | `FixtureStoreTests` passes on every supported macOS, and the runner's own store still fingerprints to something we recognise | Yes, on capture PRs | Yes — a red nightly is a release blocker until triaged |
 | `fixtures.yml` → `report-unknown-fingerprint` | after the matrix, non-PR runs | `ubuntu-latest` | Opens a `capture-degraded` issue when a runner reports a fingerprint we have never seen | No | It creates the issue that blocks |
+| `perf.yml` → `budgets` | nightly `schedule`, PR touching the gate / test plan / workflow, `workflow_dispatch` | `macos-26` | The wall-clock budgets in [PERFORMANCE_GUIDE.md](./PERFORMANCE_GUIDE.md#regression-budgets-and-ci-policy), run under the test plan's `Performance` configuration — and that none of them were *skipped*, which is how a budget stops being measured without anyone noticing | No — a shared runner's variance is larger than the budgets | Yes — a red nightly blocks the next release until triaged |
 | `release.yml` | push of tag `v*` | `macos-26` | The whole signed, notarized, stapled, published release | — | It *is* the release |
 | `cask-bump.yml` | `repository_dispatch` type `release-published` | `ubuntu-latest` | Opens the version + sha256 PR against `backglance/homebrew-tap` | — | No (runs after publish) |
 
@@ -239,7 +240,7 @@ Notes on the choices in this file:
 - **`CODE_SIGNING_ALLOWED=NO`** — `ci.yml` has no certificate and needs none. Only `release.yml` signs.
 - **`-destination 'platform=macOS,arch=arm64'`** — the `macos-26` image is Apple silicon; universal builds only matter for the release.
 - **`xcbeautify --renderer github-actions`** turns failures into `::error file=…,line=…` annotations, so they land on the PR diff instead of a 4,000-line log.
-- The `ui-test` and nightly `perf` jobs also live in `ci.yml`; they are documented with their assertions in [TESTING.md](../testing/TESTING.md#ci-configuration).
+- The `ui-test` job also lives in `ci.yml`. The nightly `perf` job has its own workflow, `.github/workflows/perf.yml`, because it is the one run that uses the test plan's `Performance` configuration — `ci.yml` and `fixtures.yml` pass `-skip-test-configuration Performance` so a pull request never measures a wall-clock budget on a shared runner. Both are documented with their assertions in [TESTING.md](../testing/TESTING.md#ci-configuration).
 
 ### adapter-guard
 
