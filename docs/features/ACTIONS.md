@@ -53,7 +53,7 @@ Every action is available from three places that share one implementation: the r
 ┌──────────────────────────── BackglanceUI ─────────────────────────────┐
 │  NotificationRow ── context menu ─┐                                    │
 │  TimelineView    ── key handling ─┼──► NotificationActionHandler       │
-│  Popover / Window toolbar ────────┘        (app target, @MainActor)    │
+│  Popover / Window toolbar ────────┘        (BackglanceUI, @MainActor)  │
 └───────────────────────────────────────────────┬────────────────────────┘
                                                 │
              ┌──────────────────────────────────┼──────────────────────────────┐
@@ -92,11 +92,13 @@ Actions never write to `rules`, `digests`, `away_sessions` or `redactions`. Dele
 |---|---|---|
 | `NotificationRow` | `BackglanceUI` | Row view; owns the `.contextMenu` and hover buttons; forwards to the handler via an `ActionDispatching` environment value |
 | `TimelineView` | `BackglanceUI` | Selection state, key equivalents (`.onKeyPress`), undo toast host |
-| `NotificationActionHandler` | `Backglance` (app target) | `@MainActor` coordinator; the only place that talks to `NSWorkspace`, `NSPasteboard`, `NSSavePanel` |
+| `NotificationActionHandler` | `BackglanceUI` | `@MainActor` coordinator; the only place that talks to `NSWorkspace`, `NSPasteboard`, `NSSavePanel` |
 | `UndoToastView` | `BackglanceUI` | Bottom-anchored toast with an "Undo" button and a 5 s countdown |
 | `ExportSheet` | `BackglanceUI` | Format picker (CSV / JSON) and "Include redacted placeholders as-is" note, then `NSSavePanel` |
 
 The popover and the full window use the same row and the same handler; the only difference is that multi-select is enabled only in the full window (the popover is single-selection to keep it a quick glance).
+
+`NotificationActionHandler` lives in `BackglanceUI` rather than the app target: the app target ships only an XCUITest bundle, which cannot unit-test a class in isolation, and a coordinator this central needs that — see `Tests/BackglanceUITests/NotificationActionHandlerTests.swift`.
 
 ### Context Menu Specification
 
@@ -460,7 +462,7 @@ The same helper is reused by the weekly summary in [ANALYTICS.md](./ANALYTICS.md
 The handler is the single entry point used by menu, keyboard and hover buttons. It is `@MainActor`, holds an `Archive`, and reports failures as thrown `ActionError` values which the view layer turns into an inline message; it never shows alerts itself.
 
 ```swift
-// Backglance/Scenes/TimelineWindow/Actions/NotificationActionHandler.swift
+// Packages/BackglanceUI/Sources/BackglanceUI/Actions/NotificationActionHandler.swift
 import AppKit
 import BackglanceCore
 import os
