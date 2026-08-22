@@ -764,6 +764,18 @@ The seeds are constants on purpose: a failing iteration is reproducible from the
 
 `OTPRedactor` is on by default for Messages and Mail, so a false negative leaks a code into the archive and a false positive damages ordinary messages. Both directions are tested, and neither test file may contain a realistic code.
 
+There are two layers, and they answer different questions:
+
+| Suite | Target | Question |
+|---|---|---|
+| `OTPRedactorTests` | `BackglanceCoreTests` | Does the matcher behave, case by case, readably? |
+| `OTPRedactorRuleTests` | `BackglanceCoreTests` | Does it hold over a seeded corpus — every keyword family × 40 codes, plus a false-positive corpus? |
+| `PerAppOTPRedactionTests` | `BackglanceCaptureTests` | Does the *gate* let the matcher run on the right apps? |
+| `RedactionInvariantTests` | `BackglanceCaptureTests` | Do the digits reach disk? |
+| `RedactionEmbeddingTests` | `BackglanceSearchTests` | Do they reach the vectors? |
+
+> ℹ️ **Note:** the sketch below predates the shipped API in two ways. `BackglanceCore` has no `ParsedNotification` — that type belongs to `BackglanceCapture`, so the rule tests take an `OTPRedactor.Content(title:subtitle:body:)` and read `result.content` / `result.event`. And `RedactionEvent` spells its pattern `patternId`, with no `original` property to assert `nil` on, because there is no property that could hold one.
+
 > 🔒 **Security:** No test, fixture, or doc may contain a real one-time code. Codes in tests are produced by `SplitMix64` at run time and inserted into templates; the digits never appear in source. `verify_fixture.sh` and the review checklist enforce the same rule for fixtures.
 
 ```swift
@@ -923,6 +935,18 @@ final class OTPRedactorRuleTests: XCTestCase {
 ```
 
 There is also a small Swift Testing suite (`OTPRedactorTests`) with a handful of readable single cases; it is shown in [DEVELOPMENT_GUIDE.md](../getting-started/DEVELOPMENT_GUIDE.md#swift-testing). The XCTest file above is the exhaustive one.
+
+### The invariant tests
+
+The rule tests prove the matcher replaces a code *in a string*. That is not the promise. The promise is that the digits are never **written** — and every place they could survive is a separate check.
+
+`RedactionInvariantTests` (`BackglanceCaptureTests/Integration`) takes the OTP-shaped records the fixture generator marks with `userInfo["bg.fixture"] == "[synthetic-otp]"`, runs each fixture store through a real `CaptureEngine` with `PerAppOTPRedaction`, and writes into a **file-backed** archive rather than `Archive(inMemory: true)` — because the assertion is a byte scan of `archive.sqlite`, its `-wal` and its `-shm`. One scan covers the notification rows, the FTS postings and anything the write-ahead log is still holding, and it would fail just as loudly for a copy in a table nobody thought to query. Alongside it: no row's columns carry a code, the code is not searchable while an ordinary word from the same notification still is, the audit rows carry only `kind` and `pattern_id`, and `NotificationLogRef` renders none of it.
+
+The suite's last test is the control. It repeats the run with redaction switched off for Messages and Mail and asserts the same codes **do** reach the archive — which is what makes the other five evidence that redaction ran, rather than evidence that the fixture had nothing to redact.
+
+`RedactionEmbeddingTests` (`BackglanceSearchTests/Integration`) covers the leg capture cannot: semantic indexing is opt-in and never runs during capture, so the vectors do not exist at that point. It indexes a redacted row and scans the file again, and asserts `SemanticIndex.embeddableText` offers the placeholder rather than the digits.
+
+Exports are not covered by either, because there is no exporter yet: the diagnostics export brings its own "excludes content" test ([3.8](../../TASKS.md)), and `ExportService` brings its own. Both read from `notifications`, which these suites prove is already redacted.
 
 ## UI tests: FDA onboarding
 
