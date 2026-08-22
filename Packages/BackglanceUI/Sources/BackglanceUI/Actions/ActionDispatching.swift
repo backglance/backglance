@@ -16,10 +16,10 @@ import SwiftUI
 /// `NotificationActionHandler` (BACKGLANCE-196) was the coordinator skeleton — its
 /// `Archive`, its shared `fetch` helper, and this seam, with no requirements yet.
 /// Open (BACKGLANCE-197) was the first action to land on top of it; Copy
-/// (BACKGLANCE-198) is the second. Delete/Undo, Pin/Read, System Settings and
-/// Export are still separate follow-up tasks, each adding its own method here as it
-/// ships, rather than this task guessing signatures for work that has not been
-/// designed yet.
+/// (BACKGLANCE-198) was the second; Delete/Undo (BACKGLANCE-199) is the third. Pin/Read,
+/// System Settings and Export are still separate follow-up tasks, each adding its own
+/// method here as it ships, rather than this task guessing signatures for work that has
+/// not been designed yet.
 ///
 /// See docs/features/ACTIONS.md#notificationactionhandler.
 @MainActor
@@ -42,6 +42,21 @@ public protocol ActionDispatching: AnyObject {
     /// the write goes straight to `NSPasteboard`, with no async AppKit call
     /// on the way, unlike ``openNotification(id:)``.
     func copy(ids: [Int64], includeAppAndTimestamp: Bool) throws
+
+    /// The ⌫ / ⌦ path — see docs/features/ACTIONS.md#delete-and-undo. Soft-deletes
+    /// `ids` and starts (or, if one was already running, replaces and restarts) the
+    /// 5-second undo window. Synchronous, like ``copy(ids:includeAppAndTimestamp:)``:
+    /// `Archive.softDelete` is an ordinary `pool.write` call with no `await` on it, and
+    /// the 5-second wait itself happens on a detached ``NotificationActionHandler``
+    /// timer, not on the caller's stack.
+    func delete(ids: [Int64]) throws
+
+    /// The ⌘Z path, valid only while the undo toast this handler renders through
+    /// ``NotificationActionHandler/pendingUndo`` is showing. Restores exactly the ids
+    /// the most recent ``delete(ids:)`` call flipped and clears the toast. A silent
+    /// no-op with nothing pending — ⌘Z with no toast on screen is a keyboard miss, not
+    /// a mistake worth a beep.
+    func undoDelete() throws
 }
 
 // MARK: - ActionDispatcherKey

@@ -366,28 +366,20 @@ Delete is a soft delete: `UPDATE notifications SET is_deleted = 1 WHERE id IN (�
 - The unread badge recomputes immediately after delete/undo.
 
 ```swift
-extension Archive {
+// Packages/BackglanceCore/Sources/BackglanceCore/Archive/Archive+Actions.swift
+public extension Archive {
     /// Soft delete. Returns the ids actually flipped so undo can restore exactly those.
-    func softDelete(_ ids: [Int64]) async throws -> [Int64] {
-        try await write { db in
-            let live = try ArchivedNotification
-                .filter(ids.contains(Column("id")) && Column("is_deleted") == false)
-                .fetchAll(db)
-                .compactMap(\.id)
-            try ArchivedNotification
-                .filter(live.contains(Column("id")))
-                .updateAll(db, Column("is_deleted").set(to: true))
-            return live
-        }
-    }
+    /// Synchronous, like every other `Archive` write (see `Archive+Digest.swift`'s
+    /// `markRead(ids:)`) — `pool.write { db in … }`, not `async`/`await write { }`, and
+    /// the read that finds the live ids happens inside the same transaction as the
+    /// update so the returned array is exact under concurrent windows.
+    @discardableResult
+    func softDelete(_ ids: [Int64]) throws -> [Int64] { /* … */ }
 
-    func restore(_ ids: [Int64]) async throws {
-        try await write { db in
-            try ArchivedNotification
-                .filter(ids.contains(Column("id")))
-                .updateAll(db, Column("is_deleted").set(to: false))
-        }
-    }
+    /// Flips ids back. Not an error if it changes nothing — the retention job may have
+    /// hard-pruned them first.
+    @discardableResult
+    func restore(_ ids: [Int64]) throws -> Int { /* … */ }
 }
 ```
 
@@ -525,27 +517,36 @@ final class NotificationActionHandler {
     }
 
     // MARK: Delete / Undo
+    //
+    // Synchronous, not `async`: `Archive.softDelete`/`restore` are ordinary
+    // `pool.write { db in … }` calls, the same as every other archive write, so there
+    // is no `await` on the archive side of either method. `pendingUndo` is a plain
+    // `@Observable` property — `NotificationActionHandler` is itself `@Observable` —
+    // rather than the `onUndoStateChanged` closure sketched earlier: a view reads
+    // `pendingUndo` directly, the same way it would read any other `@Observable`
+    // state, and SwiftUI's observation tracking is what redraws the toast. The
+    // 5-second wait goes through an injected `UndoClock` (mirrors
+    // `BackglanceCore`'s `AwayClock`) so a test can drive the expiry without
+    // sleeping for real.
 
-    func delete(ids: [Int64]) async throws {
-        let flipped = try await archive.softDelete(ids)
-        pendingUndo = flipped
-        onUndoStateChanged?(flipped)
+    func delete(ids: [Int64]) throws {
+        let flipped = try archive.softDelete(ids)
         undoExpiry?.cancel()
-        undoExpiry = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(5))
+        pendingUndo = flipped
+        guard !flipped.isEmpty else { return }   // nothing was actually deleted; no toast
+        undoExpiry = Task { [weak self, undoClock] in
+            try? await undoClock.sleep(seconds: 5)
             guard !Task.isCancelled else { return }
             self?.pendingUndo = []                 // toast goes away; rows stay soft-deleted
-            self?.onUndoStateChanged?([])
         }
     }
 
-    func undoDelete() async throws {
+    func undoDelete() throws {
         guard !pendingUndo.isEmpty else { return }  // nothing to undo: silently ignore ⌘Z
         let ids = pendingUndo
         undoExpiry?.cancel()
         pendingUndo = []
-        onUndoStateChanged?([])
-        try await archive.restore(ids)
+        try archive.restore(ids)
     }
 
     // MARK: Toggles
@@ -681,30 +682,32 @@ final class CopyActionTests: XCTestCase {
 **Soft-delete / undo test** — in-memory archive, asserts the flag flips and that the timeline query hides the row:
 
 ```swift
+// Tests/BackglanceCoreTests — Archive.softDelete/restore are synchronous, like every
+// other Archive write, so these tests are too.
 final class SoftDeleteTests: XCTestCase {
-    func testDeleteThenUndoRestoresRow() async throws {
+    func testDeleteThenUndoRestoresRow() throws {
         let archive = try Archive(inMemory: true)
-        let id = try await archive.insertFixtureNotification(title: "Hello")
-        let flipped = try await archive.softDelete([id])
+        let id = try insertFixtureNotification(archive, title: "Hello")
+        let flipped = try archive.softDelete([id])
         XCTAssertEqual(flipped, [id])
-        var visible = try await archive.read { db in try ArchivedNotification.filter(Column("is_deleted") == false).fetchCount(db) }
+        var visible = try archive.pool.read { db in try ArchivedNotification.filter(Column("is_deleted") == false).fetchCount(db) }
         XCTAssertEqual(visible, 0)
-        try await archive.restore([id])
-        visible = try await archive.read { db in try ArchivedNotification.filter(Column("is_deleted") == false).fetchCount(db) }
+        XCTAssertEqual(try archive.restore([id]), 1)
+        visible = try archive.pool.read { db in try ArchivedNotification.filter(Column("is_deleted") == false).fetchCount(db) }
         XCTAssertEqual(visible, 1)
     }
 
-    func testDeletingAlreadyDeletedRowFlipsNothing() async throws {
+    func testDeletingAlreadyDeletedRowFlipsNothing() throws {
         let archive = try Archive(inMemory: true)
-        let id = try await archive.insertFixtureNotification(title: "Hello")
-        _ = try await archive.softDelete([id])
-        let second = try await archive.softDelete([id])
+        let id = try insertFixtureNotification(archive, title: "Hello")
+        _ = try archive.softDelete([id])
+        let second = try archive.softDelete([id])
         XCTAssertTrue(second.isEmpty)               // undo of the second delete must not resurrect anything
     }
 }
 ```
 
-The 5 s undo timer is tested through the handler with `Task.sleep` replaced by an injected clock in the test target (`ContinuousClock` in production, a manual test clock in tests); the assertion is that `pendingUndo` empties after the clock advances and `restore` is not called.
+The 5 s undo timer is tested through `NotificationActionHandler` with an injected `UndoClock` (mirrors `BackglanceCore`'s `AwayClock` and the `ScriptedAwayClock` technique in `AwaySessionTrackerTests`) standing in for `Task.sleep` — a manual test clock that resolves only when the test tells it to, never the wall clock. The assertion is that `pendingUndo` empties once the clock is advanced past 5 seconds and that `Archive.restore` is never called on that path.
 
 ## Next Steps
 
