@@ -39,6 +39,13 @@ public struct Rule: Codable, FetchableRecord, MutablePersistableRecord, Identifi
     public static let databaseColumnDecodingStrategy = DatabaseColumnDecodingStrategy.convertFromSnakeCase
     public static let databaseColumnEncodingStrategy = DatabaseColumnEncodingStrategy.convertToSnakeCase
 
+    /// The id an unsaved editor draft evaluates as. Never a real archive id — `rules.id`
+    /// is `INTEGER PRIMARY KEY AUTOINCREMENT`, so real ids start at 1 and this can never
+    /// collide with one. `RulesEngine.compile(_:)` uses `rule.id ?? Rule.draftID` so a
+    /// `RuleCompileError` for an unsaved draft still has somewhere to point. See
+    /// docs/features/RULES.md#business-logic-rulesengine.
+    public static let draftID: Int64 = -1
+
     /// `nil` until the row is inserted; ``didInsert(_:)`` fills it from the
     /// autoincrement rowID.
     public var id: Int64?
