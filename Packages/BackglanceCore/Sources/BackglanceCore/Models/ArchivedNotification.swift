@@ -6,14 +6,16 @@ import GRDB
 /// One captured notification — maps `notifications` per
 /// docs/architecture/DATABASE_SCHEMA.md#canonical-ddl.
 ///
-/// > Important: This type deliberately has no `CustomStringConvertible` or
-/// > `CustomDebugStringConvertible` conformance, and nothing in this file
-/// > logs one. `title`, `subtitle`, `body`, and `sender` are notification
-/// > content — Privacy Invariant #1 (see CLAUDE.md) is that content never
-/// > reaches a log, and a convenience string description is exactly the
-/// > kind of thing that ends up in one by accident (an unguarded
-/// > `logger.debug("\(notification)")`). Log a `NotificationLogRef` (id,
-/// > bundle id, lengths) instead.
+/// > 🔒 Important: this type's `description` is content-free, and it has one
+/// > *for* that reason rather than despite it. `title`, `subtitle`, `body`
+/// > and `sender` are notification content, and Privacy Invariant #1 (see
+/// > CLAUDE.md) is that content never reaches a log. Leaving the conformance
+/// > off does not prevent `logger.debug("\(notification)")` — it makes it
+/// > worse: with no `description`, Swift falls back to reflecting the struct
+/// > and prints every stored property, title and body included. A
+/// > content-free description turns the same accident into a harmless line.
+/// > The right thing to log is still a ``NotificationLogRef``; this is the
+/// > floor under the mistake, not the intended path.
 ///
 /// > Note: `MutablePersistableRecord`, not `PersistableRecord` — see the
 /// > equivalent note on ``AppRecord``. `PersistableRecord.didInsert(_:)` is
@@ -266,5 +268,28 @@ public extension ArchivedNotification {
             .filter(RequestColumns.isDeleted == false)
             .order(RequestColumns.deliveredAt.desc)
             .limit(limit)
+    }
+}
+
+// MARK: CustomStringConvertible, CustomDebugStringConvertible
+
+extension ArchivedNotification: CustomStringConvertible, CustomDebugStringConvertible {
+    /// What a bug report needs, and nothing a notification said.
+    ///
+    /// The same shape ``ParsedNotification`` uses, so a line about a record before and after
+    /// it was archived reads the same way: a uuid prefix to correlate, the app row it belongs
+    /// to, and the field lengths — "body 0 characters" versus "body 240 characters" is the
+    /// difference between a parser bug and a display bug, and neither answer needs the body.
+    public var logDescription: String {
+        let lengths = "t=\(title?.count ?? 0) s=\(subtitle?.count ?? 0) b=\(body?.count ?? 0)"
+        return "\(uuid.prefix(8)) app=\(appId) \(lengths) src=\(source.rawValue)"
+    }
+
+    public var description: String {
+        logDescription
+    }
+
+    public var debugDescription: String {
+        logDescription
     }
 }
