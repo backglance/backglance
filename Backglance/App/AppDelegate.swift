@@ -407,11 +407,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             digests: digests,
             menuActions: .init(
                 openWindow: { window.show() },
-                pauseForAnHour: { [weak self] in
+                pause: { [weak self] choice in
                     guard let engine = self?.engine else {
                         return
                     }
-                    Task { await engine.pause(until: Date().addingTimeInterval(3_600)) }
+                    Task { await engine.pause(choice) }
                 },
                 resume: { [weak self] in
                     guard let engine = self?.engine else {

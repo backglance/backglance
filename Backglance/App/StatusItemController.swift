@@ -87,7 +87,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     /// pausing capture belongs to the app delegate, which owns the engine.
     struct MenuActions {
         var openWindow: () -> Void
-        var pauseForAnHour: () -> Void
+        var pause: (PauseChoice) -> Void
         var resume: () -> Void
         var openSettings: () -> Void
     }
@@ -190,8 +190,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
     private static func tooltip(count: Int, state: TimelineCaptureState) -> String {
         switch state {
-        case .paused:
-            String(localized: "Backglance — capture paused")
+        case let .paused(until):
+            String(localized: "Backglance — \(PauseCopy.pausedClause(until: until))")
 
         case .noFullDiskAccess:
             String(localized: "Backglance — needs Full Disk Access")
@@ -255,9 +255,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         menu.addItem(item(String(localized: "Open Full Window"), #selector(openWindow)))
         menu.addItem(.separator())
         if case .paused = store.captureState {
-            menu.addItem(item(String(localized: "Resume Capture"), #selector(resumeCapture)))
+            menu.addItem(item(PauseCopy.resumeMenuTitle, #selector(resumeCapture)))
         } else {
-            menu.addItem(item(String(localized: "Pause Capture for 1 Hour"), #selector(pauseCapture)))
+            menu.addItem(pauseSubmenuItem())
         }
         menu.addItem(item(String(localized: "Settings…"), #selector(openSettings), key: ","))
         menu.addItem(.separator())
@@ -278,9 +278,30 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         menuActions.openWindow()
     }
 
+    /// `Pause Capture ▸ For 15 Minutes / For 1 Hour / Until Tomorrow / Until I Resume`.
+    ///
+    /// A submenu rather than four items at the top level: the menu is also where Open,
+    /// Settings and Quit live, and pausing is the one thing on it that asks a follow-up
+    /// question. Each choice carries itself in `representedObject`, so the four share one
+    /// action and there is no selector-per-duration to keep in step with `PauseChoice`.
+    private func pauseSubmenuItem() -> NSMenuItem {
+        let parent = NSMenuItem(title: PauseCopy.pauseMenuTitle, action: nil, keyEquivalent: "")
+        let submenu = NSMenu(title: PauseCopy.pauseMenuTitle)
+        for choice in PauseCopy.choices {
+            let child = item(PauseCopy.menuTitle(for: choice), #selector(pauseCapture(_:)))
+            child.representedObject = choice
+            submenu.addItem(child)
+        }
+        parent.submenu = submenu
+        return parent
+    }
+
     @objc
-    private func pauseCapture() {
-        menuActions.pauseForAnHour()
+    private func pauseCapture(_ sender: NSMenuItem) {
+        guard let choice = sender.representedObject as? PauseChoice else {
+            return
+        }
+        menuActions.pause(choice)
     }
 
     @objc

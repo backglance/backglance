@@ -17,15 +17,24 @@ public extension CaptureEngine {
     /// immediately while the status is not `.running`, and leaving it armed means resume
     /// is instant rather than waiting for the next poll.
     ///
+    /// The choice is written to `UserDefaults` before the status changes, so a crash
+    /// between the two leaves a Mac that is paused rather than one that is capturing.
+    ///
     /// - Parameter date: when to resume by itself, or `nil` to stay paused until asked.
     func pause(until date: Date? = nil) {
         cancelAutoResume()
+        PauseSettings.save(state: date.map(PauseState.until) ?? .indefinite, to: defaults)
         transition(to: .paused(until: date))
 
         guard let date else {
             return
         }
         scheduleAutoResume(at: date)
+    }
+
+    /// Pauses for one of the four choices the menu and the URL scheme offer.
+    func pause(_ choice: PauseChoice, from now: Date = Date()) {
+        pause(until: choice.deadline(from: now))
     }
 
     /// Starts archiving again, skipping whatever arrived during the pause.
@@ -40,6 +49,8 @@ public extension CaptureEngine {
     /// the bootstrap path instead, which ends in `.running` or in the degraded reason.
     func resume() {
         cancelAutoResume()
+        let settings = PauseSettings(defaults: defaults)
+        PauseSettings.save(state: .notPaused, to: defaults)
 
         guard currentAdapter != nil else {
             bootstrapOrDegrade()
@@ -47,12 +58,50 @@ public extension CaptureEngine {
         }
 
         do {
-            try fastForwardCursor()
+            // "Import notifications received while paused" turns the gap into a delay.
+            // Off by default: someone who paused because they did not want a record is
+            // not served by getting one an hour later
+            // (docs/features/PRIVACY_CONTROLS.md#pause-capture).
+            if !settings.importWhilePaused {
+                try fastForwardCursor()
+            }
             transition(to: .running)
         } catch let error as CaptureError {
             transition(to: .degraded(error.degradedReason))
         } catch {
             transition(to: .degraded(.readError("\(type(of: error))")))
+        }
+    }
+}
+
+// MARK: - Restoring a pause across launches
+
+extension CaptureEngine {
+    /// Re-applies whatever pause was in force when Backglance last quit.
+    ///
+    /// Quitting is not resuming. A pause the user set for the rest of the day has to still
+    /// be there after a restart, and a pause that ran out while the app was closed has to
+    /// end the way any other pause ends — by skipping what arrived during it, rather than
+    /// by importing an evening's notifications at breakfast.
+    ///
+    /// Called after `bootstrap`, so an adapter and a cursor exist for `resume()` to
+    /// fast-forward. A pause therefore wins over a degraded state: the engine was not
+    /// going to read anything either way, and `resume()` bootstraps again when it is
+    /// asked to.
+    func restoreStoredPause() {
+        let stored = PauseSettings(defaults: defaults).state
+        switch stored.resolved(at: Date()) {
+        case .notPaused:
+            guard stored.isPaused else {
+                return
+            }
+            resume()
+
+        case .indefinite:
+            pause(until: nil)
+
+        case let .until(date):
+            pause(until: date)
         }
     }
 }

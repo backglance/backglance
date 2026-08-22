@@ -30,6 +30,8 @@ public actor CaptureEngine {
     ///   - exclusions: which apps may be archived. Checked before a payload is decoded.
     ///   - redactor: removes one-time codes before anything is written.
     ///   - enrichment: fills in the icon and the deep link.
+    ///   - defaults: where the pause state is read and written. A pause has to survive a
+    ///     relaunch, so it cannot live in the engine's memory.
     ///   - storeLocation: resolves the system store's path. Injected so tests can point
     ///     the engine at a store they built, rather than at the machine's real one.
     public init(
@@ -38,6 +40,7 @@ public actor CaptureEngine {
         exclusions: any AppExclusionList = AllowAllApps(),
         redactor: any NotificationRedactor = NoRedaction(),
         enrichment: any NotificationEnricher = NoEnrichment(),
+        defaults: UserDefaults = .standard,
         // Wrapped rather than passed as `StoreLocation.current`: referencing a static func
         // as a value produces a non-`@Sendable` function, which `-strict-concurrency`
         // rightly complains about crossing into an actor.
@@ -48,6 +51,7 @@ public actor CaptureEngine {
         self.exclusions = exclusions
         self.redactor = redactor
         self.enrichment = enrichment
+        self.defaults = defaults
         self.storeLocation = storeLocation
         let (stream, continuation) = AsyncStream.makeStream(of: CaptureStatus.self)
         statusStream = stream
@@ -110,6 +114,7 @@ public actor CaptureEngine {
 
         watcher.start()
         bootstrapOrDegrade()
+        restoreStoredPause()
 
         // The stream is read once here rather than inside the task: two consumers of one
         // AsyncStream split the wakes between them, so there must only ever be one.
@@ -137,6 +142,9 @@ public actor CaptureEngine {
     // MARK: Internal
 
     let archive: Archive
+
+    /// Where the pause state is persisted. See ``BackglanceCore/PauseSettings``.
+    let defaults: UserDefaults
 
     /// How many transient read failures have happened in a row, reset by any tick that
     /// reads the store successfully. See ``handleTickFailure(_:)``.

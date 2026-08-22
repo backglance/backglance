@@ -948,6 +948,9 @@ public actor CaptureEngine {
     /// Pause. `nil` = indefinitely. The watcher keeps running (cheap) but ticks are ignored.
     public func pause(until date: Date?) {
         autoResumeTask?.cancel()
+        // Written before the status changes: a crash between the two has to leave a Mac
+        // that is paused, not one that is capturing. Read back by `restoreStoredPause()`.
+        PauseSettings.save(state: date.map(PauseState.until) ?? .indefinite, to: defaults)
         status = .paused(until: date)
         guard let date else { return }
         autoResumeTask = Task {
@@ -959,6 +962,8 @@ public actor CaptureEngine {
 
     public func resume() async {
         autoResumeTask?.cancel()
+        let settings = PauseSettings(defaults: defaults)   // read before it is cleared
+        PauseSettings.save(state: .notPaused, to: defaults)
         guard adapter != nil else {
             await bootstrapOrDegrade()
             return
@@ -1119,8 +1124,9 @@ Pause is a promise: *nothing delivered while paused is archived*. That is why th
 | Cursor | Frozen |
 | On resume, default | Cursor is fast-forwarded to the store's tail; rows delivered during the pause are skipped for good. Even if the user later opens Settings and turns "Import notifications received while paused" on, those rows are not recovered — the cursor already moved. |
 | On resume, setting on | Cursor stays; the next tick archives everything delivered during the pause with `source = 'live'` |
-| Status item | Pause glyph; tooltip "Capture paused until 14:30" or "Capture paused" |
-| Auto-resume | `pause(until:)` schedules a `Task.sleep`; "until tomorrow" is 06:00 local next day; "indefinitely" is `nil` |
+| Status item | Pause glyph; tooltip "Backglance — capture paused until 14:30" or "Backglance — capture paused" (`PauseCopy.pausedClause`) |
+| Auto-resume | `pause(until:)` schedules a `Task.sleep`; "until tomorrow" is the next local midnight (`PauseChoice.untilTomorrow`); "indefinitely" is `nil` |
+| Across a relaunch | `capture.pausedUntil` is re-read after bootstrap: a live pause is re-applied, and one that expired while the app was closed resumes — skipping what arrived, exactly as an in-session resume would |
 | URL scheme | `backglance://pause?minutes=30`, `backglance://resume` ([EXPORT_AUTOMATION.md](./EXPORT_AUTOMATION.md)) |
 
 > ℹ️ **Info:** The Settings label reads *Import notifications received while paused: off*. Under it, one sentence: "When off, notifications that arrive during a pause are never archived, even if the system still has them."

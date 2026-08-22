@@ -572,43 +572,61 @@ Pausing stops Backglance from reading the system store. It is meant for the mome
 | Until tomorrow | next local midnight (`Calendar.current.startOfDay(for: tomorrow)`) | automatically |
 | Indefinitely | `-1` | only when the user chooses Resume |
 
-Where: the menu bar icon's right-click menu (`Pause Capture ▸ 15 minutes / 1 hour / Until tomorrow / Indefinitely`, then a single `Resume Capture` item while paused), Settings ▸ Privacy, and `backglance://pause?minutes=30` / `backglance://resume` ([EXPORT_AUTOMATION.md](./EXPORT_AUTOMATION.md) covers the URL scheme). The status item draws the icon dimmed with a small pause glyph while paused and its tooltip says until when.
+Where: the menu bar icon's right-click menu (`Pause Capture ▸ For 15 Minutes / For 1 Hour / Until Tomorrow / Until I Resume`, then a single `Resume Capture` item while paused), Settings ▸ Privacy, and `backglance://pause?minutes=30` / `backglance://resume` ([EXPORT_AUTOMATION.md](./EXPORT_AUTOMATION.md) covers the URL scheme). The status item draws the icon dimmed with a small pause glyph while paused, and its tooltip says until when — `Backglance — capture paused until 17:00`, or just `Backglance — capture paused` for an indefinite one. A deadline on another day carries its date too, since "paused until 00:00" on its own reads as a pause that has already run out.
+
+The stored form is a single `Double` under `capture.pausedUntil`, decoded by `PauseState`
+(`0` not paused, `-1` indefinitely, a Unix timestamp otherwise). Anything else negative also
+reads as indefinite: a preference written by a future build, or edited by hand, should fail
+towards *more* pausing rather than towards capturing something the user asked not to capture.
 
 ```swift
 extension CaptureEngine {
-    /// Pauses reading the system store. `until == nil` means indefinitely.
-    public func pause(until: Date?) async {
-        watcher.suspend()                                     // no DispatchSource events, no polls
-        status = .paused(until: until)
-        defaults.set(until?.timeIntervalSince1970 ?? -1, forKey: "capture.pausedUntil")   // survives relaunch
-        resumeTask?.cancel()
-        if let until {
-            resumeTask = Task { [weak self] in
-                try? await Task.sleep(for: .seconds(max(0, until.timeIntervalSinceNow)))
-                guard !Task.isCancelled else { return }
-                await self?.resume()
-            }
-        }
-        log.notice("capture paused until \(until.map { "\($0)" } ?? "resumed manually", privacy: .public)")
+    /// Pauses reading the system store. `date == nil` means indefinitely.
+    ///
+    /// The watcher keeps running. It costs nothing, its wakes reach a `tick` that returns
+    /// immediately while the status is not `.running`, and leaving it armed makes resume
+    /// instant rather than a poll interval away.
+    public func pause(until date: Date? = nil) {
+        cancelAutoResume()
+        // Written before the status changes, so a crash between the two leaves a Mac that
+        // is paused rather than one that is capturing.
+        PauseSettings.save(state: date.map(PauseState.until) ?? .indefinite, to: defaults)
+        transition(to: .paused(until: date))
+        guard let date else { return }
+        scheduleAutoResume(at: date)
     }
 
-    public func resume() async {
-        resumeTask?.cancel()
-        defaults.set(0.0, forKey: "capture.pausedUntil")
-        if !defaults.bool(forKey: "capture.importWhilePaused") {
-            // Default: whatever was delivered while paused is left in Apple's store, not imported.
-            do { try await skipToStoreHead() } catch { log.error("could not advance cursor after pause: \(error.localizedDescription, privacy: .public)") }
+    /// Pauses for one of the four choices the menu and the URL scheme offer.
+    public func pause(_ choice: PauseChoice, from now: Date = Date()) {
+        pause(until: choice.deadline(from: now))
+    }
+
+    public func resume() {
+        cancelAutoResume()
+        let settings = PauseSettings(defaults: defaults)   // read before it is cleared
+        PauseSettings.save(state: .notPaused, to: defaults)
+        guard currentAdapter != nil else {
+            bootstrapOrDegrade()                          // paused while degraded, or never bootstrapped
+            return
         }
-        watcher.resume()
-        status = .running
-        await pollNow()                                       // pick up from the (possibly advanced) cursor
+        do {
+            if !settings.importWhilePaused {
+                // Default: whatever was delivered while paused is left in Apple's store.
+                try fastForwardCursor()
+            }
+            transition(to: .running)
+        } catch let error as CaptureError {
+            transition(to: .degraded(error.degradedReason))
+        } catch {
+            transition(to: .degraded(.readError("\(type(of: error))")))
+        }
     }
 }
 ```
 
 Notifications delivered while paused are **not imported by default**: on resume the cursor is moved to the store's current head, so the pause is a real gap in the archive rather than a delay. The setting "Import notifications received while paused" (`capture.importWhilePaused`) turns this into a delay instead; that is the right choice for "I paused to give a talk and still want the record", and the wrong one for "I paused because I did not want a record". The Privacy pane explains the difference in one sentence next to the toggle.
 
-Pause survives relaunch (`capture.pausedUntil` is read at start; an expired timestamp resumes immediately). Wake from sleep does not resume a pause. The system store keeps whatever it keeps regardless — Backglance is just not looking.
+Pause survives relaunch: `restoreStoredPause()` runs immediately after bootstrap, so an adapter and a cursor exist for it to work with. A live pause is re-applied with whatever time it had left; one that expired while Backglance was closed ends the way any other pause ends — by resuming, which skips what arrived during it rather than importing an evening's notifications at breakfast. A pause therefore also outranks a degraded state on that path: the engine was not going to read anything either way, and `resume()` bootstraps again when it is asked to. Wake from sleep does not resume a pause. The system store keeps whatever it keeps regardless — Backglance is just not looking.
 
 ## Panic Wipe
 
