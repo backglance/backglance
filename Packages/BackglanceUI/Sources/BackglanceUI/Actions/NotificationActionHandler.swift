@@ -37,12 +37,72 @@ public final class NotificationActionHandler: ActionDispatching {
     ///     ``TriageEvaluating``. Defaults to ``NoTriage``, matching the timeline's own
     ///     default until then; a later action task passes the real engine in without
     ///     this initializer changing shape.
-    public init(archive: Archive, triage: any TriageEvaluating = NoTriage()) {
+    ///   - workspace: the seam `OpenAction` reaches `NSWorkspace` through — see
+    ///     ``AppLaunching``. Defaults to ``NSWorkspaceAppLauncher``, the real
+    ///     conformance; tests pass a fake that records calls and never launches
+    ///     anything.
+    public init(
+        archive: Archive,
+        triage: any TriageEvaluating = NoTriage(),
+        workspace: any AppLaunching = NSWorkspaceAppLauncher()
+    ) {
         self.archive = archive
         self.triage = triage
+        self.workspace = workspace
+    }
+
+    // MARK: Public
+
+    /// The ↩ / "Open in ‹App›" path: the full three-step ordering in
+    /// docs/features/ACTIONS.md#open-openaction-and-deeplinkresolver, then a
+    /// mark-read. Marking read happens only after `OpenAction` actually
+    /// succeeded — a click that ends in `.appNotInstalled` or `.launchFailed`
+    /// opened nothing, so there is nothing to mark as seen.
+    ///
+    /// - Throws: whatever ``OpenAction/run(deepLink:bundleID:)`` throws, or
+    ///   an ``ActionError`` from ``fetch(_:)`` / `Archive.markRead(_:)`.
+    public func openNotification(id: Int64) async throws {
+        let (notification, app) = try fetch(id)
+        try await OpenAction(workspace: workspace).run(deepLink: notification.deepLink, bundleID: app.bundleId)
+        do {
+            _ = try archive.markRead(id)
+        } catch {
+            throw ActionError.archive(reason: ArchiveError.detail(from: error))
+        }
+    }
+
+    /// The ⌘↩ "Open Link only" path: opens `deep_link` and nothing else — no
+    /// app-activation fallback, and no mark-read (docs/features/ACTIONS.md's
+    /// Archive Tables Involved table lists `is_read` as written by "Mark
+    /// read/unread, Open", not by this path).
+    ///
+    /// - Throws: ``ActionError/deepLinkUnresolvable(notificationID:)`` when
+    ///   there is no link, it does not parse, or nothing handled it.
+    public func openLink(id: Int64) throws {
+        let (notification, _) = try fetch(id)
+        try OpenAction(workspace: workspace).openLink(deepLink: notification.deepLink, notificationID: id)
     }
 
     // MARK: Internal
+
+    /// Whether the context menu's "Open Link" item should appear at all — a
+    /// `static` function, not an instance method, because the answer depends
+    /// only on the stored `deep_link` string, not on anything this handler
+    /// owns (no archive read, no workspace call). A dedicated value type felt
+    /// like overhead for one `Bool`: this and ``canActivateApp(bundleID:)``
+    /// answer two unrelated questions about two unrelated inputs, and forcing
+    /// them into one struct would make every call site build the half it
+    /// does not need.
+    ///
+    /// Delegates to ``OpenAction/parsedURL(_:)`` and
+    /// ``OpenAction/hasPathOrQuery(_:)`` so the menu's definition of "differs
+    /// from plain app activation" can never drift from `OpenAction`'s own.
+    static func showsOpenLink(deepLink: String?) -> Bool {
+        guard let url = OpenAction.parsedURL(deepLink) else {
+            return false
+        }
+        return OpenAction.hasPathOrQuery(url)
+    }
 
     /// The read every action starts from: the notification and the app that sent it.
     ///
@@ -82,8 +142,19 @@ public final class NotificationActionHandler: ActionDispatching {
         }
     }
 
+    /// Whether the context menu's "Open in ‹App›" item should render disabled
+    /// ("App not found" tooltip, per the Context Menu Specification table).
+    /// Not a protocol requirement on ``ActionDispatching``: it is a question
+    /// about menu state, not an action to dispatch, the same distinction that
+    /// keeps ``fetch(_:)`` off the protocol too. The menu itself is a later
+    /// task; this only exposes the answer it will need.
+    func canActivateApp(bundleID: String) -> Bool {
+        workspace.applicationURL(forBundleID: bundleID) != nil
+    }
+
     // MARK: Private
 
     private let archive: Archive
     private let triage: any TriageEvaluating
+    private let workspace: any AppLaunching
 }

@@ -13,23 +13,36 @@ import SwiftUI
 /// same as ``TimelineActionsKey``'s `nil` actions do for a host that cannot open a
 /// window.
 ///
-/// This protocol has no requirements yet. `NotificationActionHandler` (this task,
-/// BACKGLANCE-196) is the coordinator skeleton — its `Archive`, its shared `fetch`
-/// helper, and this seam — and the action methods land on top of it one at a time in
-/// their own follow-up tasks: Open, Copy, Delete/Undo, Pin/Read, System Settings,
-/// Export. Each of those tasks adds its method to this protocol as it ships, rather
-/// than this task guessing signatures for work that has not been designed yet.
+/// `NotificationActionHandler` (BACKGLANCE-196) was the coordinator skeleton — its
+/// `Archive`, its shared `fetch` helper, and this seam, with no requirements yet.
+/// Open (BACKGLANCE-197) is the first action to land on top of it; Copy, Delete/Undo,
+/// Pin/Read, System Settings and Export are still separate follow-up tasks, each
+/// adding its own method here as it ships, rather than this task guessing signatures
+/// for work that has not been designed yet.
 ///
 /// See docs/features/ACTIONS.md#notificationactionhandler.
 @MainActor
-public protocol ActionDispatching: AnyObject {}
+public protocol ActionDispatching: AnyObject {
+    /// The ↩ / "Open in ‹App›" path — see
+    /// docs/features/ACTIONS.md#open-openaction-and-deeplinkresolver. `async`
+    /// because it may activate an app through `NSWorkspace`, which is
+    /// itself async; `throws` for the `ActionError` cases the ordering can
+    /// end in.
+    func openNotification(id: Int64) async throws
+
+    /// The ⌘↩ "Open Link only" path — opens `deep_link` alone, with no app
+    /// fallback. Synchronous: unlike ``openNotification(id:)`` it never
+    /// reaches `openApplication`, only the synchronous `NSWorkspace.open(_:)`.
+    func openLink(id: Int64) throws
+}
 
 // MARK: - ActionDispatcherKey
 
 public struct ActionDispatcherKey: EnvironmentKey {
-    /// `nil`, not a no-op implementation: a protocol with no requirements has nothing
-    /// for a stub conformance to implement anyway, and `nil` is also what lets a row
-    /// preview detect "no host" and skip wiring up menu items that would do nothing.
+    /// `nil`, not a stub conformance: a stub would have to fabricate an outcome for
+    /// every method (does `openNotification` "succeed" with no archive behind it?),
+    /// and `nil` is also what lets a row preview detect "no host" and skip wiring up
+    /// menu items that would do nothing.
     public static let defaultValue: (any ActionDispatching)? = nil
 }
 
