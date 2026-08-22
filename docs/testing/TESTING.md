@@ -50,7 +50,7 @@ This document is the test strategy for Backglance: what kinds of tests exist, wh
 |---|---|---|---|
 | Unit | `BackglanceCoreTests`, `BackglanceCaptureTests`, `BackglanceSearchTests` | one type at a time; `Archive(inMemory: true)` when a database is needed; parser fuzz; redaction rules; query parser; rules engine; digest engine with injected clock | every PR, all three runners |
 | Integration | `Integration/` folders in the same bundles | fixture store → `StoreSnapshot` → adapter → `RecordParser` → `OTPRedactor` → `Archive` end-to-end; hybrid search over a populated archive; retention job over a populated archive; migrations from archived databases | every PR, all three runners |
-| UI | `BackglanceUITests` | XCUITest for onboarding (FDA denied / granted / skip), popover open, timeline scroll and search field | every PR, `macos-26` only |
+| UI | `BackglanceAppUITests` | XCUITest for onboarding (FDA denied / granted / skip), popover open, timeline scroll and search field | every PR, `macos-26` only |
 | Performance | `*PerformanceTests`, `SearchLatencyTests` | `XCTMetric` measurements against checked-in baselines | nightly, `macos-26` |
 
 The pyramid is deliberately bottom-heavy. A UI test that fails tells you something is wrong; a unit test that fails tells you what. Anything that would need FDA on the CI runner is not a test — it is a manual step in [SETUP_GUIDE.md](../getting-started/SETUP_GUIDE.md).
@@ -72,7 +72,8 @@ Tests/
 │   ├── Unit/            QueryParserTests, FuzzyMatcherTests, FTSIndexTests, HybridRankingTests
 │   ├── Integration/     HybridSearchOverArchiveTests, SemanticIndexTests (skipped when NLEmbedding unavailable)
 │   └── Performance/     SearchLatencyTests
-├── BackglanceUITests/
+├── BackglanceUITests/            unit tests for the BackglanceUI package (models, copy, formatting)
+├── BackglanceAppUITests/        XCUITest, driving the built app
 │   ├── OnboardingFDATests.swift, PopoverTests.swift, TimelineWindowTests.swift
 │   └── Support/         XCUIApplication+Backglance.swift
 └── Fixtures/
@@ -82,7 +83,17 @@ Tests/
 
 `Tests/Fixtures/` is read from the working copy, not copied into a test bundle: `BackglanceTestSupport.Fixtures` derives the path from its own `#filePath`, and exposes `Fixtures.systemStore` and `Fixtures.archive`. The reason is that these sources are built twice — as SwiftPM test targets (`swift test`) and as the `Backglance.xcodeproj` test targets the test plan runs — and `Bundle.module` exists only in the first, so a bundle-based lookup does not compile in Xcode at all. The fixtures are read-only inputs; a test that needs to write copies one into a temporary directory first. `Support/` files are shared through a small internal `BackglanceTestSupport` target so the SplitMix64 generator, the test clock, and stubs are written once.
 
-`Backglance.xctestplan` runs all four bundles in Debug. The plan has two configurations: `Fast`
+> ⚠️ The two names are close and mean different things. `BackglanceUITests` is a *unit* test
+> bundle for the `BackglanceUI` package — view models, copy, formatting — and needs no running
+> app. `BackglanceAppUITests` is the XCUITest bundle, and it launches Backglance.
+>
+> **Running the XCUITest bundle locally needs Accessibility permission** for whatever launches
+> it (Xcode, or the terminal running `xcodebuild`), or the runner fails with "Timed out while
+> enabling automation mode" before any test code runs — which is why an
+> `XCTSkip` cannot stand in for it. On a machine without that grant, run the rest with
+> `-skip-testing:BackglanceAppUITests`. CI runners have it.
+
+`Backglance.xctestplan` runs all five bundles in Debug. The plan has two configurations: `Fast`
 (unit + fixtures, what a PR runs first) and `Full` (everything including UI). An Xcode test-plan
 configuration varies *options*, not target membership, so the two are told apart by the
 `BACKGLANCE_TEST_SCOPE` environment variable (`fast` / `full`) that each configuration sets; a suite
@@ -950,101 +961,53 @@ Exports are not covered by either, because there is no exporter yet: the diagnos
 
 ## UI tests: FDA onboarding
 
-Onboarding is the one place where the app's behaviour depends on a system permission we cannot grant on a CI runner. The UI tests therefore stub the FDA probe with a launch argument that DEBUG builds honour:
+Onboarding is the one place where the app's behaviour depends on a system permission nothing can
+grant — not a CI runner, and not the app itself. macOS has no prompt for `SystemPolicyAllFiles`,
+so without a seam exactly one of "a Mac with the grant" and "a Mac without it" would be testable
+on any given machine, whichever one it happens to be.
 
-| Launch argument | Effect |
+`FullDiskAccessProbe` therefore honours one environment variable, on the same **DEBUG-only**
+terms as `BACKGLANCE_STORE_PATH`: a release build ignores it entirely, so no shipped Backglance
+can be told it has a permission it does not have.
+
+| Launch input | Effect |
 |---|---|
-| `--uitest-reset` | fresh `UserDefaults` suite, archive at a temp `BACKGLANCE_ARCHIVE_PATH`, onboarding forced to show |
-| `-BACKGLANCE_UITEST_FDA denied` | `FDAProbe.check()` always returns `.denied` |
-| `-BACKGLANCE_UITEST_FDA granted` | `FDAProbe.check()` always returns `.granted` |
-| `-BACKGLANCE_UITEST_FDA_GRANT_AFTER <seconds>` | with `denied`: flips to `granted` after N seconds, to test the "grant detected" transition |
-| `-BACKGLANCE_UITEST_STORE fixture:macOS26` | `StoreLocation.current()` returns the bundled fixture, so the timeline has content |
+| `BACKGLANCE_FAKE_FDA=granted` (env) | every probe returns `.granted` |
+| `BACKGLANCE_FAKE_FDA=denied` (env) | every probe returns `.denied` |
+| `BACKGLANCE_FAKE_FDA=storeMissing` (env) | every probe returns `.storeMissing` |
+| `BACKGLANCE_ARCHIVE_PATH=…` (env) | the whole support directory moves, so a UI test never touches the archive of whoever is running it |
+| `-onboarding.completedVersion 0` (argument) | the *argument domain* outranks anything written, so a developer whose real Backglance has completed setup still gets a first run |
 
-Screens and their accessibility identifiers: `onboarding.welcome`, `onboarding.fda` (`onboarding.fda.openSettings`, `onboarding.fda.skip`), `onboarding.import` (`onboarding.import.importNow`, `onboarding.import.startFresh`), `onboarding.done` (`onboarding.done.finish`); the popover root is `popover.root`; the degraded banner is `popover.degradedBanner`.
+The value is read on every probe rather than cached: a cached override would be a second code
+path the tests exercise and users never do.
+
+Screens and their accessibility identifiers: `onboarding.welcome`, `onboarding.whyFDA`,
+`onboarding.whatWeRead`, `onboarding.grant` (with `onboarding.grant.status.waiting` /
+`.granted` / `.storeMissing`, `onboarding.grant.openSettings`, `onboarding.grant.checkAgain`,
+`onboarding.grant.relaunchHint`), `onboarding.done` (with `onboarding.import.progress`,
+`onboarding.import.finished`, `onboarding.import.failed`). The footer is fixed across every
+screen: `onboarding.back`, `onboarding.skip`, `onboarding.continue`. The degraded banner is
+`capture.fdaBanner`, with `.openSettings`, `.checkAgain`, `.learnWhy` and `.dismiss`.
+
+`BackglanceLaunch` in `Tests/BackglanceAppUITests/Support/` bundles all of that into one value,
+so a test names the kind of Mac it wants rather than assembling launch arguments:
 
 ```swift
-import XCTest
-
-final class OnboardingFDATests: XCTestCase {
-    private func launch(fda: String, grantAfter: Int? = nil) -> XCUIApplication {
-        let app = XCUIApplication()
-        var args = ["--uitest-reset", "-BACKGLANCE_UITEST_FDA", fda, "-BACKGLANCE_UITEST_STORE", "fixture:macOS26"]
-        if let grantAfter { args += ["-BACKGLANCE_UITEST_FDA_GRANT_AFTER", String(grantAfter)] }
-        app.launchArguments = args
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("bg-uitest-\(UUID().uuidString)", isDirectory: true)
-        app.launchEnvironment["BACKGLANCE_ARCHIVE_PATH"] = dir.appendingPathComponent("archive.sqlite").path
-        app.launch()
-        return app
-    }
-
-    override func setUp() {
-        continueAfterFailure = false
-    }
-
-    func test_whenFDADenied_thenEachScreenAppearsInOrder() {
-        let app = launch(fda: "denied")
-
-        let welcome = app.otherElements["onboarding.welcome"]
-        XCTAssertTrue(welcome.waitForExistence(timeout: 5))
-        app.buttons["onboarding.welcome.continue"].click()
-
-        let fda = app.otherElements["onboarding.fda"]
-        XCTAssertTrue(fda.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["onboarding.fda.openSettings"].exists)
-        XCTAssertTrue(app.buttons["onboarding.fda.skip"].exists)
-        // Text must be honest about why we need FDA and that we never phone home.
-        XCTAssertTrue(app.staticTexts["onboarding.fda.explanation"].label.contains("Full Disk Access"))
-    }
-
-    func test_whenFDAGranted_thenFDAScreenSkippedAndImportOffered() {
-        let app = launch(fda: "granted")
-        app.buttons["onboarding.welcome.continue"].click()
-
-        let importScreen = app.otherElements["onboarding.import"]
-        XCTAssertTrue(importScreen.waitForExistence(timeout: 5), "granted → straight to import step")
-        XCTAssertFalse(app.otherElements["onboarding.fda"].exists)
-
-        app.buttons["onboarding.import.importNow"].click()
-        XCTAssertTrue(app.otherElements["onboarding.done"].waitForExistence(timeout: 15))
-        app.buttons["onboarding.done.finish"].click()
-        XCTAssertTrue(app.otherElements["popover.root"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.otherElements["popover.degradedBanner"].exists)
-    }
-
-    func test_whenSkipTapped_thenAppRunsDegradedWithBanner() {
-        let app = launch(fda: "denied")
-        app.buttons["onboarding.welcome.continue"].click()
-        XCTAssertTrue(app.otherElements["onboarding.fda"].waitForExistence(timeout: 5))
-
-        app.buttons["onboarding.fda.skip"].click()
-
-        XCTAssertTrue(app.otherElements["onboarding.done"].waitForExistence(timeout: 5))
-        app.buttons["onboarding.done.finish"].click()
-        let banner = app.otherElements["popover.degradedBanner"]
-        XCTAssertTrue(banner.waitForExistence(timeout: 5), "degraded banner must explain capture is off without FDA")
-        XCTAssertTrue(app.buttons["popover.degradedBanner.grantAccess"].exists)
-    }
-
-    func test_whenGrantDetectedWhileOnFDAScreen_thenAdvancesAutomatically() {
-        let app = launch(fda: "denied", grantAfter: 3)
-        app.buttons["onboarding.welcome.continue"].click()
-        XCTAssertTrue(app.otherElements["onboarding.fda"].waitForExistence(timeout: 5))
-        // The FDA screen re-probes every 2 s while visible; after the stub flips it must move on by itself.
-        XCTAssertTrue(app.otherElements["onboarding.import"].waitForExistence(timeout: 10), "grant-detected transition did not happen")
-        XCTAssertFalse(app.otherElements["onboarding.fda"].exists)
-    }
-
-    func test_whenOpenSettingsClicked_thenAppStaysOnFDAScreen() {
-        // We cannot assert System Settings opened from a UI test; assert we do not lose our place.
-        let app = launch(fda: "denied")
-        app.buttons["onboarding.welcome.continue"].click()
-        XCTAssertTrue(app.otherElements["onboarding.fda"].waitForExistence(timeout: 5))
-        app.buttons["onboarding.fda.openSettings"].click()
-        app.activate()
-        XCTAssertTrue(app.otherElements["onboarding.fda"].exists)
-    }
+private func launch(fullDiskAccess: String, hasCompletedOnboarding: Bool = false) throws -> XCUIApplication {
+    let launch = BackglanceLaunch(fullDiskAccess: fullDiskAccess, hasCompletedOnboarding: hasCompletedOnboarding)
+    let app = try launch.app(archiveDirectory: XCTUnwrap(archiveDirectory))
+    app.launch()
+    return app
 }
 ```
+
+Assertions are by accessibility identifier, never by copy: these tests are about the flow, and a
+reworded headline should not fail them ([ACCESSIBILITY.md](../reference/ACCESSIBILITY.md#identifiers-for-ui-tests)).
+
+What the suite covers: the three explanation screens in order and Continue blocked at Grant
+without the permission; the grant acknowledged and setup finishing with it; Back; "Skip for now"
+closing setup and leaving the app running (it is an agent app, so finishing is the *window*
+going away, not the process); and setup not reopening on a Mac that has already been through it.
 
 `PopoverTests` (hotkey-free: the test clicks the status item via `XCUIApplication(bundleIdentifier: "com.apple.systemuiserver")` fallback or the `--uitest-open-popover` argument) and `TimelineWindowTests` (open window, scroll 200 rows, type in search field, expect filtered rows) live next to it. UI tests run only on `macos-26` in CI because the XCUITest runner is the slowest part of the matrix and the app's UI does not vary by OS.
 

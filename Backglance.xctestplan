@@ -61,6 +61,13 @@
         "identifier": "BG0000000000000000003400",
         "name": "BackglanceUITests"
       }
+    },
+    {
+      "target": {
+        "containerPath": "container:Backglance.xcodeproj",
+        "identifier": "BG0000000000000000003500",
+        "name": "BackglanceAppUITests"
+      }
     }
   ],
   "version": 1

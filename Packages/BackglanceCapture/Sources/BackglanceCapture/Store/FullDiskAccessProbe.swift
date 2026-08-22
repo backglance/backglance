@@ -93,10 +93,38 @@ public struct FullDiskAccessProbe: Sendable {
 
     /// Whether the store can be read right now.
     public func probe() -> FullDiskAccessState {
+        if let forced = Self.forcedState(in: ProcessInfo.processInfo.environment) {
+            return forced
+        }
         guard let url = try? storeLocation() else {
             return .storeMissing
         }
         return Self.probe(at: url)
+    }
+
+    // MARK: Internal
+
+    /// `BACKGLANCE_FAKE_FDA`, which forces the answer.
+    ///
+    /// The onboarding UI tests need to be a Mac with the grant and a Mac without it, in the
+    /// same run, on a machine whose real TCC state is whatever it is — and there is no API to
+    /// change that state, which is the fact this whole file exists to work around.
+    ///
+    /// > 🔒 **DEBUG only**, on the same terms as `BACKGLANCE_STORE_PATH`: a release build
+    /// > ignores it entirely, so no shipped Backglance can be told it has a permission it does
+    /// > not have. The value is read on every probe rather than cached, because a cached
+    /// > override would be a second code path the tests exercise and users never do.
+    static func forcedState(in environment: [String: String]) -> FullDiskAccessState? {
+        #if DEBUG
+            switch environment["BACKGLANCE_FAKE_FDA"] {
+            case "granted": .granted
+            case "denied": .denied
+            case "storeMissing": .storeMissing
+            default: nil
+            }
+        #else
+            nil
+        #endif
     }
 
     // MARK: Private
