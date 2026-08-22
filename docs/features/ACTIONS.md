@@ -318,15 +318,18 @@ struct OpenAction {
 ⌘C copies plain text in the form `Title — Body` (em dash with spaces). Missing parts are dropped: a notification with no title copies just the body. ⌥⌘C prefixes a line with the app name and a local timestamp. Redacted content is copied exactly as stored, i.e. the placeholder `[code redacted]` — the original digits were never written to the archive, so there is nothing else to copy (see [PRIVACY_CONTROLS.md](./PRIVACY_CONTROLS.md)).
 
 ```swift
-// Backglance/Scenes/TimelineWindow/Actions/CopyAction.swift
+// Packages/BackglanceUI/Sources/BackglanceUI/Actions/CopyAction.swift
 import AppKit
 import BackglanceCore
 
 struct CopyAction {
     var includeAppAndTimestamp = false
-    var pasteboard: NSPasteboard = .general
+    /// `PasteboardWriting`, not `NSPasteboard`: a private named pasteboard conforms
+    /// as-is, and the one test that must force a refused write needs a fake.
+    var pasteboard: any PasteboardWriting = NSPasteboard.general
     private static let stamp: DateFormatter = {
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")   // a fixed dateFormat still reads the locale's calendar
         f.dateFormat = "yyyy-MM-dd HH:mm"      // local time, unambiguous, sorts well when pasted in a sheet
         return f
     }()
@@ -336,22 +339,23 @@ struct CopyAction {
                                      .filter { !$0.isEmpty }
         let line = parts.joined(separator: " — ")
         guard includeAppAndTimestamp else { return line }
-        let name = app.displayName ?? app.bundleID
-        return "\(name) · \(Self.stamp.string(from: n.deliveredAt))\n\(line)"
+        let name = app.displayName ?? app.bundleId
+        return "\(name) · \(Self.stamp.string(from: n.deliveredAt.date))\n\(line)"
     }
 
     /// Multi-select: one block per notification, separated by a blank line.
+    /// The write goes through `PasteboardCopier`, never straight to the pasteboard —
+    /// that is what keeps the concealed marker from being forgotten here.
     func run(_ items: [(ArchivedNotification, AppRecord)]) throws {
         let joined = items.map { text(for: $0.0, app: $0.1) }.joined(separator: "\n\n")
-        pasteboard.clearContents()
-        guard pasteboard.setString(joined, forType: .string) else {
+        guard PasteboardCopier.copyConcealed(joined, to: pasteboard) else {
             throw ActionError.pasteboardFailure
         }
     }
 }
 ```
 
-> 🔒 **Security:** Copy writes only to the pasteboard the user asked for. Backglance never reads the pasteboard and never marks its own writes as transient or concealed; the user's own clipboard manager (PasteShelf or otherwise) will see the copy, which is the expected behaviour for an explicit ⌘C.
+> 🔒 **Security:** Backglance marks every copy it makes with `org.nspasteboard.ConcealedType` (the nspasteboard.org convention), so clipboard managers that honour it — PasteShelf's clipboard monitor is one — skip the item, while managers that ignore the marker still see it, which is the expected behaviour for an explicit ⌘C. Backglance never reads the pasteboard back. See [SECURITY.md#concealed-pasteboard-copies](../security/SECURITY.md#concealed-pasteboard-copies).
 
 ### Delete and Undo
 

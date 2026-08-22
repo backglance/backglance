@@ -15,10 +15,11 @@ import SwiftUI
 ///
 /// `NotificationActionHandler` (BACKGLANCE-196) was the coordinator skeleton — its
 /// `Archive`, its shared `fetch` helper, and this seam, with no requirements yet.
-/// Open (BACKGLANCE-197) is the first action to land on top of it; Copy, Delete/Undo,
-/// Pin/Read, System Settings and Export are still separate follow-up tasks, each
-/// adding its own method here as it ships, rather than this task guessing signatures
-/// for work that has not been designed yet.
+/// Open (BACKGLANCE-197) was the first action to land on top of it; Copy
+/// (BACKGLANCE-198) is the second. Delete/Undo, Pin/Read, System Settings and
+/// Export are still separate follow-up tasks, each adding its own method here as it
+/// ships, rather than this task guessing signatures for work that has not been
+/// designed yet.
 ///
 /// See docs/features/ACTIONS.md#notificationactionhandler.
 @MainActor
@@ -34,6 +35,13 @@ public protocol ActionDispatching: AnyObject {
     /// fallback. Synchronous: unlike ``openNotification(id:)`` it never
     /// reaches `openApplication`, only the synchronous `NSWorkspace.open(_:)`.
     func openLink(id: Int64) throws
+
+    /// The ⌘C / ⌥⌘C path — see docs/features/ACTIONS.md#copy. `ids` in the
+    /// order they should appear in the copied text, which for a multi-select
+    /// is the selection's order, not necessarily delivery order. Synchronous:
+    /// the write goes straight to `NSPasteboard`, with no async AppKit call
+    /// on the way, unlike ``openNotification(id:)``.
+    func copy(ids: [Int64], includeAppAndTimestamp: Bool) throws
 }
 
 // MARK: - ActionDispatcherKey

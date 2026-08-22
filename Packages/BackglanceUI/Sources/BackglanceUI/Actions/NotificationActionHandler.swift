@@ -1,3 +1,4 @@
+import AppKit
 import BackglanceCore
 import Foundation
 
@@ -16,10 +17,11 @@ import Foundation
 /// feature needs it (`PrivacySettingsView`'s `NSWorkspace.shared.activateFileViewerSelecting`
 /// is one example), so nothing about the module boundary rules this out.
 ///
-/// This task delivers the coordinator skeleton only: the type, its dependencies, the
-/// shared ``fetch(_:)`` helper every action will read through, and the
-/// ``ActionDispatching`` seam view code reaches it by. Open, Copy, Delete/Undo,
-/// Pin/Read, System Settings and Export are separate follow-up tasks — see
+/// BACKGLANCE-196 delivered the coordinator skeleton: the type, its dependencies,
+/// the shared ``fetch(_:)`` helper every action reads through, and the
+/// ``ActionDispatching`` seam view code reaches it by. Open (BACKGLANCE-197) and
+/// Copy (BACKGLANCE-198) have landed on top of it; Delete/Undo, Pin/Read, System
+/// Settings and Export are still separate follow-up tasks — see
 /// docs/features/ACTIONS.md#notificationactionhandler for the full shape this class
 /// grows into.
 ///
@@ -41,14 +43,21 @@ public final class NotificationActionHandler: ActionDispatching {
     ///     ``AppLaunching``. Defaults to ``NSWorkspaceAppLauncher``, the real
     ///     conformance; tests pass a fake that records calls and never launches
     ///     anything.
+    ///   - pasteboard: the seam `CopyAction` reaches `NSPasteboard` through —
+    ///     see ``PasteboardWriting``. Defaults to `.general`, the real
+    ///     pasteboard; tests pass either a private named pasteboard
+    ///     (`NSPasteboard(name:)`, which conforms with no wrapper needed) or a
+    ///     fake that reports failure, to reach `ActionError.pasteboardFailure`.
     public init(
         archive: Archive,
         triage: any TriageEvaluating = NoTriage(),
-        workspace: any AppLaunching = NSWorkspaceAppLauncher()
+        workspace: any AppLaunching = NSWorkspaceAppLauncher(),
+        pasteboard: any PasteboardWriting = NSPasteboard.general
     ) {
         self.archive = archive
         self.triage = triage
         self.workspace = workspace
+        self.pasteboard = pasteboard
     }
 
     // MARK: Public
@@ -81,6 +90,22 @@ public final class NotificationActionHandler: ActionDispatching {
     public func openLink(id: Int64) throws {
         let (notification, _) = try fetch(id)
         try OpenAction(workspace: workspace).openLink(deepLink: notification.deepLink, notificationID: id)
+    }
+
+    /// The ⌘C / ⌥⌘C path: fetches every id through the shared ``fetch(_:)``
+    /// helper, preserving `ids`' order, and hands the results to `CopyAction`
+    /// to build the text and write it concealed. See
+    /// docs/features/ACTIONS.md#copy.
+    ///
+    /// - Throws: ``ActionError/notFound(notificationID:)`` (propagated from
+    ///   ``fetch(_:)``) the moment any id no longer resolves — a multi-select
+    ///   copy either copies everything or copies nothing, never a partial
+    ///   pasteboard silently missing one row — or
+    ///   ``ActionError/pasteboardFailure`` if the concealed write itself
+    ///   failed.
+    public func copy(ids: [Int64], includeAppAndTimestamp: Bool) throws {
+        let items = try ids.map { try fetch($0) }
+        try CopyAction(includeAppAndTimestamp: includeAppAndTimestamp, pasteboard: pasteboard).run(items)
     }
 
     // MARK: Internal
@@ -157,4 +182,5 @@ public final class NotificationActionHandler: ActionDispatching {
     private let archive: Archive
     private let triage: any TriageEvaluating
     private let workspace: any AppLaunching
+    private let pasteboard: any PasteboardWriting
 }
