@@ -311,7 +311,7 @@ notifications.is_deleted = 1 ───► DELETE FROM notifications
 
 ### Defaults
 
-Backglance seeds a small exclusion list in the `v1_initial` migration. Excluded apps are `apps` rows with `is_excluded = 1` and `retention = 'never'`, inserted whether or not the app is installed:
+Backglance ships a small exclusion list. It lives in code, as `ExclusionList.shippedDefaults` (`BackglanceCore/Privacy/ExclusionList.swift`), and the user's own decisions are layered over it as `apps.is_excluded`:
 
 | Bundle identifier | Why |
 |---|---|
@@ -323,9 +323,15 @@ Backglance seeds a small exclusion list in the `v1_initial` migration. Excluded 
 | `com.apple.Passwords` | Apple Passwords |
 | `app.backglance.Backglance` | Backglance's own local notifications (digest banner, snooze reminders) — archiving them would be noise |
 
+> ℹ️ **Note:** an earlier version of this document had the seven rows seeded into `apps` by the `v1_initial` migration. They are not, and the reason is worth stating: a seeded row is frozen at the moment the archive was created, so a release that added a password manager to the list would only ever protect *new* installs. Held in code, the list is whatever the running build says it is, and every existing archive picks up an addition on the next launch. It also keeps `apps` meaning one thing — apps that have notified, or that the user has configured — rather than filling it with rows carrying `first_seen_at` values that never happened.
+>
+> The same note applies to the redaction defaults ([above](#per-app-toggle-and-redact-codes-in-all-apps)), for the same reason.
+
+An excluded app is not given `retention = 'never'`. Exclusion governs *capture*; retention governs what is *kept*, and coupling them would make the Excluded Apps toggle silently destructive — someone excluding an app from here on has not thereby asked to lose the last month of it. Deleting what is already archived is the per-app `never` retention policy, which is a separate, explicitly labelled choice ([Retention Policies](#policy-values-and-inheritance)).
+
 The list is deliberately short. Backglance cannot know that an app is a bank, a brokerage, or a health service: bundle identifiers do not say, and a curated list of "sensitive apps" would be wrong for most people. The Excluded Apps pane makes adding an app a two-click job (pick from apps seen in the archive, apps currently installed, or type a bundle identifier), and the onboarding's last screen points at it once.
 
-Users can remove any default, including the password managers. A "Restore defaults" button re-inserts the seven rows above without touching anything else.
+Users can remove any default, including the password managers: an `apps` row saying `is_excluded = 0` outranks the shipped default, which is what makes that promise true rather than merely stated. "Restore defaults" (`Archive.restoreDefaultExclusions()`) undoes exactly those removals — `ExclusionList.suppressedDefaults` — and leaves an app the user added themselves excluded, because restoring the defaults means restoring the defaults and not un-excluding somebody's bank.
 
 > 💡 **Tip:** If you only want to hide an app's *bodies* but keep the fact that it notified you, use the per-app "Show bodies" override or a rule ([RULES.md](./RULES.md)) rather than exclusion. Exclusion stores nothing, not even the timestamp.
 
