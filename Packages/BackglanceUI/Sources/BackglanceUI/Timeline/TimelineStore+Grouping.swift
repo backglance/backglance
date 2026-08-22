@@ -31,9 +31,10 @@ extension TimelineStore {
 
         return byDay.keys.sorted(by: >).map { day in
             let dayItems = byDay[day] ?? []
-            // Pinned first — the user's own pin, then a VIP rule's — and stable
-            // (newest-first) within each group.
-            let pinned = dayItems.filter(\.isPinned)
+            // Pinned first, and within that bucket a manual pin sorts before a
+            // VIP-triage pin, then newest first — see
+            // ``pinnedOrder(lhs:rhs:)``.
+            let pinned = dayItems.filter(\.isPinned).sorted(by: pinnedOrder)
             let unpinned = dayItems.filter { !$0.isPinned }
             let muted = unpinned.filter(\.triage.muted)
             let normal = pinned + unpinned.filter { !$0.triage.muted }
@@ -90,6 +91,21 @@ extension TimelineStore {
                 mutedItems: muted
             )
         }
+    }
+
+    /// The order within the pinned bucket of one day: manual pin before a
+    /// VIP-triage pin, then `deliveredAt` descending — per
+    /// docs/features/ACTIONS.md#pin-unpin-read-unread ("the manual pin wins
+    /// ties"). `Array.sorted(by:)` is not a stable sort, so both keys are
+    /// compared explicitly here rather than leaning on the caller's incoming
+    /// order to keep same-kind pins newest-first: two manual pins (or two VIP
+    /// pins) still need `deliveredAt` as the tiebreaker, not whatever order they
+    /// happened to arrive from `regroup()` in.
+    private static func pinnedOrder(_ lhs: TimelineItem, _ rhs: TimelineItem) -> Bool {
+        if lhs.notification.isPinned != rhs.notification.isPinned {
+            return lhs.notification.isPinned
+        }
+        return lhs.notification.deliveredAt > rhs.notification.deliveredAt
     }
 
     /// Rebuilds ``sections`` from the rows in memory. Pure, synchronous and

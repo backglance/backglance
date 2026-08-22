@@ -16,10 +16,10 @@ import SwiftUI
 /// `NotificationActionHandler` (BACKGLANCE-196) was the coordinator skeleton — its
 /// `Archive`, its shared `fetch` helper, and this seam, with no requirements yet.
 /// Open (BACKGLANCE-197) was the first action to land on top of it; Copy
-/// (BACKGLANCE-198) was the second; Delete/Undo (BACKGLANCE-199) is the third. Pin/Read,
-/// System Settings and Export are still separate follow-up tasks, each adding its own
-/// method here as it ships, rather than this task guessing signatures for work that has
-/// not been designed yet.
+/// (BACKGLANCE-198) was the second; Delete/Undo (BACKGLANCE-199) was the third;
+/// Pin/Read (BACKGLANCE-200) is the fourth. System Settings and Export are still
+/// separate follow-up tasks, each adding its own method here as it ships, rather than
+/// this task guessing signatures for work that has not been designed yet.
 ///
 /// See docs/features/ACTIONS.md#notificationactionhandler.
 @MainActor
@@ -57,6 +57,24 @@ public protocol ActionDispatching: AnyObject {
     /// no-op with nothing pending — ⌘Z with no toast on screen is a keyboard miss, not
     /// a mistake worth a beep.
     func undoDelete() throws
+
+    /// The pin / unpin toggle — see
+    /// docs/features/ACTIONS.md#pin-unpin-read-unread. Pinning is what moves a row to
+    /// the top of its day in ``TimelineStore/buildSections(items:groupByApp:anchor:calendar:now:)``,
+    /// manual pin before a VIP-triage pin. Synchronous, like
+    /// ``delete(ids:)``: `Archive.setPinned` is an ordinary `pool.write` call with no
+    /// `await` on it.
+    func setPinned(ids: [Int64], _ pinned: Bool) throws
+
+    /// The read / unread toggle — see
+    /// docs/features/ACTIONS.md#pin-unpin-read-unread. Marking read affects only the
+    /// unread badge; opening a notification marks it read implicitly through
+    /// ``openNotification(id:)``, so this method is for the explicit toggle only.
+    /// Marking unread is not a lesser path than marking read — a row unread again
+    /// re-enters the badge count if it was delivered since the last popover open, per
+    /// the doc above. Synchronous, like ``delete(ids:)``: `Archive.setRead` is an
+    /// ordinary `pool.write` call with no `await` on it.
+    func setRead(ids: [Int64], _ read: Bool) throws
 }
 
 // MARK: - ActionDispatcherKey

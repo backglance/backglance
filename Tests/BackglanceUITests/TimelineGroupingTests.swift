@@ -105,6 +105,30 @@ final class TimelineGroupingTests: XCTestCase {
         XCTAssertEqual(sections(items).first?.items.map(\.id), [2, 1])
     }
 
+    /// docs/features/ACTIONS.md#pin-unpin-read-unread: "the manual pin wins ties" —
+    /// a manual pin sorts before a VIP-triage pin within the same day even when the
+    /// VIP row is the newer of the two, which a plain newest-first sort would get
+    /// backwards.
+    func testAManualPinSortsBeforeAVIPPinEvenWhenTheVIPRowIsNewer() {
+        let items = [
+            TimelineFixtures.item(id: 1, secondsAgo: 120, isPinned: true),
+            TimelineFixtures.item(id: 2, secondsAgo: 0, triage: Triage(pinned: true)),
+        ]
+
+        XCTAssertEqual(sections(items).first?.items.map(\.id), [1, 2])
+    }
+
+    /// Within the manual-pin bucket, two manual pins still sort newest-first —
+    /// the tiebreaker docs/features/ACTIONS.md names after "manual before VIP".
+    func testTwoManualPinsStayNewestFirst() {
+        let items = [
+            TimelineFixtures.item(id: 1, secondsAgo: 120, isPinned: true),
+            TimelineFixtures.item(id: 2, secondsAgo: 0, isPinned: true),
+        ]
+
+        XCTAssertEqual(sections(items).first?.items.map(\.id), [2, 1])
+    }
+
     // MARK: - Muting
 
     /// Muted rows collapse into one trailing header per day. They stay in the

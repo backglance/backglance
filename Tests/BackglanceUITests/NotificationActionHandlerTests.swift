@@ -76,6 +76,49 @@ final class NotificationActionHandlerTests: XCTestCase {
         }
     }
 
+    // MARK: - setPinned(ids:_:) / setRead(ids:_:)
+
+    /// Writes through to the archive: pinning via the handler is visible on the
+    /// row exactly the way a direct `Archive.setPinned` call would leave it.
+    func testSetPinnedWritesThroughToTheArchive() throws {
+        let archive = try XCTUnwrap(archive)
+        let id = try insertFixtureNotification(into: archive)
+
+        try makeHandler(archive: archive).setPinned(ids: [id], true)
+
+        XCTAssertTrue(try archive.pool.read { db in
+            try XCTUnwrap(ArchivedNotification.fetchOne(db, key: id)).isPinned
+        })
+    }
+
+    /// Writes through to the archive: marking read via the handler is visible on
+    /// the row exactly the way a direct `Archive.setRead` call would leave it.
+    func testSetReadWritesThroughToTheArchive() throws {
+        let archive = try XCTUnwrap(archive)
+        let id = try insertFixtureNotification(into: archive)
+
+        try makeHandler(archive: archive).setRead(ids: [id], true)
+
+        XCTAssertTrue(try archive.pool.read { db in
+            try XCTUnwrap(ArchivedNotification.fetchOne(db, key: id)).isRead
+        })
+    }
+
+    /// A closed archive makes the underlying write fail; the handler must surface
+    /// that as `.archive`, the same shape `delete(ids:)`/`undoDelete()` already use
+    /// for a failed archive write, rather than letting the raw GRDB error escape.
+    func testSetPinnedSurfacesAnArchiveFailureAsActionErrorArchive() throws {
+        let archive = try XCTUnwrap(archive)
+        let id = try insertFixtureNotification(into: archive)
+        try archive.pool.close()
+
+        XCTAssertThrowsError(try makeHandler(archive: archive).setPinned(ids: [id], true)) { error in
+            guard case .archive = error as? ActionError else {
+                return XCTFail("expected .archive, got \(error)")
+            }
+        }
+    }
+
     // MARK: - ActionError.userMessage
 
     func testUserMessageForEveryCase() {
@@ -123,5 +166,20 @@ final class NotificationActionHandlerTests: XCTestCase {
         let handler = NotificationActionHandler(archive: archive)
         self.handler = handler
         return handler
+    }
+
+    /// One live, unpinned, unread row — the shape the pin/read toggle tests start
+    /// from — matching ``testFetchReturnsTheNotificationAndItsApp``'s fixture.
+    private func insertFixtureNotification(into archive: Archive) throws -> Int64 {
+        let app = try archive.upsertApp(bundleID: Stubs.BundleID.slack, now: Stubs.epoch)
+        let appID = try XCTUnwrap(app.id)
+        let inserted = try archive.insert(ArchivedNotification(
+            uuid: "FIXTURE-\(UUID().uuidString)",
+            appId: appID,
+            title: "Fixture message",
+            deliveredAt: UnixDate(Stubs.epoch),
+            capturedAt: UnixDate(Stubs.epoch)
+        ))
+        return try XCTUnwrap(inserted.id)
     }
 }

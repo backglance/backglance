@@ -156,30 +156,15 @@ public extension Archive {
     /// timeline. Already-read and deleted rows are skipped so the write touches only
     /// what changes, because every write here wakes the timeline's observation.
     ///
+    /// The statement itself now lives in `Archive+Actions.swift`'s ``setRead(_:_:)``
+    /// (added alongside ``setPinned(_:_:)`` for the pin/read toggles) — this is kept as
+    /// a thin, differently-named wrapper rather than folded away, since every call site
+    /// here reads "mark read", not "set the read flag to true".
+    ///
     /// - Returns: how many rows changed.
     @discardableResult
     func markRead(ids: [Int64]) throws -> Int {
-        guard !ids.isEmpty else {
-            return 0
-        }
-        do {
-            return try pool.write { db in
-                let placeholders = ids.map { _ in "?" }.joined(separator: ",")
-                try db.execute(
-                    sql: """
-                    UPDATE notifications SET is_read = 1
-                    WHERE is_read = 0 AND is_deleted = 0 AND id IN (\(placeholders))
-                    """,
-                    arguments: StatementArguments(ids)
-                )
-                return db.changesCount
-            }
-        } catch {
-            throw ArchiveError.writeFailed(
-                table: ArchivedNotification.databaseTableName,
-                underlying: ArchiveError.detail(from: error)
-            )
-        }
+        try setRead(ids, true)
     }
 }
 

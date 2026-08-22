@@ -21,10 +21,10 @@ import Observation
 /// BACKGLANCE-196 delivered the coordinator skeleton: the type, its dependencies,
 /// the shared ``fetch(_:)`` helper every action reads through, and the
 /// ``ActionDispatching`` seam view code reaches it by. Open (BACKGLANCE-197), Copy
-/// (BACKGLANCE-198) and Delete/Undo (BACKGLANCE-199) have landed on top of it;
-/// Pin/Read, System Settings and Export are still separate follow-up tasks — see
-/// docs/features/ACTIONS.md#notificationactionhandler for the full shape this class
-/// grows into.
+/// (BACKGLANCE-198), Delete/Undo (BACKGLANCE-199) and Pin/Read (BACKGLANCE-200) have
+/// landed on top of it; System Settings and Export are still separate follow-up
+/// tasks — see docs/features/ACTIONS.md#notificationactionhandler for the full shape
+/// this class grows into.
 ///
 /// `@MainActor` because `NSWorkspace` and `NSPasteboard` (used by the actions layered
 /// on top) are main-thread APIs, and because the view layer that calls this is
@@ -206,6 +206,57 @@ public final class NotificationActionHandler: ActionDispatching {
         } catch {
             let detail = ArchiveError.detail(from: error)
             Log.ui.error("restore failed for \(ids.count) id(s): \(detail)")
+            throw ActionError.archive(reason: detail)
+        }
+    }
+
+    /// The pin / unpin toggle — see docs/features/ACTIONS.md#pin-unpin-read-unread.
+    ///
+    /// Synchronous, not `async`, the same deviation from the docs/features/ACTIONS.md
+    /// sketch that ``delete(ids:)`` already makes: ``Archive/setPinned(_:_:)`` is an
+    /// ordinary `pool.write` call with no `await` on it, so there is nothing here for
+    /// `async` to buy.
+    ///
+    /// The changed-count ``Archive/setPinned(_:_:)`` returns is discarded on purpose —
+    /// pinning rows that are already pinned (or unpinning rows already unpinned) is not
+    /// a failure, it is a redundant click, and this method has nothing useful to say
+    /// about "zero of these changed" that the caller doesn't already know from having
+    /// asked for the state that was already true.
+    ///
+    /// - Throws: ``ActionError/archive(reason:)`` if the write itself failed.
+    public func setPinned(ids: [Int64], _ pinned: Bool) throws {
+        do {
+            _ = try archive.setPinned(ids, pinned)
+        } catch {
+            let detail = ArchiveError.detail(from: error)
+            Log.ui.error("setPinned failed for \(ids.count) id(s): \(detail)")
+            throw ActionError.archive(reason: detail)
+        }
+    }
+
+    /// The read / unread toggle — see docs/features/ACTIONS.md#pin-unpin-read-unread.
+    ///
+    /// This is the explicit toggle only; ``openNotification(id:)`` marks a row read on
+    /// its own once `OpenAction` succeeds, through `Archive.markRead(_:)`'s single-id
+    /// statement rather than through here. Keeping the two apart is deliberate: "open
+    /// implies read" is one row, one direction, and never unread, so making it share a
+    /// signature with a bulk two-directional toggle would buy nothing but a wider
+    /// method for the open path to pass constants into.
+    ///
+    /// Synchronous, not `async`, the same deviation from the docs/features/ACTIONS.md
+    /// sketch that ``delete(ids:)`` already makes: ``Archive/setRead(_:_:)`` is an
+    /// ordinary `pool.write` call with no `await` on it.
+    ///
+    /// The changed-count is discarded for the same reason as ``setPinned(ids:_:)``: a
+    /// toggle that changed nothing is not an error, whichever direction it was aimed.
+    ///
+    /// - Throws: ``ActionError/archive(reason:)`` if the write itself failed.
+    public func setRead(ids: [Int64], _ read: Bool) throws {
+        do {
+            _ = try archive.setRead(ids, read)
+        } catch {
+            let detail = ArchiveError.detail(from: error)
+            Log.ui.error("setRead failed for \(ids.count) id(s): \(detail)")
             throw ActionError.archive(reason: detail)
         }
     }

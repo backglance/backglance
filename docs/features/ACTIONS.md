@@ -550,9 +550,13 @@ final class NotificationActionHandler {
     }
 
     // MARK: Toggles
+    //
+    // Synchronous, like Delete/Undo above: `Archive.setPinned`/`setRead` are ordinary
+    // `pool.write { db in … }` calls, so there is no `await` on the archive side of
+    // either method.
 
-    func setPinned(ids: [Int64], _ pinned: Bool) async throws { try await archive.setPinned(ids, pinned) }
-    func setRead(ids: [Int64], _ read: Bool) async throws { try await archive.markRead(ids, read: read) }
+    func setPinned(ids: [Int64], _ pinned: Bool) throws { try archive.setPinned(ids, pinned) }
+    func setRead(ids: [Int64], _ read: Bool) throws { try archive.setRead(ids, read) }
 
     func setAppMuted(bundleID: String, _ muted: Bool) async throws {
         try await rules.setAppMuted(bundleID: bundleID, muted: muted)   // invalidates the triage cache

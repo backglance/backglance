@@ -114,3 +114,104 @@ public extension Archive {
         }
     }
 }
+
+// MARK: - Archive + pin / read toggles
+
+/// Pin/unpin and read/unread — see docs/features/ACTIONS.md#pin-unpin-read-unread.
+///
+/// Both are single-column flag flips on `notifications`, the same shape as
+/// `softDelete(_:)`/`restore(_:)` above and `markRead(ids:)` in
+/// `Archive+Digest.swift` (which now delegates to ``setRead(_:_:)`` rather than
+/// keeping its own copy of the statement). Pinning changes where a row sorts
+/// (`TimelineStore.buildSections` puts pinned rows — manual before VIP, then
+/// `delivered_at DESC` — at the top of their day); marking read changes only the
+/// unread badge. Neither toggle touches `is_deleted`: a soft-deleted row is not in
+/// front of the user, so pinning or reading it would be acting on something the
+/// timeline is not even showing, the same reasoning `markRead(ids:)` already
+/// applied to its own guard.
+public extension Archive {
+    /// Pins or unpins `ids`.
+    ///
+    /// - Parameters:
+    ///   - ids: candidate notification ids. An empty array short-circuits before
+    ///     opening a transaction.
+    ///   - pinned: the new value. Rows already at that value are left alone, so a
+    ///     redundant pin (or unpin) of an already-pinned row touches nothing.
+    /// - Returns: how many rows actually changed.
+    /// - Throws: ``ArchiveError/writeFailed(table:underlying:)`` if the write itself
+    ///   failed.
+    @discardableResult
+    func setPinned(_ ids: [Int64], _ pinned: Bool) throws -> Int {
+        guard !ids.isEmpty else {
+            return 0
+        }
+        return try setFlag("is_pinned", ids: ids, to: pinned)
+    }
+
+    /// Marks `ids` read or unread.
+    ///
+    /// Unread is not a lesser-used mirror of read: docs/features/ACTIONS.md is
+    /// explicit that marking a row unread again is allowed, and puts it back into
+    /// the badge count if it was delivered since the last popover open. Nothing
+    /// about the statement below distinguishes the two directions — the `pinned`/
+    /// `read` argument is the only difference between "mark read" and "mark
+    /// unread", which is exactly why both go through one ``setFlag(_:ids:to:)``
+    /// helper instead of two near-identical hand-written statements.
+    ///
+    /// - Parameters:
+    ///   - ids: candidate notification ids. An empty array short-circuits before
+    ///     opening a transaction.
+    ///   - read: the new value. Rows already at that value are left alone.
+    /// - Returns: how many rows actually changed.
+    /// - Throws: ``ArchiveError/writeFailed(table:underlying:)`` if the write itself
+    ///   failed.
+    @discardableResult
+    func setRead(_ ids: [Int64], _ read: Bool) throws -> Int {
+        guard !ids.isEmpty else {
+            return 0
+        }
+        return try setFlag("is_read", ids: ids, to: read)
+    }
+}
+
+private extension Archive {
+    /// The one statement both toggles above share.
+    ///
+    /// - Parameter column: a literal from this file only — `"is_pinned"` or
+    ///   `"is_read"` — never caller input, so the interpolation cannot carry
+    ///   anything but one of those two names (the same rule
+    ///   `Archive+Digest.swift`'s `stamp(column:onDigest:at:)` documents; see
+    ///   docs/security/SECURITY.md#parameterized-sql-only). Every value that could
+    ///   vary at the call site — the ids, the old value, the new value — is a `?`
+    ///   placeholder, never interpolated.
+    ///
+    /// The `<column> = ? (old value)` predicate is what keeps an already-correct
+    /// row out of the write: flipping ten rows and asking to pin the same ten
+    /// again should change nothing on disk, both because it is not what happened
+    /// (nothing about those rows is different) and because every write here wakes
+    /// the timeline's live observation — touching rows that would not actually
+    /// change is a redraw for nothing. `is_deleted = 0` keeps a soft-deleted row
+    /// out of the write entirely, matching `markRead(ids:)`'s own guard: a row the
+    /// user cannot currently see is not a row a pin or a read/unread click could
+    /// have been aimed at.
+    func setFlag(_ column: String, ids: [Int64], to value: Bool) throws -> Int {
+        do {
+            return try pool.write { db in
+                let placeholders = ids.map { _ in "?" }.joined(separator: ",")
+                try db.execute(
+                    sql: """
+                    UPDATE notifications SET \(column) = ?
+                    WHERE \(column) = ? AND is_deleted = 0 AND id IN (\(placeholders))
+                    """,
+                    arguments: StatementArguments([value, !value]) + StatementArguments(ids)
+                )
+                return db.changesCount
+            }
+        } catch {
+            throw ArchiveError.writeFailed(
+                table: ArchivedNotification.databaseTableName,
+                underlying: ArchiveError.detail(from: error)
+            )
+        }
+    }
+}
