@@ -1,6 +1,8 @@
 import AppKit
 import BackglanceCapture
 import BackglanceUI
+import ServiceManagement
+import UserNotifications
 
 // MARK: - AppDelegate + onboarding
 
@@ -51,5 +53,78 @@ extension AppDelegate {
         let onboarding = OnboardingWindowController(monitor: monitor, engine: engine)
         self.onboarding = onboarding
         onboarding.show()
+    }
+
+    /// The Permissions pane's model.
+    ///
+    /// All three readers live here because none of the three APIs is reachable from
+    /// `BackglanceUI`: TCC through `open(2)`, `UNUserNotificationCenter`, and `SMAppService`.
+    /// None of them *requests* anything — the pane reports, and the one place that asks for
+    /// notification authorization is the Digest pane's banner toggle.
+    func makePermissionsModel() -> PermissionsSettingsModel {
+        PermissionsSettingsModel(
+            readFullDiskAccess: { [weak self] in
+                MainActor.assumeIsolated {
+                    Self.displayState(self?.monitor?.checkNow() ?? .denied)
+                }
+            },
+            readBannerAuthorization: { await Self.bannerAuthorization() },
+            readLoginItemStatus: { MainActor.assumeIsolated { Self.loginItemStatus() } },
+            actions: PermissionsActions(
+                openFullDiskAccessSettings: { SystemSettingsLinks.openFullDiskAccess() },
+                openNotificationSettings: { SystemSettingsLinks.openNotifications() },
+                openLoginItemsSettings: { SystemSettingsLinks.openLoginItems() },
+                showSetupAgain: { [weak self] in
+                    MainActor.assumeIsolated { self?.showOnboarding() }
+                },
+                copyToPasteboard: { text in
+                    MainActor.assumeIsolated {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(text, forType: .string)
+                    }
+                }
+            )
+        )
+    }
+
+    static func displayState(_ state: FullDiskAccessState) -> FullDiskAccessDisplayState {
+        switch state {
+        case .granted: .granted
+        case .denied: .denied
+        case .storeMissing: .storeMissing
+        }
+    }
+
+    /// What the notification centre would do with a banner, without asking for anything.
+    private static func bannerAuthorization() async -> BannerAuthorization {
+        switch await UNUserNotificationCenter.current().notificationSettings().authorizationStatus {
+        case .authorized,
+             .provisional,
+             .ephemeral:
+            .authorized
+
+        case .denied:
+            .denied
+
+        case .notDetermined:
+            .notDetermined
+
+        @unknown default:
+            // A status this build does not know about is not a reason to claim permission.
+            .denied
+        }
+    }
+
+    /// Read only. Registering is `LaunchAtLogin`'s, which arrives with its toggle in Phase 4.3;
+    /// reporting the state now is what stops a Mac that is waiting for approval looking simply
+    /// "off".
+    private static func loginItemStatus() -> LoginItemStatus {
+        switch SMAppService.mainApp.status {
+        case .enabled: .registered
+        case .notRegistered: .notRegistered
+        case .requiresApproval: .requiresApproval
+        case .notFound: .unavailable
+        @unknown default: .unavailable
+        }
     }
 }

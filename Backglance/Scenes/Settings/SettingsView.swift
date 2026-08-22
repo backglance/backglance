@@ -5,12 +5,14 @@ import SwiftUI
 
 /// Settings, as far as this milestone has settings.
 ///
-/// Two tabs. General holds Search — semantic indexing is the first thing the app
+/// Three tabs. General holds Search — semantic indexing is the first thing the app
 /// does that needs the user's permission in the plain sense, since it reads every
 /// notification they have ever received and writes a vector for each one — and
 /// Digest, which owns the app's only permission prompt. Privacy holds everything
 /// that decides what Backglance keeps, assembled by `PrivacySettingsView`
-/// (docs/features/PRIVACY_CONTROLS.md#ui-components).
+/// (docs/features/PRIVACY_CONTROLS.md#ui-components). Permissions reports what
+/// macOS has allowed, and is the one place that can reopen setup
+/// (docs/features/PERMISSIONS_PRIVACY.md#ui-components).
 ///
 /// The split is the one the docs called for once the Privacy pane existed. General
 /// gains its own controls — launch at login, the hotkey, updates — in Phase 4.3.
@@ -23,6 +25,8 @@ struct SettingsView: View {
 
     let privacy: PrivacySettingsModel
 
+    let permissions: PermissionsSettingsModel
+
     var body: some View {
         TabView {
             general
@@ -32,6 +36,10 @@ struct SettingsView: View {
             PrivacySettingsView(model: privacy)
                 .tabItem { Label(String(localized: "Privacy"), systemImage: "hand.raised") }
                 .accessibilityIdentifier("settings.tab.privacy")
+
+            PermissionsSettingsView(model: permissions)
+                .tabItem { Label(String(localized: "Permissions"), systemImage: "lock.shield") }
+                .accessibilityIdentifier("settings.tab.permissions")
         }
         .frame(minWidth: 480, minHeight: 420)
     }

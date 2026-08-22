@@ -191,7 +191,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return SettingsWindowController(
             search: search,
             digest: Self.digestSettings(),
-            privacy: privacy
+            privacy: privacy,
+            permissions: makePermissionsModel()
         )
     }
 
