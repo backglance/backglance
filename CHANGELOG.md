@@ -1,6 +1,6 @@
 # Changelog
 
-Last Updated: 2026-08-20
+Last Updated: 2026-08-22
 
 All notable changes to Backglance are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html): breaking changes (including any archive migration that is not forward-transparent) bump MAJOR, features bump MINOR, fixes bump PATCH. Pre-1.0 releases (`0.x`) make no compatibility promises, and the archive may be reset between them.
 
@@ -60,6 +60,88 @@ Planned pre-release tags on the way to 1.0.0, one per milestone (targets, not pr
 - `v0.3.0` — M2: timeline and search
 - `v0.4.0` — M3: digest, privacy controls, onboarding
 - `v1.0.0` — M4: actions, rules, foundation, release pipeline
+
+## [0.4.0] - unreleased
+
+M3 — the digest, the privacy controls, and onboarding. The milestone where Backglance stops
+being a thing that records and starts being a thing you can tell what *not* to record.
+
+> The tag is not cut, and cannot be until `v0.2.0` and `v0.3.0` are: tags follow the
+> milestones in order. Two of this milestone's own gates are also open, and both need a
+> machine permission rather than more code. `OnboardingFDATests` is written and its bundle
+> builds, but XCUITest needs Accessibility permission for whatever launches it, and without
+> that the runner times out before any test code runs. And none of this milestone's UI has
+> been screenshot-verified: `screencapture` needs Screen Recording permission, and System
+> Events exposes nothing inside an `NSHostingController`, so no automated substitute exists.
+> Everything below builds, passes its unit tests, and lints clean; what is missing is a
+> human's eyes on the pixels.
+
+### Added
+
+- **Away sessions and the digest.** Lock, sleep and Focus become sessions; sessions under a
+  minute apart merge; a session shorter than five minutes gets no digest, because "you were
+  away" should mean away. One banner per return, dismissible, never twice for the same
+  session, and never at all if you already opened the popover — someone who is already
+  looking does not also need to be told
+- **One-time-code redaction, on before you arrive.** Codes are replaced with
+  `[code redacted]` in memory, before the insert, so the original digits never reach the
+  archive, the search index, an embedding, an export or a log. Irreversible by construction:
+  turning redaction off cannot bring back what was never stored, and the pane says so
+- **An exclusion list with real defaults.** Password managers, `com.apple.Passwords` and
+  Backglance itself, excluded before the payload is decoded rather than after — the check
+  runs ahead of the parser, so an excluded app's notification is never a decoded value in
+  memory at all
+- **Per-app retention.** `24h`, `7d`, `30d`, `forever`, `never` and `inherit`, with a
+  thirty-day global default: long enough to find last week's delivery code, short enough that
+  the archive does not become a years-long log of a life by accident
+- **Pause, with four choices.** Fifteen minutes, an hour, until tomorrow's midnight, or until
+  you say. It survives a relaunch, because quitting is not resuming — a pause set for the rest
+  of the day is still there after a restart, and one that ran out overnight ends the way any
+  pause ends, by skipping what arrived rather than importing an evening's notifications at
+  breakfast
+- **Panic wipe.** Zero the pages, *then* unlink. Unlinking first would leave every
+  notification's text in the blocks the file used to occupy, which is the threat the feature
+  exists to answer; a test proves it against the file's raw bytes, WAL included. Behind two
+  gates — a typed word, and Touch ID where the hardware offers it — and the sheet says which
+  gates this Mac actually applies, because an unstated missing gate is how someone assumes a
+  protection they do not have
+- **Onboarding, five screens.** It names the permission on the first screen rather than
+  springing it on the fourth, and gives the honest reason for its size: macOS offers nothing
+  narrower for this database, which is also why Backglance is not in the App Store. The Grant
+  screen waits rather than asks, because there is no API to request Full Disk Access — it
+  notices the grant on its own and moves on, which is the confirmation that what you just did
+  worked. "Skip for now" is on every screen and is a supported outcome
+- **A degraded-mode banner that says it once.** No modal, no local notification, no badge, and
+  no gating of unrelated features to apply pressure — the timeline, search, export and every
+  privacy control keep working without the permission. Dismissible per session, shared by the
+  popover and the window
+- **Settings ▸ Privacy, Permissions and Status.** Privacy gathers every control that decides
+  what is kept, in the order the data travels. Permissions reports three permissions and
+  requests none of them. Status answers the question capture cannot answer for itself — is it
+  running — because capture fails silently and the timeline simply stops growing
+- **A log a user can find.** `FileLogSink` writes the same content-free lines to
+  `~/Library/Logs/Backglance/`, five files of two megabytes, `0600` in a `0700` directory
+- **A diagnostics bundle nobody has to take on trust.** Versions, capture state and counts, as
+  plain JSON in a zip you can open before you send it. The builder issues no `SELECT` against
+  a text column, settings are an allow-list rather than a dump of the suite, and app names are
+  left out unless you ask — which apps notify you is itself personal
+
+### Fixed
+
+- **`ArchivedNotification` had no `description`,** which meant `"\(notification)"` did not fail
+  and did not print an opaque `Type(...)` — Swift reflected the struct and wrote every stored
+  property to the log, title, subtitle, body and sender in plain text. The conformance had been
+  deliberately withheld to prevent exactly that accident, and was maximising it instead
+
+### Security
+
+- **The privacy lint rules are now proven to bite.** A custom SwiftLint rule is a regex, and one
+  that matches nothing passes silently and forever — this repository had already had that
+  happen. `Scripts/verify_lint_rules.sh` writes a deliberately bad file per rule and fails if
+  any is let through
+- **Two ways past those rules are closed:** interpolating a whole notification into a log call,
+  and silencing a privacy rule with a `swiftlint:disable` comment — which is how an invariant
+  becomes a suggestion
 
 ## [0.3.0] - unreleased
 
