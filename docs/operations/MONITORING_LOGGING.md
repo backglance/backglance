@@ -298,27 +298,51 @@ A bad record is counted, not narrated: `ArchiveOutcome.failed` goes into the tic
 
 ### SwiftLint Rule
 
-The lint rule is the belt to the type system's braces. It flags any logger call whose argument text mentions a content field:
+The lint rules are the belt to the type system's braces. Four of them, in `.swiftlint.yml`,
+all `severity: error` so `swiftlint --strict` fails the build:
 
-```yaml
-# .swiftlint.yml (excerpt)
-custom_rules:
-  no_notification_content_in_logs:
-    name: "No notification content in logs"
-    included: ".*\\.swift"
-    excluded: ".*Tests.*"
-    regex: '(Log\.(capture|adapter|parser|archive|search|digest|rules|ui|updater)|logger|Logger\()[^\n]*\.(body|title|subtitle|sender|threadID|thread_id|deepLink|deep_link|userInfo|plistData)\b'
-    message: "Notification content must not be logged. Pass NotificationLogRef(n) instead."
-    severity: error
-  no_string_describing_notification:
-    name: "No String(describing:) on notifications"
-    included: ".*\\.swift"
-    regex: 'String\((describing|reflecting):\s*(parsed|notification|archived|n)\b'
-    message: "Do not stringify a notification for logging."
-    severity: error
+| Rule | Catches |
+|---|---|
+| `no_notification_content_in_logs` | a content *field* in a log call — `Log.capture.error("\(n.body)")` |
+| `no_string_describing_notification` | `String(describing:)` / `String(reflecting:)` on a notification-shaped name |
+| `no_notification_interpolation_in_logs` | the whole value dropped into a message — `Log.capture.debug("saw \(notification)")` |
+| `no_silencing_privacy_rules` | a `swiftlint:disable` naming any of the above, or the Turkish-locale rule |
+
+The last one is the one worth explaining. A `disable` comment on a privacy rule is how an
+invariant becomes a suggestion: the line that needed silencing is exactly the line worth
+reading, and the reviewer who would have read it sees a passing build instead. If one of these
+fires and the code is genuinely fine, the fix is to make the code not look like a leak, or to
+change the rule in a commit that says why.
+
+**A custom rule is a regex, and a regex that matches nothing passes silently and forever.**
+This repository has already had that happen: an earlier `no_notification_content_in_logs`
+keyed on the literal `logger.`, which no call site in Backglance uses, so it matched nothing
+and the invariant went unenforced while every run reported zero violations. A green
+`swiftlint --strict` is evidence that the code is clean *or* that the rules are dead, and
+nothing distinguishes the two.
+
+`Scripts/verify_lint_rules.sh` is what distinguishes them. It writes a deliberately bad file
+per rule — a body interpolated into a log line, a notification stringified, a whole value
+dropped into a message, a Turkish-breaking fold, a disable comment on a privacy rule — and
+fails if SwiftLint lets any of them through:
+
+```console
+$ Scripts/verify_lint_rules.sh
+Verifying the privacy lint rules reject what they are supposed to reject:
+  ok       no_notification_content_in_logs
+  ok       no_string_describing_notification
+  ok       no_notification_interpolation_in_logs
+  ok       no_locale_sensitive_case_folding
+  ok       no_silencing_privacy_rules
+
+All privacy lint rules are live.
 ```
 
-CI runs `swiftlint --strict`; both rules are `error`, so a violation fails the build. See [`../deployment/CI_CD.md`](../deployment/CI_CD.md).
+Note the cases are written *outside* a `Tests/` path on purpose: every privacy rule sets
+`excluded: ".*Tests.*"`, so a fixture placed under `Tests/` would be skipped and the check
+would pass without proving anything. CI runs the script beside `swiftlint --strict`
+(see [`../deployment/CI_CD.md`](../deployment/CI_CD.md)); the pre-commit hook does not, because
+it costs a second per commit and the rules do not change often.
 
 ## Viewing Logs
 

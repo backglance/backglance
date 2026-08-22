@@ -214,3 +214,29 @@ custom_rules:
     regex: 'String\((describing|reflecting):\s*(parsed|notification|archived|raw|record)\b'
     message: "Interpolating a whole notification into a string risks leaking content into logs."
     severity: error
+
+  # The accident the two rules above do not see: not a field, and not
+  # `String(describing:)`, but the whole value dropped straight into the message —
+  # `Log.capture.debug("saw \(notification)")`. `ArchivedNotification` and
+  # `ParsedNotification` both render content-free, so this is a third line of defence
+  # rather than the only one; it exists because that is a property of those two types
+  # today and a lint rule is what keeps a future type from quietly not having it.
+  no_notification_interpolation_in_logs:
+    name: "No Notification Interpolation in Logs"
+    included: ".*\\.swift"
+    excluded: ".*Tests.*"
+    regex: 'Log\.[a-z]+\.(debug|info|notice|error|fault)\([^\n]*\\\((parsed|notification|archived|record|batch|records|notifications)\b'
+    message: "Log a NotificationLogRef, not the notification itself."
+    severity: error
+
+  # 🔒 The privacy rules are not silenceable. A `swiftlint:disable` naming one of them is
+  # how an invariant becomes a suggestion: the line that needed silencing is exactly the
+  # line worth reading, and the reviewer who would have read it sees a passing build
+  # instead. If one of these fires and the code is genuinely fine, the fix is to make the
+  # code not look like a leak, or to change the rule in a commit that says why.
+  no_silencing_privacy_rules:
+    name: "Privacy Rules May Not Be Silenced"
+    included: ".*\\.swift"
+    regex: 'swiftlint:disable[^\n]*(no_notification_content_in_logs|no_string_describing_notification|no_notification_interpolation_in_logs|no_locale_sensitive_case_folding)'
+    message: "This rule guards a privacy invariant and must not be disabled. See CLAUDE.md."
+    severity: error
