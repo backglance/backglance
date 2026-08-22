@@ -279,8 +279,15 @@ final class FakeAppLauncher: AppLaunching {
 
     private(set) var calls: [Call] = []
 
-    /// Scripted return for `open(_:)`.
+    /// Scripted return for `open(_:)`, used when `url` has no entry in
+    /// ``openResults``.
     var openResult = true
+    /// Per-URL override for `open(_:)`, keyed by the exact URL. Missing keys fall
+    /// back to ``openResult``. Empty by default, so every existing caller that only
+    /// sets ``openResult`` is unaffected; `SystemSettingsLinkTests` uses this to
+    /// script "refuse the first two rungs, accept the third" without needing three
+    /// separate fakes.
+    var openResults: [URL: Bool] = [:]
     /// Scripted return for `applicationURL(forBundleID:)`, keyed by bundle id.
     /// Missing keys mean "not installed" (`nil`), same as the real API.
     var applicationURLs: [String: URL] = [:]
@@ -289,7 +296,7 @@ final class FakeAppLauncher: AppLaunching {
 
     func open(_ url: URL) -> Bool {
         calls.append(.open(url))
-        return openResult
+        return openResults[url] ?? openResult
     }
 
     func applicationURL(forBundleID bundleID: String) -> URL? {

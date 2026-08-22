@@ -21,10 +21,10 @@ import Observation
 /// BACKGLANCE-196 delivered the coordinator skeleton: the type, its dependencies,
 /// the shared ``fetch(_:)`` helper every action reads through, and the
 /// ``ActionDispatching`` seam view code reaches it by. Open (BACKGLANCE-197), Copy
-/// (BACKGLANCE-198), Delete/Undo (BACKGLANCE-199) and Pin/Read (BACKGLANCE-200) have
-/// landed on top of it; System Settings and Export are still separate follow-up
-/// tasks — see docs/features/ACTIONS.md#notificationactionhandler for the full shape
-/// this class grows into.
+/// (BACKGLANCE-198), Delete/Undo (BACKGLANCE-199), Pin/Read (BACKGLANCE-200) and
+/// System Settings (BACKGLANCE-201) have landed on top of it; Export is still a
+/// separate follow-up task — see docs/features/ACTIONS.md#notificationactionhandler
+/// for the full shape this class grows into.
 ///
 /// `@MainActor` because `NSWorkspace` and `NSPasteboard` (used by the actions layered
 /// on top) are main-thread APIs, and because the view layer that calls this is
@@ -259,6 +259,25 @@ public final class NotificationActionHandler: ActionDispatching {
             Log.ui.error("setRead failed for \(ids.count) id(s): \(detail)")
             throw ActionError.archive(reason: detail)
         }
+    }
+
+    /// Item 9 of the context menu ("Notification Settings for ‹App›…") — see
+    /// docs/features/ACTIONS.md#open-in-system-settings--notifications. Takes a
+    /// bundle id, not a notification id: per the Context Menu Specification table,
+    /// this item acts on the right-clicked row's app, the same as items 1, 2 and 8,
+    /// never on the whole selection — there is no meaningful "open System Settings
+    /// for 3 different apps at once" for a multi-select to mean.
+    ///
+    /// Constructs ``SystemSettingsLink`` with this handler's own `workspace`,
+    /// exactly the way ``openNotification(id:)`` constructs an
+    /// `OpenAction(workspace: workspace)` — the same seam, the same reason: a test
+    /// can script every rung of the fallback ladder without ever opening System
+    /// Settings for real.
+    ///
+    /// - Throws: ``ActionError/systemSettingsUnavailable`` when every URL in the
+    ///   ladder is refused.
+    public func openNotificationSettings(bundleID: String) throws {
+        try SystemSettingsLink(workspace: workspace).open(bundleID: bundleID)
     }
 
     // MARK: Internal

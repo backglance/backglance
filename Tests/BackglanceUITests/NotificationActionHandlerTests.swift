@@ -119,6 +119,43 @@ final class NotificationActionHandlerTests: XCTestCase {
         }
     }
 
+    // MARK: - openNotificationSettings(bundleID:)
+
+    /// Routes through the injected `workspace`, the same seam `openNotification(id:)`
+    /// reaches `NSWorkspace` through — see `OpenActionTests` for the launcher fake.
+    func testOpenNotificationSettingsRoutesThroughTheInjectedWorkspace() throws {
+        let archive = try XCTUnwrap(archive)
+        let launcher = FakeAppLauncher()
+        launcher.openResult = true
+
+        try NotificationActionHandler(archive: archive, workspace: launcher)
+            .openNotificationSettings(bundleID: Stubs.BundleID.slack)
+
+        XCTAssertEqual(launcher.calls, try [
+            .open(XCTUnwrap(SystemSettingsLink.notificationSettingsURLs(for: Stubs.BundleID.slack).first)),
+        ])
+    }
+
+    /// A total refusal of every rung in the ladder surfaces as `.systemSettingsUnavailable`,
+    /// matching `ActionError`'s case for "the user is told to open System Settings
+    /// manually" per docs/features/ACTIONS.md#edge-cases-and-error-handling.
+    func testOpenNotificationSettingsTotalRefusalSurfacesAsSystemSettingsUnavailable() throws {
+        let archive = try XCTUnwrap(archive)
+        let launcher = FakeAppLauncher()
+        launcher.openResult = false
+
+        XCTAssertThrowsError(
+            try NotificationActionHandler(archive: archive, workspace: launcher)
+                .openNotificationSettings(bundleID: Stubs.BundleID.slack)
+        ) { error in
+            XCTAssertEqual(error as? ActionError, .systemSettingsUnavailable)
+        }
+        XCTAssertEqual(
+            launcher.calls,
+            SystemSettingsLink.notificationSettingsURLs(for: Stubs.BundleID.slack).map { .open($0) }
+        )
+    }
+
     // MARK: - ActionError.userMessage
 
     func testUserMessageForEveryCase() {

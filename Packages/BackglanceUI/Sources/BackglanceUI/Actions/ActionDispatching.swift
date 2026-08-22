@@ -17,9 +17,10 @@ import SwiftUI
 /// `Archive`, its shared `fetch` helper, and this seam, with no requirements yet.
 /// Open (BACKGLANCE-197) was the first action to land on top of it; Copy
 /// (BACKGLANCE-198) was the second; Delete/Undo (BACKGLANCE-199) was the third;
-/// Pin/Read (BACKGLANCE-200) is the fourth. System Settings and Export are still
-/// separate follow-up tasks, each adding its own method here as it ships, rather than
-/// this task guessing signatures for work that has not been designed yet.
+/// Pin/Read (BACKGLANCE-200) was the fourth; System Settings (BACKGLANCE-201) is the
+/// fifth. Export is still a separate follow-up task, adding its own method here as it
+/// ships, rather than this task guessing a signature for work that has not been
+/// designed yet.
 ///
 /// See docs/features/ACTIONS.md#notificationactionhandler.
 @MainActor
@@ -75,6 +76,17 @@ public protocol ActionDispatching: AnyObject {
     /// the doc above. Synchronous, like ``delete(ids:)``: `Archive.setRead` is an
     /// ordinary `pool.write` call with no `await` on it.
     func setRead(ids: [Int64], _ read: Bool) throws
+
+    /// Item 9 of the context menu ("Notification Settings for ‹App›…") — see
+    /// docs/features/ACTIONS.md#open-in-system-settings--notifications. Takes a
+    /// bundle id, not a notification id: per the Context Menu Specification table,
+    /// items 1, 2, 8 and 9 act on the row that was right-clicked — its app — not on
+    /// the whole selection, unlike ``copy(ids:includeAppAndTimestamp:)``,
+    /// ``delete(ids:)``, ``setPinned(ids:_:)`` and ``setRead(ids:_:)``, which act on
+    /// every id passed in. Synchronous: the underlying `NSWorkspace.open(_:)` call is
+    /// itself synchronous, unlike ``openNotification(id:)``'s app-activation
+    /// fallback.
+    func openNotificationSettings(bundleID: String) throws
 }
 
 // MARK: - ActionDispatcherKey
