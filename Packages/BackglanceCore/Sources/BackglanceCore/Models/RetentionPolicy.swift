@@ -20,6 +20,15 @@ public enum RetentionPolicy: String, Codable, CaseIterable, Hashable, Sendable {
 
     // MARK: Public
 
+    /// The policy in force before the user has chosen one.
+    ///
+    /// Thirty days is meant to match what people expect of a "recent history": long
+    /// enough to find last week's delivery code or Monday's meeting link, short enough
+    /// that the archive does not become a years-long log of someone's life by accident.
+    /// `forever` is one click away for anyone who wants a real archive, which is the
+    /// right way round — keeping less by default and more on request.
+    public static let globalDefault = RetentionPolicy.days30
+
     /// How far back from now a notification is kept, or `nil` when the
     /// policy has no time bound.
     ///
@@ -34,6 +43,17 @@ public enum RetentionPolicy: String, Codable, CaseIterable, Hashable, Sendable {
         case .forever,
              .never: nil
         }
+    }
+
+    /// The instant before which a notification has expired, or `nil` when nothing
+    /// expires by age.
+    ///
+    /// Measured from `delivered_at`, not `captured_at`. A first-launch import that brings
+    /// in a six-day-old notification under a seven-day policy sees it expire tomorrow,
+    /// which is what the policy says: the user asked to keep a week of *notifications*,
+    /// not a week of Backglance having run.
+    public func cutoff(from now: Date) -> Date? {
+        interval.map { now.addingTimeInterval(-$0) }
     }
 }
 
@@ -71,5 +91,28 @@ public enum AppRetention: RawRepresentable, Codable, Hashable, Sendable {
         case .inherit: "inherit"
         case let .policy(policy): policy.rawValue
         }
+    }
+}
+
+// MARK: - AppRetention + effective policy
+
+public extension AppRetention {
+    /// The policy that actually applies to this app.
+    ///
+    /// `inherit` is not a policy, it is the absence of one — which is why it cannot be a
+    /// `RetentionPolicy` case. Resolving it needs the global default, and the global
+    /// default has no "inherit" of its own to resolve.
+    func effectivePolicy(global: RetentionPolicy) -> RetentionPolicy {
+        switch self {
+        case .inherit: global
+        case let .policy(policy): policy
+        }
+    }
+}
+
+public extension AppRecord {
+    /// The retention policy in force for this app's notifications.
+    func effectiveRetention(global: RetentionPolicy) -> RetentionPolicy {
+        retention.effectivePolicy(global: global)
     }
 }

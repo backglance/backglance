@@ -157,3 +157,50 @@ public extension Archive {
         return suppressed.count
     }
 }
+
+// MARK: - Retention
+
+public extension Archive {
+    /// Sets one app's retention override.
+    ///
+    /// `never` is the one value that means more than a window. It says "do not store this
+    /// app at all", which is the exclusion list's sentence — so `is_excluded` is set in
+    /// the *same transaction*, and the two can never disagree. A user who picks "Never
+    /// store" and then finds the app still being captured because a second write failed
+    /// would have every reason to stop trusting the pane.
+    ///
+    /// The reverse is deliberately not symmetric: moving *off* `never` does not
+    /// un-exclude. The app may have been on the exclusion list before the retention
+    /// override existed — a password manager, or one the user added by hand — and quietly
+    /// resuming capture of it because a retention picker moved is exactly the kind of
+    /// surprise this file is trying not to hold. Un-excluding is the Excluded Apps pane's
+    /// job, where it is the visible, labelled action.
+    ///
+    /// Nothing already archived is deleted here. Offering that is the settings sheet's
+    /// business, and it asks first (docs/features/PRIVACY_CONTROLS.md#policy-values-and-inheritance).
+    ///
+    /// - Returns: the app row as it now stands.
+    @discardableResult
+    func setRetention(_ retention: AppRetention, bundleID: String, now: Date = Date()) throws -> AppRecord {
+        do {
+            return try pool.write { db in
+                var app = try Self.upsertApp(db, bundleID: bundleID, now: now, retention: nil)
+                let excludes = retention == .policy(.never)
+                guard app.retention != retention || (excludes && !app.isExcluded) else {
+                    return app
+                }
+                app.retention = retention
+                if excludes {
+                    app.isExcluded = true
+                }
+                try app.update(db)
+                return app
+            }
+        } catch {
+            throw ArchiveError.writeFailed(
+                table: AppRecord.databaseTableName,
+                underlying: ArchiveError.detail(from: error)
+            )
+        }
+    }
+}

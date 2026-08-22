@@ -20,7 +20,10 @@ import Foundation
 public struct RedactionPolicy: Sendable, Equatable {
     // MARK: Lifecycle
 
-    public init(redactsAllApps: Bool = false) {
+    /// No default value on purpose: with one, `RedactionPolicy()` would compile as either
+    /// this or ``init(defaults:)``, and neither the compiler nor a reader could tell which
+    /// was meant.
+    public init(redactsAllApps: Bool) {
         self.redactsAllApps = redactsAllApps
     }
 
