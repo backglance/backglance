@@ -337,7 +337,11 @@ Users can remove any default, including the password managers: an `apps` row say
 
 ### Where Exclusion Happens
 
-Exclusion is checked in `CaptureEngine.ingest` on the raw record's `appIdentifier`, **before** `RecordParser.parse` decodes the property list. The record's `plistData` bytes exist in memory as part of the batch read from the snapshot copy of the system store, but they are never decoded, never logged, and never handed to any other component; they are released with the batch. The cursor is still advanced past the record so it is not read again on the next poll.
+Exclusion is checked in `CaptureEngine.archiveOne` on the raw record's `appIdentifier`, **before** `RecordParser.parse` decodes the property list, and again on the parsed bundle id — helper processes and iPhone Mirroring post on behalf of another app, and the app the user excluded is the one the payload names. The record's `plistData` bytes exist in memory as part of the batch read from the snapshot copy of the system store, but they are never decoded, never logged, and never handed to any other component; they are released with the batch. The cursor is still advanced past the record so it is not read again on the next poll.
+
+The list itself is `ArchiveExclusionList`, refreshed once at the top of each tick rather than once per record — which is what lets `AppExclusionList.allows(_:)` stay synchronous and non-throwing on the hot path. A refresh that fails keeps the previous snapshot rather than falling back to allowing everything, and the snapshot starts as the shipped defaults, so there is no instant during launch in which nothing is excluded.
+
+The ordering is pinned by `CaptureExclusionTests`, and pinned in a way that cannot pass by accident: the excluded record's payload is bytes the parser cannot decode, so a check that ran *after* the parse would count the record `failed` where a check that ran before it counts `excluded`. A control test feeds the identical payload from an allowed app and asserts `failed`.
 
 ```swift
 extension CaptureEngine {

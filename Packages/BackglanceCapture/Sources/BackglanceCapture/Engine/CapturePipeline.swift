@@ -12,12 +12,30 @@ import Foundation
 /// > "excluded apps are never read" has to be true of the parse, not just of the insert
 /// > (docs/features/CAPTURE.md#exclusion-before-parse).
 ///
-/// The real list — `apps.is_excluded` plus the built-in defaults, reloaded when the user
-/// toggles an app in Settings — arrives with the privacy controls. Until then the engine
-/// takes one of these and the default allows everything.
+/// ``ArchiveExclusionList`` is the shipped implementation — `apps.is_excluded` layered
+/// over `ExclusionList.shippedDefaults`, reloaded at the top of each tick. ``AllowAllApps``
+/// is what a test injects when exclusion is not what it is testing.
 public protocol AppExclusionList: Sendable {
     /// Whether notifications from `bundleID` may be archived.
+    ///
+    /// Synchronous and non-throwing on purpose. It is asked once per store record on the
+    /// hot path, ahead of the parse, and an answer that could suspend or fail would put
+    /// the engine in the position of deciding what to do when it does not know whether an
+    /// app is excluded — for which there is no safe answer that is also correct.
     func allows(_ bundleID: String) -> Bool
+
+    /// Reloads whatever backs the list.
+    ///
+    /// Called once at the top of each tick rather than once per record, which is what lets
+    /// ``allows(_:)`` stay synchronous. The window that opens is one tick wide and can
+    /// only ever contain a notification that arrived in the moments before the user
+    /// excluded its app.
+    func refresh()
+}
+
+public extension AppExclusionList {
+    /// A list with nothing behind it has nothing to reload.
+    func refresh() {}
 }
 
 // MARK: - AllowAllApps
@@ -37,6 +55,58 @@ public struct AllowAllApps: AppExclusionList {
     public func allows(_: String) -> Bool {
         true
     }
+}
+
+// MARK: - ArchiveExclusionList
+
+/// The shipped exclusion list: `ExclusionList`, read from the archive.
+///
+/// > 🔒 Privacy Invariant #3. The snapshot is what ``allows(_:)`` answers from, and it is
+/// > replaced wholesale at the top of each tick — never mutated entry by entry, so a
+/// > record can never be checked against a half-updated list.
+///
+/// A read that fails keeps the previous snapshot rather than falling back to allowing
+/// everything. That is the whole design decision in this type: a transient database error
+/// must not be the reason a password manager's notification gets archived, and the
+/// starting snapshot is the shipped defaults rather than an empty list, so even a
+/// first refresh that never succeeds leaves the password managers excluded.
+public final class ArchiveExclusionList: AppExclusionList, @unchecked Sendable {
+    // MARK: Lifecycle
+
+    /// - Parameter archive: where `apps.is_excluded` lives. The shipped defaults come from
+    ///   `ExclusionList` itself, so this is only ever asked for the user's overrides.
+    public init(archive: Archive) {
+        self.archive = archive
+    }
+
+    // MARK: Public
+
+    public func allows(_ bundleID: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return !snapshot.excludes(bundleID)
+    }
+
+    public func refresh() {
+        guard let reloaded = try? archive.exclusionList() else {
+            // Deliberately not logged per call: a database that is unavailable is
+            // unavailable for the whole tick, and `CaptureEngine` already reports that
+            // through its status. What must not happen here is a fallback to "allow".
+            return
+        }
+        lock.lock()
+        snapshot = reloaded
+        lock.unlock()
+    }
+
+    // MARK: Private
+
+    private let archive: Archive
+    private let lock = NSLock()
+
+    /// The shipped defaults until the first successful refresh — not an empty list, so
+    /// there is no instant during launch in which nothing is excluded.
+    private var snapshot = ExclusionList()
 }
 
 // MARK: - NotificationRedactor

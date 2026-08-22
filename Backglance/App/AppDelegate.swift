@@ -212,6 +212,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let engine = CaptureEngine(
             archive: archive,
             watcher: watcher,
+            // 🔒 The real exclusion list, not the `AllowAllApps` default. Without this
+            // line a password manager's notifications are parsed and archived like any
+            // other app's (Privacy Invariant #3).
+            exclusions: ArchiveExclusionList(archive: archive),
             // 🔒 The real redactor, not the `NoRedaction` default. This is the only place
             // it is installed: a build that dropped this line would archive one-time
             // codes in plain text and nothing else would notice, because every other

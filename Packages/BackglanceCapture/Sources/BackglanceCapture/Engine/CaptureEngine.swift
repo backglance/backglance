@@ -230,6 +230,12 @@ public actor CaptureEngine {
         }
 
         do {
+            // 🔒 Once per tick, before a single record is looked at. The list has to be
+            // current *before* the first `allows(_:)` of the batch, not after — an app the
+            // user excluded a second ago is an app whose next notification must not be
+            // archived (docs/features/PRIVACY_CONTROLS.md#where-exclusion-happens).
+            exclusions.refresh()
+
             let batch = try readBatch(with: adapter)
 
             // Counted before the empty check: a tick that found nothing still *ran*, and

@@ -150,55 +150,6 @@ final class CaptureEnginePipelineTests: XCTestCase {
         XCTAssertEqual(stored.first?.storeRecId, 2)
     }
 
-    // MARK: - Exclusion
-
-    /// 🔒 The invariant: exclusion runs on the store row, before the payload is decoded.
-    /// The payload here names an app that *is* allowed — so if the check ran after the
-    /// parse, this notification would be archived.
-    func testAnExcludedAppsPayloadIsNeverDecoded() async throws {
-        let archive = try XCTUnwrap(archive)
-        try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: [
-            MiniatureStore.notification(
-                recID: 1,
-                bundleID: "com.example.passwords",
-                payloadBundleID: "com.example.chat"
-            ),
-        ])
-        let exclusions = DenyList(["com.example.passwords"])
-        let engine = try makeEngine(exclusions: exclusions)
-
-        try archive.captureFromTheStartOfTheStore()
-
-        await engine.start()
-        await engine.tick(reason: .manual)
-
-        let count = try await archive.pool.read { db in try ArchivedNotification.fetchCount(db) }
-        XCTAssertEqual(count, 0)
-        XCTAssertEqual(exclusions.asked.first, "com.example.passwords")
-    }
-
-    /// Helper processes and iPhone Mirroring post on behalf of another bundle, so the
-    /// payload's own app has to be checked too — that is the app the user excluded.
-    func testAnAppExcludedByThePayloadsOwnBundleIDIsAlsoSkipped() async throws {
-        let archive = try XCTUnwrap(archive)
-        try MiniatureStore.makeFile(at: XCTUnwrap(storeURL), rows: [
-            MiniatureStore.notification(
-                recID: 1,
-                bundleID: "com.apple.iphonemirroring",
-                payloadBundleID: "com.example.passwords"
-            ),
-        ])
-        let engine = try makeEngine(exclusions: DenyList(["com.example.passwords"]))
-
-        try archive.captureFromTheStartOfTheStore()
-
-        await engine.start()
-        await engine.tick(reason: .manual)
-
-        let count = try await archive.pool.read { db in try ArchivedNotification.fetchCount(db) }
-        XCTAssertEqual(count, 0)
-    }
-
     // MARK: - Redaction and enrichment
 
     /// 🔒 What reaches the archive is what the redactor returned, and the audit row lands
@@ -335,34 +286,6 @@ final class CaptureEnginePipelineTests: XCTestCase {
             enrichment: enrichment
         ) { storeURL }
     }
-}
-
-// MARK: - DenyList
-
-/// An exclusion list that remembers what it was asked about, so a test can prove *when*
-/// the question was put.
-private final class DenyList: AppExclusionList, @unchecked Sendable {
-    // MARK: Lifecycle
-
-    init(_ excluded: Set<String>) {
-        self.excluded = excluded
-    }
-
-    // MARK: Internal
-
-    private(set) var asked: [String] = []
-
-    func allows(_ bundleID: String) -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        asked.append(bundleID)
-        return !excluded.contains(bundleID)
-    }
-
-    // MARK: Private
-
-    private let excluded: Set<String>
-    private let lock = NSLock()
 }
 
 // MARK: - StubRedactor
