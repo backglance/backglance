@@ -33,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         startCapture()
         startAwayTracking()
         startInterface()
+        startRetention()
         // Setting a delegate neither requests authorization nor shows anything; it is
         // only how a tap on a banner we may never post finds its way back here.
         UNUserNotificationCenter.current().delegate = self
@@ -48,6 +49,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // best-effort posture as the engine below.
         if let awayTracker {
             Task { await awayTracker.flush() }
+        }
+        if let retention {
+            Task { await retention.stop() }
         }
 
         guard let engine else {
@@ -102,6 +106,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     /// The away model. The tracker is the state machine; the bridge is the only thing
     /// holding its OS observers, and both die with the app.
+    /// The prune loop. Retained for the same reason as the engine: a local would
+    /// deallocate it at the end of launch and nothing would ever expire.
+    private var retention: RetentionJob?
+
     private var awayTracker: AwaySessionTracker?
     private var awayBridge: AwayEventBridge?
     private var focusWatcher: FocusAssertionWatcher?
@@ -322,6 +330,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         awayBridge = bridge
         focusWatcher = focus
         presentationDetector = presentation
+    }
+
+    /// Starts the prune loop.
+    ///
+    /// Last of the four, and thirty seconds behind even that: it is the only subsystem
+    /// with no deadline, and the writer it wants during a pass is the one capture and the
+    /// popover are competing for at launch. Ordered after `startInterface()` so that a
+    /// build which somehow made a prune expensive shows a painted popover first and a slow
+    /// one second, rather than no popover at all.
+    ///
+    /// No archive means nothing to prune, which is the same reason `startInterface()`
+    /// gives up early.
+    private func startRetention() {
+        guard let archive else {
+            return
+        }
+        let job = RetentionJob(archive: archive)
+        retention = job
+        Task { await job.start() }
     }
 
     /// Builds the timeline and everything that shows it.

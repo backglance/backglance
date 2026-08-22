@@ -170,6 +170,8 @@ Global default is 30 days. The choice is meant to match what people expect from 
 
 `RetentionJob` is an actor in `BackglanceCore`. It runs once 30 seconds after launch (so the popover and capture come up first) and then every 6 hours while the app is running. It is also invoked directly when the user changes a policy to a shorter value, chooses "Never store" with "also delete existing", or picks "Run cleanup now" in settings.
 
+> ℹ️ **Note:** the sketch below is close to what shipped, with three differences. There is no `deleted_at` column, so the undo window is not "rows soft-deleted in the last 60 s" but an injected `protectedIDs` provider — the seam is there and tested, and manual delete (a later milestone) is what will populate it. `PRAGMA incremental_vacuum` is absent because `auto_vacuum` is not `INCREMENTAL` on this schema, which makes the pragma a no-op; the vacuum policy is [3.5's own task](../../TASKS.md). And the schedule is a `Schedule` value rather than two static constants, so a test can drive the loop without waiting six hours for the second pass.
+
 ```swift
 import Foundation
 import GRDB
@@ -286,7 +288,7 @@ Behaviour worth stating plainly:
 
 - **Pinned rows are exempt.** `is_pinned = 1` rows are never expired by age. Unpinning them makes them eligible on the next pass.
 - **Order of phases.** Hard delete first, then soft delete. A row that expires today is soft-deleted on this pass and hard-deleted on the next one (at most 6 hours later, or on the next launch). During that window it is invisible everywhere (timeline, search, digest, export, analytics all filter `is_deleted = 0`) but still on disk.
-- **The job never touches `apps.notification_count`.** That is a lifetime counter for analytics; it is not a "rows currently archived" count.
+- **`apps.notification_count` follows the prune.** An earlier version of this document called it a lifetime counter for analytics. It cannot be one: hard deletion is permanent, so nothing could recompute a lifetime total after the first pass, and `Archive.repairCounts()` has always defined the column as live rows (`is_deleted = 0`). It means "rows currently archived", the panes and the app filter show it as such, and a pass that changed anything calls `repairCounts()` — one `UPDATE` over a few hundred rows, cheaper to run than to reason about keeping incrementally correct across two delete phases.
 - **`never` does no work here.** Excluded apps never got rows inserted in the first place; if the app was excluded *after* it had notifications, the settings sheet offers to delete them, which is a soft delete followed by an immediate `runOnce()`.
 
 ### Soft Delete, Hard Delete, and Cascades
