@@ -116,6 +116,14 @@ public final class TimelineStore {
     /// ones actually being drawn get hydrated.
     public private(set) var searchItems: [Int64: TimelineItem] = [:]
 
+    /// The full window's multi-select: which rows are selected, and where a
+    /// ⇧-click range would start from. Window-only — the popover has a
+    /// single focused row and no multi-select (see
+    /// docs/features/ACTIONS.md#selection-model). The mutating operations,
+    /// and the host check that keeps this empty in the popover, live in
+    /// `TimelineStore+Selection`.
+    public internal(set) var selection = TimelineSelection()
+
     /// Compact or detailed rows, remembered per host.
     public var viewMode: TimelineViewMode = .compact {
         didSet {
@@ -154,6 +162,9 @@ public final class TimelineStore {
             guard oldValue != appFilter else {
                 return
             }
+            // A selection that survived a filter change would let ⌫ delete rows
+            // the user can no longer see — docs/features/ACTIONS.md#selection-model.
+            selection.clear()
             regroup()
         }
     }

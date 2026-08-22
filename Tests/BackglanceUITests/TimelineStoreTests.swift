@@ -183,6 +183,105 @@ final class TimelineStoreTests: XCTestCase {
         )
     }
 
+    // MARK: - Selection
+
+    /// The popover has a single focused row and no multi-select —
+    /// docs/features/ACTIONS.md#selection-model.
+    func testAPopoverStoreIgnoresEverySelectionOperation() async throws {
+        let archive = try XCTUnwrap(archive)
+        try seed(archive, count: 3)
+        let store = makeStore(archive: archive, host: .popover)
+        try await waitUntil { store.visibleItems.count == 3 }
+        let id = try XCTUnwrap(store.visibleItems.first?.id)
+
+        store.selectOnly(id)
+        store.toggleSelection(id)
+        store.extendSelection(to: id)
+        store.selectAllVisible()
+
+        XCTAssertEqual(store.selection.count, 0, "the popover never accumulates a multi-selection")
+        store.clearSelection() // must not crash on an already-empty selection
+    }
+
+    func testAWindowStoreHonoursSelectionOperations() async throws {
+        let archive = try XCTUnwrap(archive)
+        try seed(archive, count: 3)
+        let store = makeStore(archive: archive, host: .window)
+        try await waitUntil { store.visibleItems.count == 3 }
+        let ids = store.visibleItems.map(\.id)
+
+        store.selectOnly(ids[0])
+        XCTAssertEqual(store.selection.ids, [ids[0]])
+        XCTAssertEqual(store.selectedID, ids[0], "a plain click also moves the keyboard focus")
+
+        store.toggleSelection(ids[1])
+        XCTAssertEqual(store.selection.ids, [ids[0], ids[1]])
+        XCTAssertEqual(store.selectedID, ids[1])
+
+        store.selectAllVisible()
+        XCTAssertEqual(store.selection.ids, Set(ids))
+
+        store.clearSelection()
+        XCTAssertEqual(store.selection.count, 0)
+    }
+
+    /// Ranges resolve over `visibleItems` — "after filters, muted groups
+    /// collapsed" — not over every row the store happens to hold in memory.
+    func testExtendSelectionResolvesOverVisibleItemsOnly() async throws {
+        let archive = try XCTUnwrap(archive)
+        try seed(archive, count: 2)
+        try seed(archive, count: 3, startingAt: 50, bundleID: Stubs.BundleID.mail)
+        let store = makeStore(archive: archive, host: .window)
+        try await waitUntil { store.visibleItems.count == 5 }
+        store.appFilter = [Stubs.BundleID.mail]
+        let ids = store.visibleItems.map(\.id)
+        XCTAssertEqual(ids.count, 3, "the mail-only filter is the visible ordering the range must respect")
+
+        store.selectOnly(ids[0])
+        store.extendSelection(to: ids[2])
+
+        XCTAssertEqual(store.selection.ids, Set(ids), "the range covers exactly the filtered, visible rows")
+    }
+
+    /// A selection that survived a filter change would let ⌫ delete rows the
+    /// user can no longer see.
+    func testChangingTheAppFilterClearsTheSelection() async throws {
+        let archive = try XCTUnwrap(archive)
+        try seed(archive, count: 2)
+        try seed(archive, count: 3, startingAt: 50, bundleID: Stubs.BundleID.mail)
+        let store = makeStore(archive: archive, host: .window)
+        try await waitUntil { store.visibleItems.count == 5 }
+        store.selectAllVisible()
+        XCTAssertEqual(store.selection.count, 5)
+
+        store.appFilter = [Stubs.BundleID.mail]
+
+        XCTAssertEqual(store.selection.count, 0)
+        XCTAssertNil(store.selection.anchor)
+    }
+
+    /// The action layer calls one property for both hosts: with nothing
+    /// multi-selected, the focused row is the target of ⌘C or ⌫.
+    func testSelectedIDsInVisibleOrderFallsBackToSelectedIDWhenTheMultiSelectionIsEmpty() async throws {
+        let archive = try XCTUnwrap(archive)
+        try seed(archive, count: 3)
+        let store = makeStore(archive: archive, host: .window)
+        try await waitUntil { store.visibleItems.count == 3 }
+        let id = try XCTUnwrap(store.visibleItems.first?.id)
+
+        XCTAssertEqual(store.selectedIDsInVisibleOrder, [], "nothing focused and nothing selected")
+
+        store.selectedID = id
+        XCTAssertEqual(store.selectedIDsInVisibleOrder, [id])
+
+        store.selectAllVisible()
+        XCTAssertEqual(
+            Set(store.selectedIDsInVisibleOrder),
+            Set(store.visibleItems.map(\.id)),
+            "once there is a real multi-selection it wins over the single focused row"
+        )
+    }
+
     // MARK: Private
 
     private var archive: Archive?
@@ -192,8 +291,12 @@ final class TimelineStoreTests: XCTestCase {
     /// A store held by the test case, so the subscription is not cancelled by
     /// `deinit` the moment the local goes out of scope.
     @discardableResult
-    private func makeStore(archive: Archive, defaults: UserDefaults? = nil) -> TimelineStore {
-        let store = TimelineStore(archive: archive, defaults: defaults ?? makeDefaults() ?? .standard)
+    private func makeStore(
+        archive: Archive,
+        host: TimelineStore.Host = .popover,
+        defaults: UserDefaults? = nil
+    ) -> TimelineStore {
+        let store = TimelineStore(archive: archive, host: host, defaults: defaults ?? makeDefaults() ?? .standard)
         self.store = store
         return store
     }
