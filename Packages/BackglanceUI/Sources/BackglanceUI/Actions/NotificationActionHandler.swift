@@ -21,10 +21,12 @@ import Observation
 /// BACKGLANCE-196 delivered the coordinator skeleton: the type, its dependencies,
 /// the shared ``fetch(_:)`` helper every action reads through, and the
 /// ``ActionDispatching`` seam view code reaches it by. Open (BACKGLANCE-197), Copy
-/// (BACKGLANCE-198), Delete/Undo (BACKGLANCE-199), Pin/Read (BACKGLANCE-200) and
-/// System Settings (BACKGLANCE-201) have landed on top of it; Export is still a
-/// separate follow-up task — see docs/features/ACTIONS.md#notificationactionhandler
-/// for the full shape this class grows into.
+/// (BACKGLANCE-198), Delete/Undo (BACKGLANCE-199), Pin/Read (BACKGLANCE-200),
+/// System Settings (BACKGLANCE-201) and Export (BACKGLANCE-204) have landed on top
+/// of it. Every action in docs/features/ACTIONS.md's context menu has now shipped
+/// except Mute (item 8), which waits on the `RulesEngine` Phase 4.2 introduces —
+/// see docs/features/ACTIONS.md#notificationactionhandler for the full shape this
+/// class grows into.
 ///
 /// `@MainActor` because `NSWorkspace` and `NSPasteboard` (used by the actions layered
 /// on top) are main-thread APIs, and because the view layer that calls this is
@@ -62,18 +64,33 @@ public final class NotificationActionHandler: ActionDispatching {
     ///     through — see ``UndoClock``. Defaults to ``SystemUndoClock``, the real
     ///     clock; tests pass one that resolves only when told to, so an expiry
     ///     assertion never costs the suite five real seconds.
+    ///   - exportService: what ``exportSelection(_:format:)`` streams rows through. `nil`
+    ///     (the default) builds an ``ExportService`` from `archive` — the same archive this
+    ///     handler already holds — rather than a fixed default value in the signature, since a
+    ///     default parameter cannot read another parameter to construct itself. Tests pass an
+    ///     ``ExportService`` built over their own `Archive(inMemory: true)` only when they need
+    ///     to point it at a different archive than `archive`; most tests just let this default.
+    ///   - savePanel: the seam ``exportSelection(_:format:)`` reaches `NSSavePanel` through — see
+    ///     ``SavePanelPresenting``. Defaults to ``NSSavePanelPresenter``, the real conformance;
+    ///     tests pass a fake that records the suggested name/format and returns a scripted
+    ///     `URL?`, so a cancelled or confirmed panel can be asserted without a modal window ever
+    ///     opening.
     public init(
         archive: Archive,
         triage: any TriageEvaluating = NoTriage(),
         workspace: any AppLaunching = NSWorkspaceAppLauncher(),
         pasteboard: any PasteboardWriting = NSPasteboard.general,
-        undoClock: any UndoClock = SystemUndoClock()
+        undoClock: any UndoClock = SystemUndoClock(),
+        exportService: ExportService? = nil,
+        savePanel: any SavePanelPresenting = NSSavePanelPresenter()
     ) {
         self.archive = archive
         self.triage = triage
         self.workspace = workspace
         self.pasteboard = pasteboard
         self.undoClock = undoClock
+        self.exportService = exportService ?? ExportService(archive: archive)
+        self.savePanel = savePanel
     }
 
     // MARK: Public
@@ -280,6 +297,42 @@ public final class NotificationActionHandler: ActionDispatching {
         try SystemSettingsLink(workspace: workspace).open(bundleID: bundleID)
     }
 
+    /// Item 10 of the context menu ("Export Selection…") — see
+    /// docs/features/ACTIONS.md#select-and-export. Runs the save panel first and, only if the
+    /// user confirms a destination, streams `ids` through ``ExportService``.
+    ///
+    /// Nothing is written until the panel returns a URL: a cancelled panel — ``savePanel``
+    /// returning `nil` — is not an error, per docs/features/ACTIONS.md's edge-case table ("Export
+    /// cancelled in the save panel"), so this returns silently rather than throwing. The same is
+    /// true one step later: `ExportService.export` can itself throw ``ExportError/cancelled`` if
+    /// the calling `Task` is cancelled mid-write, which is the same "the user did not get a file"
+    /// outcome as declining the panel in the first place, not a failure to surface.
+    ///
+    /// - Throws: ``ActionError/exportFailed(reason:)`` for every other ``ExportError`` —
+    ///   `.invalidRange` cannot actually occur here (``ExportRequest/selection(_:format:)``
+    ///   always builds a valid `distantPast..<distantFuture` range), so in practice this is
+    ///   `.io(_:)`: an unwritable destination or a disk that filled mid-export.
+    public func exportSelection(_ ids: [Int64], format: ExportFormat) async throws {
+        let suggestedName = ExportSheet.defaultFilename(for: format)
+        guard let url = savePanel.runModal(suggestedName: suggestedName, format: format) else {
+            return
+        }
+        do {
+            _ = try await exportService.export(.selection(ids, format: format), to: url)
+        } catch ExportError.cancelled {
+            return
+        } catch {
+            // 🔒 `error.localizedDescription`, not `ArchiveError.detail(from:)`: this catches
+            // `ExportError`, whose `errorDescription` is built entirely from fixed sentences, day
+            // counts and `FileManager`/`FileHandle` messages (see `ExportService.ioMessage(for:)`
+            // in BackglanceCore) — never from a notification's own fields — so it is already safe
+            // to both log and surface to the sheet verbatim.
+            let reason = error.localizedDescription
+            Log.ui.error("export failed for \(ids.count) id(s), format \(format.rawValue): \(reason)")
+            throw ActionError.exportFailed(reason: reason)
+        }
+    }
+
     // MARK: Internal
 
     /// Whether the context menu's "Open Link" item should appear at all — a
@@ -361,6 +414,8 @@ public final class NotificationActionHandler: ActionDispatching {
     private let workspace: any AppLaunching
     private let pasteboard: any PasteboardWriting
     private let undoClock: any UndoClock
+    private let exportService: ExportService
+    private let savePanel: any SavePanelPresenting
 
     /// The task counting down the current undo toast, if one is showing.
     /// `@ObservationIgnored` because a view has no business redrawing when this is

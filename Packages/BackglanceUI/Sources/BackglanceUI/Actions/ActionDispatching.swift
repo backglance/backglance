@@ -1,3 +1,4 @@
+import BackglanceCore
 import SwiftUI
 
 // MARK: - ActionDispatching
@@ -17,10 +18,11 @@ import SwiftUI
 /// `Archive`, its shared `fetch` helper, and this seam, with no requirements yet.
 /// Open (BACKGLANCE-197) was the first action to land on top of it; Copy
 /// (BACKGLANCE-198) was the second; Delete/Undo (BACKGLANCE-199) was the third;
-/// Pin/Read (BACKGLANCE-200) was the fourth; System Settings (BACKGLANCE-201) is the
-/// fifth. Export is still a separate follow-up task, adding its own method here as it
-/// ships, rather than this task guessing a signature for work that has not been
-/// designed yet.
+/// Pin/Read (BACKGLANCE-200) was the fourth; System Settings (BACKGLANCE-201) was
+/// the fifth; Export (BACKGLANCE-204) is the sixth, added below. Every action in
+/// docs/features/ACTIONS.md's context menu has now shipped except Mute (item 8),
+/// which waits on the `RulesEngine` Phase 4.2 introduces and will add its own
+/// method here the same way each of these did.
 ///
 /// See docs/features/ACTIONS.md#notificationactionhandler.
 @MainActor
@@ -87,6 +89,15 @@ public protocol ActionDispatching: AnyObject {
     /// itself synchronous, unlike ``openNotification(id:)``'s app-activation
     /// fallback.
     func openNotificationSettings(bundleID: String) throws
+
+    /// Item 10 of the context menu ("Export Selection…") — see
+    /// docs/features/ACTIONS.md#select-and-export. `ids` acts on the whole selection, like
+    /// ``copy(ids:includeAppAndTimestamp:)``, ``delete(ids:)``, ``setPinned(ids:_:)`` and
+    /// ``setRead(ids:_:)`` — never on just the right-clicked row. `async` because it runs the
+    /// save panel and then `ExportService.export`, itself `async`; `throws` only for a failure
+    /// after the user confirmed a destination — cancelling the panel returns silently, per
+    /// docs/features/ACTIONS.md's edge-case table, never an ``ActionError``.
+    func exportSelection(_ ids: [Int64], format: ExportFormat) async throws
 }
 
 // MARK: - ActionDispatcherKey
