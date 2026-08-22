@@ -387,7 +387,7 @@ public extension Archive {
 
 v1.0 ships the *selection* subset of export: select rows in the full window (⌘-click / ⇧-click / ⌘A over the visible filter), then **Export Selection…** (⌘E). The `ExportSheet` asks for CSV or JSON, then an `NSSavePanel` picks the destination; the default filename is `Backglance-export-2026-08-17.csv`. Date-range export, `backglance://export?…` and the Shortcuts action are v1.x and documented in [EXPORT_AUTOMATION.md](./EXPORT_AUTOMATION.md).
 
-Export columns (CSV header, same keys in JSON): `uuid, app_bundle_id, app_name, title, subtitle, body, sender, delivered_at (ISO 8601 local), presented, is_read, is_pinned, redaction, deep_link`. Redacted bodies export the placeholder. Attachments export as metadata only, never bytes.
+Export columns (CSV header, same keys in JSON): `uuid, app_bundle_id, app_name, title, subtitle, body, sender, delivered_at (ISO 8601 local), presented, missed, redacted, deep_link, attachments`. Redacted bodies export the placeholder. Attachments export as metadata only, never bytes.
 
 ```swift
 @MainActor
