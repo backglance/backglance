@@ -23,6 +23,14 @@ import UserNotifications
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     // MARK: Internal
 
+    /// Internal rather than private: the onboarding wiring lives in
+    /// `AppDelegate+Onboarding.swift`, and `private` does not reach across files even within
+    /// one type. Each is retained for the app's lifetime for the reason below.
+    var engine: CaptureEngine?
+    var monitor: FullDiskAccessMonitor?
+    var onboarding: OnboardingWindowController?
+    var activationObserver: (any NSObjectProtocol)?
+
     func applicationDidFinishLaunching(_: Notification) {
         // LSUIElement already does this at launch. Setting it again is what keeps the app
         // an agent if it is ever launched in a way that bypasses the Info.plist key, and
@@ -40,6 +48,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // about when a *pass* runs, not about when this method is called.
         startRetention()
         startInterface()
+        // Last, and after the interface: setup's last screen ends with "Backglance lives in
+        // your menu bar", which wants a menu bar item already there to look at.
+        startOnboardingIfNeeded()
         // Setting a delegate neither requests authorization nor shows anything; it is
         // only how a tap on a banner we may never post finds its way back here.
         UNUserNotificationCenter.current().delegate = self
@@ -108,7 +119,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     /// both at the end of launch and capture would silently never run.
     private var archive: Archive?
     private var watcher: StoreWatcher?
-    private var engine: CaptureEngine?
 
     /// The away model. The tracker is the state machine; the bridge is the only thing
     /// holding its OS observers, and both die with the app.
