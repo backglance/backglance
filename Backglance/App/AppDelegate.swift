@@ -43,6 +43,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         logger.notice("Backglance launched as an agent app")
 
         startCapture()
+        // Before startAwayTracking(): the recorder's digest build and the timeline both
+        // triage through this one instance, so it has to exist before the first thing that
+        // hands it out does.
+        startRules()
         startAwayTracking()
         // Before startInterface(): the settings window built there needs a `RetentionJob`
         // reference for the Retention pane's "Run cleanup now" button. Moving this call
@@ -124,6 +128,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var archive: Archive?
     private var watcher: StoreWatcher?
 
+    /// One instance for the whole app, built right after `archive` and started before
+    /// anything that needs to triage a row hands it out — see `startRules()`. Never one
+    /// engine per surface: the popover and the window would otherwise be able to disagree
+    /// about a rule, and the triage cache would be duplicated instead of shared.
+    private var rulesEngine: RulesEngine?
+
     /// The away model. The tracker is the state machine; the bridge is the only thing
     /// holding its OS observers, and both die with the app.
     /// The prune loop. Retained for the same reason as the engine: a local would
@@ -145,6 +155,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var statusItem: StatusItemController?
     private var hotKeys: HotKeyCenter?
     private var window: TimelineWindowController?
+
+    /// `rulesEngine`, or ``NoTriage`` when it has not been built — which only happens when
+    /// `startCapture()` itself found no archive, the same state every `guard let archive`
+    /// below already treats as "nothing to build". Every triage-consuming type default-
+    /// initializes to `NoTriage()` on its own, so this exists only to give every call site
+    /// below the same one instance instead of each falling back to its own separate no-op.
+    private var triage: any TriageEvaluating {
+        if let rulesEngine {
+            return rulesEngine
+        }
+        return NoTriage()
+    }
 
     /// The Digest pane's model, and the only place in Backglance that can cause a
     /// permission prompt — and only when the user switches banners on.
@@ -270,6 +292,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         Task { await engine.start() }
     }
 
+    /// Builds the app's one `RulesEngine` and starts its observation.
+    ///
+    /// Ordered after `startCapture()`, for the same reason every other `start…()` method
+    /// here is: no archive means nothing to compile rules against or mute an app in. Ordered
+    /// before `startAwayTracking()` and `startInterface()`, which is the part that actually
+    /// matters — both hand this instance out (`AwaySessionRecorder`'s digest build,
+    /// `TimelineStore`'s `regroup()`), and a `nil` engine there would silently fall back to
+    /// `NoTriage`, leaving every rule with no visible effect until the next launch.
+    ///
+    /// `start()` only subscribes; the first snapshot is not required to have landed by the
+    /// time this method returns. Until it does, `evaluate(_:)` answers `Triage.none` for
+    /// every row — the same "no rules yet" state a fresh install with zero rules is in
+    /// anyway, so there is nothing to wait for here.
+    private func startRules() {
+        guard let archive else {
+            return
+        }
+        let engine = RulesEngine(archive: archive)
+        engine.start()
+        rulesEngine = engine
+    }
+
     /// Starts watching for the user going away, and writes finished sessions down.
     ///
     /// Ordered after `startCapture()` because it needs the archive that opened there — no
@@ -302,7 +346,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // holding, and a 500-record batch is not a wait the menu bar should take.
         // Recording, linking and building live in `BackglanceCore` so the whole chain can
         // be driven by a test; this closure only decides what the *app* does afterwards.
-        let recorder = AwaySessionRecorder(archive: archive)
+        let recorder = AwaySessionRecorder(archive: archive, triage: triage)
         let tracker = AwaySessionTracker(minDuration: DigestThreshold.minDuration()) { [weak self] ended in
             guard let outcome = recorder.record(ended), let digest = outcome.digest else {
                 return
@@ -388,7 +432,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return
         }
 
-        let store = TimelineStore(archive: archive, host: .popover)
+        let store = TimelineStore(archive: archive, triage: triage, host: .popover)
         let banners = makeBannerModel()
         self.banners = banners
         let window = TimelineWindowController(store: store, banners: banners)
