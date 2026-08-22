@@ -1,4 +1,4 @@
-// swift-tools-version: 5.10
+// swift-tools-version: 6.0
 import PackageDescription
 
 let package = Package(
@@ -18,6 +18,7 @@ let package = Package(
                 .product(name: "GRDB", package: "GRDB.swift"),
             ],
             swiftSettings: [
+                .swiftLanguageMode(.v5), // tools-version 6.0 would otherwise default to language mode 6
                 .enableUpcomingFeature("StrictConcurrency"), // warning-clean under Swift 6 toolchain
             ]
         ),
@@ -29,7 +30,10 @@ let package = Package(
             // BackglanceTestSupport's `Fixtures`, not copied into the test bundle: the
             // same sources are compiled by the Xcode test target, which gets no
             // `Bundle.module`. The symlink is excluded so SwiftPM does not warn about it.
-            exclude: ["SharedFixtures"]
+            exclude: ["SharedFixtures"],
+            swiftSettings: [
+                .swiftLanguageMode(.v5),
+            ]
         ),
     ]
 )

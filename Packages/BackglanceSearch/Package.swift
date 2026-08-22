@@ -1,4 +1,4 @@
-// swift-tools-version: 5.10
+// swift-tools-version: 6.0
 import PackageDescription
 
 let package = Package(
@@ -20,6 +20,7 @@ let package = Package(
                 .product(name: "GRDB", package: "GRDB.swift"),
             ],
             swiftSettings: [
+                .swiftLanguageMode(.v5),
                 .enableUpcomingFeature("StrictConcurrency"),
             ],
             linkerSettings: [
@@ -30,7 +31,10 @@ let package = Package(
         .testTarget(
             name: "BackglanceSearchTests",
             dependencies: ["BackglanceSearch", "BackglanceTestSupport"],
-            path: "Tests/BackglanceSearchTests"
+            path: "Tests/BackglanceSearchTests",
+            swiftSettings: [
+                .swiftLanguageMode(.v5),
+            ]
         ),
     ]
 )

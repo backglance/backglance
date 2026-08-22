@@ -37,7 +37,7 @@ This document explains what Backglance is built with and, more importantly, why.
 
 | Layer | Choice | One-line reason |
 |---|---|---|
-| Language | Swift 5.10+ (language mode 5, Swift 6 toolchain warning-clean as a goal) | Native, first-class on macOS, `Sendable`/actors for the capture pipeline |
+| Language | Swift 5.10+ (language mode 5, Swift 6 toolchain warning-clean as a goal; manifests are tools-version 6.0) | Native, first-class on macOS, `Sendable`/actors for the capture pipeline |
 | UI | SwiftUI for timeline / settings / onboarding / digest; AppKit for `NSStatusItem`, `NSPopover`, global hotkey, windows | SwiftUI is productive for content views; AppKit is still the only reliable way to own a menu bar item |
 | Persistence | GRDB.swift 7.x over the system SQLite | Real SQL, FTS5, migrations, `ValueObservation`, no ORM opacity |
 | Full-text search | SQLite FTS5 (external-content table) | Ships in the OS, sub-50 ms at 100k rows, prefix indexes, BM25 |
@@ -111,7 +111,7 @@ SwiftData is a Core Data wrapper with a nicer surface, and its minimum for macOS
 
 - **`DatabasePool` for the archive** — WAL mode, many concurrent readers, one serialized writer. The capture loop writes in batches; the UI reads through `ValueObservation`, which re-runs a query only when the tables it touched change.
 - **`DatabaseQueue` (read-only) for store snapshots** — one queue per copied snapshot, opened with `readonly = true` and `immutable=1`, discarded after the batch. Apple's live file is never opened for write. See [ARCHITECTURE.md](./ARCHITECTURE.md#watch-strategy-poll--dispatchsource--snapshot).
-- **`DatabaseMigrator`** — migrations `v1_initial`, `v1_fts`, `v2_embeddings`, then the v1.x ones (`v3_saved_searches`, `v4_snoozes`, `v5_sync_metadata`) in `ArchiveMigrations.swift`, with `eraseDatabaseOnSchemaChange = true` only in DEBUG.
+- **`DatabaseMigrator`** — migrations `v1_initial`, `v1_fts`, `v2_embeddings`, `v3_match_keys`, then the v1.x ones (`v4_saved_searches`, `v5_snoozes`, `v6_sync_metadata`) in `ArchiveMigrations.swift`, with `eraseDatabaseOnSchemaChange = true` only in DEBUG.
 - **Record protocols** — models are `Codable, FetchableRecord, PersistableRecord`; no code generation, no `.xcdatamodeld`.
 - **System SQLite** — GRDB links the SQLite that ships with macOS (FTS5, JSON1 and R*Tree are all compiled in on macOS 14+), so there is no bundled SQLite to keep patched. The optional v1.x SQLCipher build (`GRDB.swift/SQLCipher`) swaps in an encrypted SQLite behind the same API.
 
@@ -339,7 +339,8 @@ For a utility that lives in the menu bar all day, idle footprint is the product.
 
 | Component | Minimum | Recommended / documented against | Notes |
 |---|---|---|---|
-| Swift language | 5.10 (language mode 5) | Swift 6.2 toolchain (Xcode 26.x), language mode 5 | Warning-clean with `-strict-concurrency=complete`; language mode 6 planned for v1.x |
+| Swift language | Language mode 5, pinned per target with `.swiftLanguageMode(.v5)` | Swift 6.2 toolchain (Xcode 26.x) | Warning-clean with `-strict-concurrency=complete`; language mode 6 planned for v1.x |
+| Package manifests | `swift-tools-version: 6.0` | SwiftPM 6.0+ (Xcode 16+) | Not a language-mode change: 6.0 is the first tools-version that can express `BackglanceCoreTests` depending on `BackglanceTestSupport`, which depends back on `BackglanceCore`. Under 5.10 SwiftPM refused the manifest as a cycle and `swift build --package-path Packages/BackglanceCore` did not work at all. Every target pins `.swiftLanguageMode(.v5)` so the tools-version bump changes nothing else. |
 | Xcode | 16.2 | 26.2 | GRDB 7 requires the Swift 6 compiler (Xcode 16+); Xcode 26 needed for macOS 26 SDK features and the `macos-26` runner |
 | macOS SDK | 15.x (Xcode 16.2) | 26.x | Deployment target stays 14.0 regardless of SDK |
 | macOS deployment target | 14.0 (Sonoma) | — | `SMAppService`, `@Observable`, `MenuBarExtra` fixes, SwiftData baseline all need 14 |
@@ -392,7 +393,7 @@ Each package under `Packages/` is a standalone SPM package so it can be built an
 `Packages/BackglanceCore/Package.swift`:
 
 ```swift
-// swift-tools-version: 5.10
+// swift-tools-version: 6.0
 import PackageDescription
 
 let package = Package(
@@ -426,7 +427,7 @@ let package = Package(
 `Packages/BackglanceCapture/Package.swift`:
 
 ```swift
-// swift-tools-version: 5.10
+// swift-tools-version: 6.0
 import PackageDescription
 
 let package = Package(
@@ -468,7 +469,7 @@ let package = Package(
 `Packages/BackglanceSearch/Package.swift`:
 
 ```swift
-// swift-tools-version: 5.10
+// swift-tools-version: 6.0
 import PackageDescription
 
 let package = Package(

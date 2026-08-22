@@ -1,4 +1,4 @@
-// swift-tools-version: 5.10
+// swift-tools-version: 6.0
 import PackageDescription
 
 /// Test-only helpers shared by all four test bundles.
@@ -23,6 +23,7 @@ let package = Package(
             name: "BackglanceTestSupport",
             dependencies: ["BackglanceCore"],
             swiftSettings: [
+                .swiftLanguageMode(.v5),
                 .enableUpcomingFeature("StrictConcurrency"),
             ]
         ),

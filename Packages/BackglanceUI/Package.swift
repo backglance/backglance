@@ -1,4 +1,4 @@
-// swift-tools-version: 5.10
+// swift-tools-version: 6.0
 import PackageDescription
 
 /// SwiftUI views shared by the popover, the timeline window and (v1.x) the widgets.
@@ -23,13 +23,17 @@ let package = Package(
                 "BackglanceCore",
             ],
             swiftSettings: [
+                .swiftLanguageMode(.v5),
                 .enableUpcomingFeature("StrictConcurrency"),
             ]
         ),
         .testTarget(
             name: "BackglanceUITests",
             dependencies: ["BackglanceUI", "BackglanceCore", "BackglanceTestSupport"],
-            path: "Tests/BackglanceUITests"
+            path: "Tests/BackglanceUITests",
+            swiftSettings: [
+                .swiftLanguageMode(.v5),
+            ]
         ),
     ]
 )
