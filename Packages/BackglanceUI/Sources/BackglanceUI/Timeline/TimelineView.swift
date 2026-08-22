@@ -100,6 +100,18 @@ public struct TimelineView: View {
     /// so scrolling a muted row off screen and back does not re-collapse it.
     @State private var expandedMutedDays: Set<Date> = []
 
+    /// The most recent context-menu dispatch failure a row reported through
+    /// `onActionError`, if any is still worth showing.
+    ///
+    /// BACKGLANCE-203 part 2: this is where the inline error message
+    /// (docs/features/ACTIONS.md's error table — "Couldn't open ‹App›",
+    /// "Export failed: …", and so on) gets presented. Nothing reads this
+    /// property yet; it exists now so `NotificationRow`'s `onActionError`
+    /// closure has somewhere real to write to rather than a `_ = error`
+    /// thrown away, and so part 2 can wire the presentation without also
+    /// having to thread a new closure back down through `TimelineSectionSlots`.
+    @State private var actionError: ActionError?
+
     private var timeline: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -110,10 +122,18 @@ public struct TimelineView: View {
                                 section: section,
                                 mode: store.viewMode,
                                 isMutedExpanded: expandedMutedDays.contains(section.id),
+                                selectionIDs: store.selectedIDsInVisibleOrder,
+                                host: store.host,
                                 onToggleMuted: { toggleMuted(section.id) },
                                 onOpen: { store.open($0) },
                                 onRowAppear: { store.rowBecameVisible($0) },
-                                onRowDisappear: { store.rowBecameHidden($0) }
+                                onRowDisappear: { store.rowBecameHidden($0) },
+                                onToggleSelect: { store.toggleSelection($0) },
+                                onExtendSelect: { store.extendSelection(to: $0) },
+                                // BACKGLANCE-203 part 2 presents `ExportSheet` here and
+                                // calls `exportSelection(_:format:)` with the chosen format.
+                                onRequestExport: { _ in },
+                                onActionError: { actionError = $0 }
                             )
                         } header: {
                             DayHeader(title: section.title)
@@ -171,10 +191,21 @@ private struct TimelineSectionSlots: View {
     let section: TimelineSection.Model
     let mode: TimelineViewMode
     let isMutedExpanded: Bool
+
+    /// Passed straight through to every `NotificationRow` in this section —
+    /// see `NotificationRow`'s own doc comment for why it takes these as
+    /// plain values instead of reaching for `TimelineStore` itself.
+    let selectionIDs: [Int64]
+    let host: TimelineStore.Host
+
     let onToggleMuted: () -> Void
     let onOpen: (Int64) -> Void
     let onRowAppear: (Int64) -> Void
     let onRowDisappear: (Int64) -> Void
+    let onToggleSelect: (Int64) -> Void
+    let onExtendSelect: (Int64) -> Void
+    let onRequestExport: ([Int64]) -> Void
+    let onActionError: (ActionError) -> Void
 
     var body: some View {
         Group {
@@ -205,10 +236,20 @@ private struct TimelineSectionSlots: View {
     // MARK: Private
 
     private func row(for item: TimelineItem) -> some View {
-        NotificationRow(item: item, mode: mode, onOpen: onOpen)
-            .id(item.id)
-            .onAppear { onRowAppear(item.id) }
-            .onDisappear { onRowDisappear(item.id) }
+        NotificationRow(
+            item: item,
+            mode: mode,
+            onOpen: onOpen,
+            selectionIDs: selectionIDs,
+            host: host,
+            onToggleSelect: onToggleSelect,
+            onExtendSelect: onExtendSelect,
+            onRequestExport: onRequestExport,
+            onActionError: onActionError
+        )
+        .id(item.id)
+        .onAppear { onRowAppear(item.id) }
+        .onDisappear { onRowDisappear(item.id) }
     }
 }
 
@@ -239,10 +280,16 @@ private struct PageLoadingSentinel: View {
                         section: section,
                         mode: .compact,
                         isMutedExpanded: true,
+                        selectionIDs: [],
+                        host: .popover,
                         onToggleMuted: {},
                         onOpen: { _ in },
                         onRowAppear: { _ in },
-                        onRowDisappear: { _ in }
+                        onRowDisappear: { _ in },
+                        onToggleSelect: { _ in },
+                        onExtendSelect: { _ in },
+                        onRequestExport: { _ in },
+                        onActionError: { _ in }
                     )
                 } header: {
                     DayHeader(title: section.title)
