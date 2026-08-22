@@ -120,7 +120,7 @@ Unified logging is the primary sink, but users cannot easily hand you a `log sho
 
 | Property | Value |
 |---|---|
-| Path | `~/Library/Logs/Backglance/backglance.log` |
+| Path | `~/Library/Logs/Backglance/backglance.log`, or `$BACKGLANCE_LOG_DIR/backglance.log` |
 | Rotation | 5 files × 2 MB (`backglance.log`, `backglance.1.log` … `backglance.4.log`); oldest deleted |
 | Default level | `notice` and above |
 | Override | Environment variable `BACKGLANCE_LOG_LEVEL` = `debug` \| `info` \| `notice` \| `error` \| `fault` |
@@ -140,6 +140,20 @@ launchctl unsetenv BACKGLANCE_LOG_LEVEL
 ```
 
 The file sink receives the same *already-formatted* messages as `os.Logger`, and it never sees `.private` values (they are formatted as `<private>` before reaching the sink). The `FileLogSink` is fed from the `RedactingLogger` described next, so there is only one place where log strings are assembled.
+
+Two details worth stating, because both are easy to get backwards:
+
+- **Rotation happens before a write, not after.** Rotating after the write that crossed the
+  limit leaves the directory holding only numbered files until the next message arrives — a
+  confusing thing to hand someone who has just been asked to send you `backglance.log`. Checking
+  the size first means a live file always exists once anything has been logged.
+- **Nothing is created until the first message above the threshold.** A quiet Backglance leaves
+  no file at all, and building the shared sink does not touch the disk.
+
+`BACKGLANCE_LOG_DIR` moves the directory. It exists for the test plan, which sets it so a test
+run does not append to the log of whoever is running it — a suite that writes into the
+developer's own support directory makes their diagnostics export meaningless. It is honoured in
+release builds too, and safely: it changes *where* lines are written, never what may be written.
 
 ## RedactingLogger: Content Cannot Reach a Log Call
 

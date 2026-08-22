@@ -5,16 +5,17 @@ import os
 
 /// Somewhere a log line goes besides the unified log.
 ///
-/// Users cannot easily hand anyone a `log show` dump, so Backglance keeps a small
-/// plain-text file log as well. That file and its rotation arrive with the diagnostics
-/// export; until then this protocol is the seam, and the default sink drops everything —
-/// which is the honest state rather than a half-written file.
+/// Users cannot easily hand anyone a `log show` dump, so Backglance keeps a small plain-text
+/// file log as well — ``FileLogSink``, which is what every logger uses by default. The
+/// protocol stays because a test wants its own destination, and because the diagnostics
+/// export reads the same lines from somewhere it controls.
 public protocol LogSink: Sendable {
     func write(level: OSLogType, category: String, message: String)
 }
 
 // MARK: - NoLogSink
 
+/// Drops everything. For previews and for tests that only care that a call type-checks.
 public struct NoLogSink: LogSink {
     // MARK: Lifecycle
 
@@ -43,7 +44,11 @@ public struct NoLogSink: LogSink {
 public struct RedactingLogger: Sendable {
     // MARK: Lifecycle
 
-    public init(category: String, sink: any LogSink = NoLogSink()) {
+    /// - Parameters:
+    ///   - category: the `os.Logger` category, and the third field of each file-log line.
+    ///   - sink: where lines go besides the unified log. Defaults to the app's rotating file
+    ///     log, which is the copy a user can actually find and send.
+    public init(category: String, sink: any LogSink = FileLogSink.shared) {
         self.category = category
         self.sink = sink
         logger = Logger(subsystem: Log.subsystem, category: category)
