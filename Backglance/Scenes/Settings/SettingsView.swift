@@ -5,18 +5,15 @@ import SwiftUI
 
 /// Settings, as far as this milestone has settings.
 ///
-/// Five sections today. Search, because semantic indexing is the first thing
-/// the app does that needs the user's permission in the plain sense: it reads
-/// every notification they have ever received and writes a vector for each one.
-/// Digest, which owns the app's only permission prompt — switching banners on is
-/// what asks for Notifications authorization, and nothing else in Backglance
-/// asks for anything. One-time code redaction, which is on before the user
-/// gets here and so has to be findable. Retention, which decides how long a
-/// notification survives at all. And excluded apps, which is the one control
-/// that removes a notification before it is ever stored. The rest of the
-/// privacy controls join them in a Privacy pane in the same milestone, at
-/// which point this becomes a `TabView`
-/// (docs/getting-started/DEVELOPMENT_GUIDE.md#backglanceui).
+/// Two tabs. General holds Search — semantic indexing is the first thing the app
+/// does that needs the user's permission in the plain sense, since it reads every
+/// notification they have ever received and writes a vector for each one — and
+/// Digest, which owns the app's only permission prompt. Privacy holds everything
+/// that decides what Backglance keeps, assembled by `PrivacySettingsView`
+/// (docs/features/PRIVACY_CONTROLS.md#ui-components).
+///
+/// The split is the one the docs called for once the Privacy pane existed. General
+/// gains its own controls — launch at login, the hotkey, updates — in Phase 4.3.
 struct SettingsView: View {
     // MARK: Internal
 
@@ -24,13 +21,41 @@ struct SettingsView: View {
 
     let digest: DigestSettingsModel
 
-    let redaction: CodeRedactionSettingsModel
-
-    let retention: RetentionSettingsModel
-
-    let exclusions: ExcludedAppsSettingsModel
+    let privacy: PrivacySettingsModel
 
     var body: some View {
+        TabView {
+            general
+                .tabItem { Label(String(localized: "General"), systemImage: "gearshape") }
+                .accessibilityIdentifier("settings.tab.general")
+
+            PrivacySettingsView(model: privacy)
+                .tabItem { Label(String(localized: "Privacy"), systemImage: "hand.raised") }
+                .accessibilityIdentifier("settings.tab.privacy")
+        }
+        .frame(minWidth: 480, minHeight: 420)
+    }
+
+    // MARK: Private
+
+    /// The honest version, not the marketing one: what it does, what it costs,
+    /// and what it cannot do (docs/features/SEARCH.md#what-semantic-search-cannot-do).
+    private var explanation: String {
+        guard search.isSemanticAvailable else {
+            return String(localized: """
+            The on-device English sentence model isn't available on this Mac. \
+            Semantic search is off; full-text search still works.
+            """)
+        }
+        return String(localized: """
+        Finds notifications by meaning as well as by wording — "the message about the invoice" \
+        rather than the exact words. Everything is computed on this Mac and stored in your archive, \
+        about 2 KB per notification. The model is English, so other languages fall back to \
+        full-text search.
+        """)
+    }
+
+    private var general: some View {
         Form {
             Section {
                 Toggle(String(localized: "Semantic search"), isOn: $search.semanticEnabled)
@@ -54,34 +79,8 @@ struct SettingsView: View {
             }
 
             DigestSettingsView(model: digest)
-
-            CodeRedactionSettingsView(model: redaction)
-
-            RetentionSettingsView(model: retention)
-
-            ExcludedAppsSettingsView(model: exclusions)
         }
         .formStyle(.grouped)
-        .frame(minWidth: 460, minHeight: 260)
-    }
-
-    // MARK: Private
-
-    /// The honest version, not the marketing one: what it does, what it costs,
-    /// and what it cannot do (docs/features/SEARCH.md#what-semantic-search-cannot-do).
-    private var explanation: String {
-        guard search.isSemanticAvailable else {
-            return String(localized: """
-            The on-device English sentence model isn't available on this Mac. \
-            Semantic search is off; full-text search still works.
-            """)
-        }
-        return String(localized: """
-        Finds notifications by meaning as well as by wording — "the message about the invoice" \
-        rather than the exact words. Everything is computed on this Mac and stored in your archive, \
-        about 2 KB per notification. The model is English, so other languages fall back to \
-        full-text search.
-        """)
     }
 }
 

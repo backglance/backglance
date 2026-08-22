@@ -175,17 +175,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     ///   archive). `RetentionSettingsModel` treats that the same way every other pane treats
     ///   a `nil` archive: "Run cleanup now" disables itself rather than pressing a button
     ///   that quietly does nothing.
-    private static func settingsWindow(
+    private func settingsWindow(
         search: SearchService,
         archive: Archive,
         retention: RetentionJob?
     ) -> SettingsWindowController {
-        SettingsWindowController(
-            search: search,
-            digest: digestSettings(),
-            redaction: CodeRedactionSettingsModel(archive: archive),
+        // The Privacy pane is the only place that can destroy the archive, so it is also
+        // the only place given the closures that stop and start capture. The engine is
+        // reached weakly and per call: it is built after the archive and can be replaced.
+        let pause: @Sendable () async -> Void = { [weak self] in await self?.engine?.pause() }
+        let resume: @Sendable () async -> Void = { [weak self] in await self?.engine?.resume() }
+        let wipe = WipeConfirmationModel(archive: archive, pauseCapture: pause, resumeCapture: resume)
+        let privacy = PrivacySettingsModel(
+            archive: archive,
             retention: RetentionSettingsModel(archive: archive, job: retention),
-            exclusions: ExcludedAppsSettingsModel(archive: archive)
+            exclusions: ExcludedAppsSettingsModel(archive: archive),
+            redaction: CodeRedactionSettingsModel(archive: archive),
+            wipe: wipe,
+            resumeCapture: resume
+        )
+        return SettingsWindowController(
+            search: search,
+            digest: Self.digestSettings(),
+            privacy: privacy
         )
     }
 
@@ -386,7 +398,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // which stay asleep until the user turns the setting on.
         let search = SearchService(archive: archive)
         search.start()
-        let settings = Self.settingsWindow(search: search, archive: archive, retention: retention)
+        let settings = settingsWindow(search: search, archive: archive, retention: retention)
         // The field's own state: what was typed, what came back, what is still
         // in flight. It asks `search` its questions through `SearchRunning`.
         // Read per call rather than captured once: the toggle can change

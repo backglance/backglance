@@ -16,12 +16,10 @@ final class SettingsWindowController: NSWindowController {
     convenience init(
         search: SearchService,
         digest: DigestSettingsModel,
-        redaction: CodeRedactionSettingsModel,
-        retention: RetentionSettingsModel,
-        exclusions: ExcludedAppsSettingsModel
+        privacy: PrivacySettingsModel
     ) {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 520),
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 620),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -32,9 +30,7 @@ final class SettingsWindowController: NSWindowController {
             rootView: SettingsView(
                 search: search,
                 digest: digest,
-                redaction: redaction,
-                retention: retention,
-                exclusions: exclusions
+                privacy: privacy
             )
         )
         // The window owns its size. Left to the hosting controller, the form's
@@ -42,7 +38,7 @@ final class SettingsWindowController: NSWindowController {
         // autosaved frame was "0 260 0 32".
         hosting.sizingOptions = []
         window.contentViewController = hosting
-        window.setContentSize(NSSize(width: 460, height: 520))
+        window.setContentSize(NSSize(width: 520, height: 620))
         window.isReleasedWhenClosed = false
         self.init(window: window)
     }

@@ -60,8 +60,18 @@ public enum PauseCopy {
         guard let date else {
             return String(localized: "capture paused")
         }
-        let when = date.formatted(deadlineStyle(for: date, now: now, calendar: calendar))
+        let when = deadlineText(for: date, now: now, calendar: calendar)
         return String(localized: "capture paused until \(when)")
+    }
+
+    /// Just the time a pause ends — "17:00", or "23 Aug 17:00" when that is another day.
+    ///
+    /// Separate from ``pausedClause(until:now:calendar:)`` because the two places that name
+    /// a deadline want different sentences around the same instant: the status item's
+    /// tooltip has room for "Backglance — capture paused until 17:00", and the Privacy
+    /// pane's row is already labelled "Capture" and only needs "Paused until 17:00".
+    public static func deadlineText(for date: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
+        date.formatted(deadlineStyle(for: date, now: now, calendar: calendar))
     }
 
     // MARK: Internal
