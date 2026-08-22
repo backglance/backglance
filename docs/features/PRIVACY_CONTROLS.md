@@ -641,48 +641,55 @@ Settings ▸ Privacy ▸ **Wipe archive…** deletes everything Backglance has s
 
 The optional global hotkey (`privacy.wipeHotkeyEnabled`, registered through `HotKeyCenter`, no default binding) opens the same sheet. It never wipes without the sheet.
 
+Both gates live in `WipeConfirmationModel` (`BackglanceUI`), not in `PanicWipe`: a typed
+field and a biometric prompt are the sheet's business, and `PanicWipe.execute` deliberately
+asks nothing so it can also be driven from a test or a future App Intent. The model also
+owns the order around the wipe — pause capture, wipe, resume — through closures the app
+shell supplies, because `BackglanceUI` cannot see `BackglanceCapture` and does not need to:
+"stop the writers" is the same instruction whatever is doing the writing.
+
 ```swift
-import LocalAuthentication
-
-public enum PanicWipeError: Error, LocalizedError {
-    case confirmationMismatch
-    case biometricsFailed(underlying: Error?)
-    case fileRemovalFailed(URL, underlying: Error)
-    case reopenFailed(underlying: Error)
-
-    public var errorDescription: String? {
-        switch self {
-        case .confirmationMismatch:            return "Type “wipe” to confirm."
-        case .biometricsFailed:                return "Touch ID did not succeed. Nothing was deleted."
-        case .fileRemovalFailed(let url, _):   return "Could not remove \(url.lastPathComponent). The archive was emptied but the file remains; see the log."
-        case .reopenFailed:                    return "The archive was wiped but a new one could not be created. Capture is paused; relaunch Backglance."
-        }
-    }
+public enum WipeConfirmationError: Error, Equatable, Sendable {
+    case confirmationMismatch                 // nothing was deleted
+    case biometricsFailed                     // nothing was deleted
+    case incomplete(remaining: [String])      // the wipe happened; some files outlived it
+    case failed(String)                       // nothing was deleted
+    public var userMessage: String { … }      // one sentence; the file names stay in the log
 }
 
-extension PanicWipe {
-    /// Both gates. Throws before any file is touched.
-    public static func confirm(typed: String) async throws {
-        guard typed.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "wipe" else {
-            throw PanicWipeError.confirmationMismatch
-        }
-        let context = LAContext()
-        var probeError: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &probeError) else {
-            return                                    // no Touch ID here: the typed word is the only gate
-        }
-        do {
-            let ok = try await context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics,
-                                                      localizedReason: "Wipe the Backglance archive")
-            guard ok else { throw PanicWipeError.biometricsFailed(underlying: nil) }
-        } catch let e as PanicWipeError {
-            throw e
-        } catch {
-            throw PanicWipeError.biometricsFailed(underlying: error)   // user cancelled, lockout, etc.
-        }
-    }
+@MainActor @Observable
+public final class WipeConfirmationModel {
+    public var typed: String                  // the confirmation field
+    public var forgetPerAppSettings: Bool     // the optional checkbox, off by default
+    public private(set) var isBusy: Bool
+    public private(set) var failure: WipeConfirmationError?
+    public private(set) var didWipe: Bool
+
+    public var isConfirmationWordTyped: Bool  // trimmed, folded through String.matchKey
+    public var canWipe: Bool                  // an archive exists, the word matches, not already running
+    public var asksForBiometrics: Bool        // whether this Mac has Touch ID at all
+
+    public func confirm() async             // word → Touch ID → pause → wipe → resume
+    public func reset()
 }
 ```
+
+The fold goes through `String.matchKey`, which folds without a locale: a locale-sensitive
+`"WIPE"` in a Turkish locale does not produce `"wipe"`, and would leave a Turkish user unable
+to confirm ([the Turkish rule](../reference/INTERNATIONALIZATION.md#the-turkish-locale-rule)).
+The SwiftLint rule that enforces this is not silenced here.
+
+Touch ID is reached through `BiometricGate`, a protocol with one real implementation over a
+fresh `LAContext` per call — a reused context caches a successful evaluation for its
+lifetime, which would turn "ask before wiping" into "ask before the first wipe of this
+launch". The protocol exists because the prompt is system UI that wants a finger and cannot
+be driven from a test, while the logic around it — that a Mac without Touch ID falls back to
+the typed word rather than becoming un-wipeable, and that a cancelled prompt deletes
+nothing — is exactly what has to be asserted.
+
+The sheet says which gates this Mac applies, in both directions. On a Mac without Touch ID
+it reads "This Mac has no Touch ID, so the typed word is the only confirmation" — an
+unstated missing gate is how someone assumes a protection they do not have.
 
 ### PanicWipe.execute()
 
