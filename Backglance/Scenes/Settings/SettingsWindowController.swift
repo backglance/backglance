@@ -18,6 +18,7 @@ final class SettingsWindowController: NSWindowController {
         apps: AppsSettingsModel,
         privacy: PrivacySettingsModel,
         rules: RulesSettingsModel,
+        updates: UpdatesSettingsModel,
         permissions: PermissionsSettingsModel,
         status: StatusSettingsModel
     ) {
@@ -35,6 +36,7 @@ final class SettingsWindowController: NSWindowController {
                 apps: apps,
                 privacy: privacy,
                 rules: rules,
+                updates: updates,
                 permissions: permissions,
                 status: status
             )

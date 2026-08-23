@@ -88,6 +88,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     /// (docs/api/API_DOCUMENTATION.md#url-scheme-backglance).
     var urlSchemeHandler: URLSchemeHandler?
 
+    /// The Sparkle owner, and with it the only network access this app has. Built and
+    /// gated in `AppDelegate+Updates.swift`; retained here because an updater that
+    /// deallocated would take Sparkle's scheduled check with it.
+    var updater: SparkleUpdaterController?
+
     /// `rulesEngine`, or ``NoTriage`` when it has not been built — which only happens when
     /// `startCapture()` itself found no archive, the same state every `guard let archive`
     /// below already treats as "nothing to build". Every triage-consuming type default-
@@ -120,6 +125,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // "painted popover first" ordering `startRetention()`'s own doc comment describes is
         // about when a *pass* runs, not about when this method is called.
         startRetention()
+        // Before startInterface(): that method builds the settings window, whose Updates
+        // pane reads this controller, and the status item's menu, which asks it whether to
+        // offer "Check for Updates…" at all. Starting it here costs nothing at launch — an
+        // updater that is allowed to run schedules its first check, it does not make one.
+        startUpdater()
         startInterface()
         // After startInterface(): every surface a route can reach — the status item, the
         // timeline window, the engine — has to exist before the first `kAEGetURL` can
@@ -242,6 +252,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             apps: apps,
             privacy: privacy,
             rules: rules,
+            updates: makeUpdatesModel(),
             permissions: makePermissionsModel(),
             status: makeStatusModel(archive: archive)
         )

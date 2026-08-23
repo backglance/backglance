@@ -43,7 +43,7 @@ This document explains what Backglance is built with and, more importantly, why.
 | Full-text search | SQLite FTS5 (external-content table) | Ships in the OS, sub-50 ms at 100k rows, prefix indexes, BM25 |
 | Semantic search | Apple NaturalLanguage `NLEmbedding.sentenceEmbedding(for: .english)`, cosine top-K, brute force | On-device, no model download, no network; engine ported from PasteShelf |
 | Fuzzy search | Levenshtein `FuzzyMatcher` (threshold 0.6) over FTS candidates | Typos in searches are common; ported from PasteShelf |
-| Updates | Sparkle 2.7.x, EdDSA-signed appcast on GitHub Pages | The only network access in the app, and the user can turn it off |
+| Updates | Sparkle 2.x (2.9.6 at integration), EdDSA-signed appcast on GitHub Pages | The only network access in the app, and the user can turn it off |
 | Distribution | GitHub Releases (Developer ID signed + notarized DMG) + Homebrew cask | FDA is incompatible with the App Sandbox, so the Mac App Store is not an option |
 | Launch at login | `SMAppService.mainApp` | Modern API, no helper bundle |
 | Hotkey | Carbon `RegisterEventHotKey` (`HotKeyCenter`), default ⌃⌥N | Still the dependable global-hotkey API on macOS |
@@ -346,7 +346,7 @@ For a utility that lives in the menu bar all day, idle footprint is the product.
 | macOS deployment target | 14.0 (Sonoma) | — | `SMAppService`, `@Observable`, `MenuBarExtra` fixes, SwiftData baseline all need 14 |
 | macOS runtime | 14, 15, 26 supported; 27 beta best-effort | 26.5 (primary dev target) | See [OS_COMPATIBILITY_PLAYBOOK.md](./OS_COMPATIBILITY_PLAYBOOK.md) |
 | GRDB.swift | 7.0.0 | latest 7.x | `from: "7.0.0"`; system SQLite; `GRDB.swift/SQLCipher` optional for v1.x |
-| Sparkle | 2.7.0 | latest 2.7.x | `from: "2.7.0"`; EdDSA keys; macOS 10.13+ runtime so no constraint for us |
+| Sparkle | 2.7.0 | latest 2.x | `from: "2.7.0"`, so SwiftPM resolves the newest 2.x rather than the newest 2.7.x — the update channel is the one dependency where lagging behind a security fix is the risk; EdDSA keys; macOS 10.13+ runtime so no constraint for us |
 | System SQLite (macOS 14 / 15 / 26) | 3.43 / 3.46 / 3.49 (approximate) | — | FTS5, JSON1 present on all; `unicode61 remove_diacritics 2` since 3.27 |
 | GitHub Actions runners | `macos-14` (Xcode 16.2 selected), `macos-15` (Xcode 16.2 selected), `macos-26` (Xcode 26.x) | — | `DEVELOPER_DIR` pinned per runner in `ci.yml`; matrix fails the build if any leg fails |
 | Architectures | Universal 2 (arm64 + x86_64) | Apple silicon primary | Intel best-effort on 14/15/26; macOS 27 is Apple silicon only |
@@ -360,7 +360,7 @@ Backglance has exactly two third-party dependencies at build time. Everything el
 | Dependency | Version | Where | Purpose | License |
 |---|---|---|---|---|
 | [GRDB.swift](https://github.com/groue/GRDB.swift) | 7.x | `BackglanceCore`, `BackglanceCapture`, `BackglanceSearch` | SQLite access, migrations, FTS5, observation | MIT |
-| [Sparkle](https://github.com/sparkle-project/Sparkle) | 2.7.x | `Backglance` app target only | Updates | MIT |
+| [Sparkle](https://github.com/sparkle-project/Sparkle) | 2.x | `Backglance` app target only | Updates | MIT |
 
 Apple frameworks used, per package:
 

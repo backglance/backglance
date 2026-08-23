@@ -165,7 +165,12 @@ extension AppDelegate {
                 }
                 Task { await engine.resume() }
             },
-            openSettings: { settings.show() }
+            openSettings: { settings.show() },
+            // `nil` rather than a closure that would do nothing, so the menu leaves the
+            // item out entirely in a build with no signing key — see `MenuActions`.
+            checkForUpdates: updater.flatMap { updater in
+                updater.isConfigured ? { updater.checkForUpdates() } : nil
+            }
         )
     }
 }

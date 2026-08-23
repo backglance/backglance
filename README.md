@@ -93,7 +93,7 @@ Full threat model: [SECURITY.md](docs/security/SECURITY.md).
 | UI | SwiftUI (timeline, settings, onboarding) + AppKit (menu bar item, popover, hotkey, windows) | macOS 14 SDK+ |
 | Storage | SQLite via [GRDB.swift](https://github.com/groue/GRDB.swift) with FTS5 | GRDB 7.x |
 | Search | FTS5 + Levenshtein fuzzy matching; optional semantic search with Apple `NLEmbedding` (on-device) | — |
-| Updates | [Sparkle 2](https://sparkle-project.org) (EdDSA-signed appcast on GitHub Pages) | 2.7.x |
+| Updates | [Sparkle 2](https://sparkle-project.org) (EdDSA-signed appcast on GitHub Pages) | 2.x |
 | Distribution | GitHub Releases (signed + notarized) and Homebrew cask | — |
 | Build | Xcode 16.2+ (26.x recommended) | — |
 | Minimum macOS | 14.0 (Sonoma) | — |

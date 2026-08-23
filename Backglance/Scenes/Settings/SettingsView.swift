@@ -5,7 +5,7 @@ import SwiftUI
 
 /// Settings, as far as this milestone has settings.
 ///
-/// Six tabs. General holds launch at login, the ⌃⌥N hotkey note, Search — semantic indexing
+/// Seven tabs. General holds launch at login, the ⌃⌥N hotkey note, Search — semantic indexing
 /// is the first thing the app does that needs the user's permission in the plain sense, since
 /// it reads every notification they have ever received and writes a vector for each one — and
 /// Digest, which owns the app's only permission prompt, assembled by `GeneralSettingsView`
@@ -15,7 +15,9 @@ import SwiftUI
 /// what Backglance keeps across *every* app at once, assembled by `PrivacySettingsView`
 /// (docs/features/PRIVACY_CONTROLS.md#ui-components). Rules holds the highlight, VIP, mute
 /// and (v1.x) regex rules that triage the timeline, assembled by `RulesSettingsView`
-/// (docs/features/RULES.md#ui-components, BACKGLANCE-209). Permissions reports what macOS
+/// (docs/features/RULES.md#ui-components, BACKGLANCE-209). Updates holds the one switch that
+/// decides whether this app ever touches the network, assembled by `UpdatesSettingsView`
+/// (docs/security/SECURITY.md#the-updater, BACKGLANCE-214). Permissions reports what macOS
 /// has allowed, and is the one place that can reopen setup
 /// (docs/features/PERMISSIONS_PRIVACY.md#ui-components). Status answers the one question
 /// capture cannot answer for itself — is it working — because capture fails silently and the
@@ -28,6 +30,8 @@ struct SettingsView: View {
     let privacy: PrivacySettingsModel
 
     let rules: RulesSettingsModel
+
+    let updates: UpdatesSettingsModel
 
     let permissions: PermissionsSettingsModel
 
@@ -50,6 +54,10 @@ struct SettingsView: View {
             RulesSettingsView(model: rules)
                 .tabItem { Label(String(localized: "Rules"), systemImage: "wand.and.stars") }
                 .accessibilityIdentifier("settings.tab.rules")
+
+            UpdatesSettingsView(model: updates)
+                .tabItem { Label(String(localized: "Updates"), systemImage: "arrow.down.circle") }
+                .accessibilityIdentifier("settings.tab.updates")
 
             PermissionsSettingsView(model: permissions)
                 .tabItem { Label(String(localized: "Permissions"), systemImage: "lock.shield") }

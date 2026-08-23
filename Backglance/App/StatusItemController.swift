@@ -98,6 +98,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         var pause: (PauseChoice) -> Void
         var resume: () -> Void
         var openSettings: () -> Void
+        /// `nil` in a build with no updater — a Debug build carries no `SUPublicEDKey`, and
+        /// an item that could only ever say "this build cannot check" is worse than no item
+        /// (docs/deployment/PACKAGING_NOTARIZATION.md#sparkleupdatercontroller-and-the-off-means-off-guarantee).
+        var checkForUpdates: (() -> Void)?
     }
 
     /// When the popover was last opened, or `nil` if it never has been this launch.
@@ -281,6 +285,11 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             menu.addItem(pauseSubmenuItem())
         }
         menu.addItem(item(String(localized: "Settings…"), #selector(openSettings), key: ","))
+        // Only when there is an updater to ask. Clicking this is the user's consent for one
+        // network request, and it works even with automatic checks turned off.
+        if menuActions.checkForUpdates != nil {
+            menu.addItem(item(String(localized: "Check for Updates…"), #selector(checkForUpdates)))
+        }
         menu.addItem(.separator())
         menu.addItem(withTitle: String(localized: "Quit Backglance"),
                      action: #selector(NSApplication.terminate(_:)),
@@ -333,5 +342,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     @objc
     private func openSettings() {
         menuActions.openSettings()
+    }
+
+    @objc
+    private func checkForUpdates() {
+        menuActions.checkForUpdates?()
     }
 }

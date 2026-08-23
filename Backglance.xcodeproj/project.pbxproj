@@ -11,6 +11,7 @@
 		BG000000000000000002021 /* BackglanceCapture in Frameworks */ = {isa = PBXBuildFile; productRef = BG000000000000000002022 /* BackglanceCapture */; };
 		BG000000000000000002031 /* BackglanceSearch in Frameworks */ = {isa = PBXBuildFile; productRef = BG000000000000000002032 /* BackglanceSearch */; };
 		BG000000000000000002041 /* BackglanceUI in Frameworks */ = {isa = PBXBuildFile; productRef = BG000000000000000002042 /* BackglanceUI */; };
+		BG000000000000000002051 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = BG000000000000000002052 /* Sparkle */; };
 		BG0000000000000000003110 /* BackglanceCore in Frameworks */ = {isa = PBXBuildFile; productRef = BG0000000000000000003120 /* BackglanceCore */; };
 		BG0000000000000000003111 /* BackglanceTestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = BG0000000000000000003121 /* BackglanceTestSupport */; };
 		BG0000000000000000003210 /* BackglanceCore in Frameworks */ = {isa = PBXBuildFile; productRef = BG0000000000000000003220 /* BackglanceCore */; };
@@ -74,6 +75,7 @@
 				BG000000000000000002021 /* BackglanceCapture in Frameworks */,
 				BG000000000000000002031 /* BackglanceSearch in Frameworks */,
 				BG000000000000000002041 /* BackglanceUI in Frameworks */,
+				BG000000000000000002051 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -177,6 +179,7 @@
 				BG000000000000000002022 /* BackglanceCapture */,
 				BG000000000000000002032 /* BackglanceSearch */,
 				BG000000000000000002042 /* BackglanceUI */,
+				BG000000000000000002052 /* Sparkle */,
 			);
 			productName = Backglance;
 			productReference = BG0000000000000000000001 /* Backglance.app */;
@@ -333,6 +336,7 @@
 				BG000000000000000002033 /* XCLocalSwiftPackageReference "Packages/BackglanceSearch" */,
 				BG000000000000000002043 /* XCLocalSwiftPackageReference "Packages/BackglanceUI" */,
 				BG0000000000000000002053 /* XCLocalSwiftPackageReference "Tests/BackglanceTestSupport" */,
+				BG000000000000000002053 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			productRefGroup = BG0000000000000000000060 /* Products */;
 			projectDirPath = "";
@@ -755,6 +759,17 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		BG000000000000000002053 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.7.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCConfigurationList section */
 		BG0000000000000000000110 /* Build configuration list for PBXProject "Backglance" */ = {
 			isa = XCConfigurationList;
@@ -837,6 +852,11 @@
 		BG000000000000000002042 /* BackglanceUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = BackglanceUI;
+		};
+		BG000000000000000002052 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BG000000000000000002053 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 		BG0000000000000000003120 /* BackglanceCore */ = {
 			isa = XCSwiftPackageProductDependency;
