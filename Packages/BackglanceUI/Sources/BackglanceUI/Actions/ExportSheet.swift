@@ -60,26 +60,22 @@ public struct ExportSheet: View {
 
     // MARK: Internal
 
-    /// "Export 1 Notification" / "Export 3 Notifications" — this sheet's title.
+    /// "Export 1 Notification" / "Export 3 Notifications" — this sheet's title, with the
+    /// singular in the catalog entry's plural variations
+    /// (docs/reference/INTERNATIONALIZATION.md#plural-rules).
     ///
-    /// Two `String(localized:)` calls, one per branch, rather than an interpolated count left to
-    /// a string catalog's plural variants: the same trade ``UndoToastView/message(count:)`` makes
-    /// and for the same reason — `Backglance/Resources/Localizable.xcstrings` has no entries yet,
-    /// and this package's tests have no host application for a catalog entry to resolve against
-    /// even if it did.
-    ///
-    /// A `static func`, not a computed property on the view, so ``ExportSheetTests`` can assert
-    /// the exact copy for `1` and for `n` without standing up a SwiftUI hierarchy — the same shape
+    /// ``ExportSheetTests`` can only assert the key's fallback — no host application, so the
+    /// catalog never resolves there; the rendered forms are asserted in
+    /// `PluralRenderingTests` (`BackglanceAppUITests`): the singular by opening this sheet
+    /// off a one-row selection, both branches against the built app's compiled catalog.
+    /// A `static func`, not a computed property on the view, so the
+    /// tests can call it without standing up a SwiftUI hierarchy — the same shape
     /// `UndoToastView.message(count:)` uses.
     static func title(count: Int) -> String {
-        if count == 1 {
-            String(localized: "Export 1 Notification", comment: "Export sheet title, single selection")
-        } else {
-            String(
-                localized: "Export \(count) Notifications",
-                comment: "Export sheet title; placeholder is how many notifications are selected (always 2 or more)"
-            )
-        }
+        String(
+            localized: "Export \(count) Notifications",
+            comment: "Export sheet title; count of selected notifications, pluralized by the catalog"
+        )
     }
 
     /// `Backglance-export-<yyyy-MM-dd>.<ext>`, per docs/features/ACTIONS.md#select-and-export's

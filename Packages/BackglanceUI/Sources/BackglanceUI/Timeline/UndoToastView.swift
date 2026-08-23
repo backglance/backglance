@@ -73,37 +73,24 @@ public struct UndoToastView: View {
 
     // MARK: Internal
 
-    /// "Deleted 1 notification" / "Deleted 3 notifications".
+    /// "Deleted 1 notification" / "Deleted 3 notifications" — the singular lives in
+    /// the catalog entry's plural variations, per
+    /// docs/reference/INTERNATIONALIZATION.md#plural-rules.
     ///
-    /// docs/reference/INTERNATIONALIZATION.md#plural-rules asks for an interpolated
-    /// count left to the string catalog's plural variants rather than a hand-written
-    /// `count == 1 ? … : …`, and ``DigestViewModel/headline`` does exactly that. This
-    /// does not: `Backglance/Resources/Localizable.xcstrings` ships with no entries
-    /// yet (every string in the app is in the same boat, awaiting a dedicated
-    /// localization pass), and this package's tests have no host application — their
-    /// `Bundle.main` is the test runner, not `Backglance.app` — so a catalog entry
-    /// here would compile correctly and then silently never resolve in
-    /// ``UndoToastViewTests``, or in the running app until that pass lands. Two
-    /// `String(localized:)` calls, one per branch, are each independently
-    /// translatable today and correct *right now* without depending on that pass —
-    /// the same trade ``StatusItemAccessibility/label(unreadCount:state:)`` already
-    /// makes for its own count-dependent text, for the same reason.
+    /// ``UndoToastViewTests`` can only assert the key's fallback, never the rendered
+    /// plural — this package's tests have no host application, so `Bundle.main` is
+    /// the test runner and the catalog never resolves. The rendered forms are
+    /// asserted in `PluralRenderingTests` (`BackglanceAppUITests`): the singular by
+    /// deleting a row in the running app and reading this toast, both branches
+    /// against the built app's compiled catalog.
     ///
-    /// A `static func` rather than a computed property on the view so
-    /// ``UndoToastViewTests`` can assert the exact copy for `1` and for `n` without
-    /// standing up a SwiftUI hierarchy to inspect.
+    /// A `static func` rather than a computed property on the view so the tests can
+    /// call it without standing up a SwiftUI hierarchy to inspect.
     static func message(count: Int) -> String {
-        if count == 1 {
-            String(
-                localized: "Deleted 1 notification",
-                comment: "Toast message after a delete (statement, not a button)"
-            )
-        } else {
-            String(
-                localized: "Deleted \(count) notifications",
-                comment: "Toast message after a delete; placeholder is how many were deleted (always 2 or more)"
-            )
-        }
+        String(
+            localized: "Deleted \(count) notifications",
+            comment: "Toast message after a delete; count pluralized by the catalog (statement, not a button)"
+        )
     }
 }
 

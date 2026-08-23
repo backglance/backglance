@@ -363,14 +363,28 @@
       "localizations": {}
     },
     "Backglance, %lld unread notifications": {
-      "comment": "Spoken by VoiceOver for the menu bar item; placeholder is the unread count (always 2–99)",
+      "comment": "Spoken by VoiceOver for the menu bar item; count pluralized by the catalog (1–99)",
       "extractionState": "manual",
-      "localizations": {}
-    },
-    "Backglance, 1 unread notification": {
-      "comment": "Spoken by VoiceOver for the menu bar item; Backglance is the app name, do not translate it",
-      "extractionState": "manual",
-      "localizations": {}
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Backglance, %lld unread notification"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Backglance, %lld unread notifications"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "Backglance, more than 99 unread notifications": {
       "comment": "Spoken by VoiceOver for the menu bar item; Backglance is the app name, do not translate it",
@@ -585,14 +599,28 @@
       "localizations": {}
     },
     "Deleted %lld notifications": {
-      "comment": "Toast message after a delete; placeholder is how many were deleted (always 2 or more)",
+      "comment": "Toast message after a delete; count pluralized by the catalog (statement, not a button)",
       "extractionState": "manual",
-      "localizations": {}
-    },
-    "Deleted 1 notification": {
-      "comment": "Toast message after a delete (statement, not a button)",
-      "extractionState": "manual",
-      "localizations": {}
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Deleted %lld notification"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Deleted %lld notifications"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "Diagnostics": {
       "comment": "Section header: the diagnostics export",
@@ -651,14 +679,28 @@
       "localizations": {}
     },
     "Export %lld Notifications": {
-      "comment": "Export sheet title; placeholder is how many notifications are selected (always 2 or more)",
+      "comment": "Export sheet title; count of selected notifications, pluralized by the catalog",
       "extractionState": "manual",
-      "localizations": {}
-    },
-    "Export 1 Notification": {
-      "comment": "Export sheet title, single selection",
-      "extractionState": "manual",
-      "localizations": {}
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Export %lld Notification"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Export %lld Notifications"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "Export Diagnostics…": {
       "extractionState": "manual",

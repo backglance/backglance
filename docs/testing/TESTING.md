@@ -74,7 +74,8 @@ Tests/
 │   └── Performance/     SearchLatencyTests
 ├── BackglanceUITests/            unit tests for the BackglanceUI package (models, copy, formatting)
 ├── BackglanceAppUITests/        XCUITest, driving the built app
-│   ├── OnboardingFDATests.swift, StatusItemMenuTests.swift, SettingsWindowTests.swift
+│   ├── OnboardingFDATests.swift, StatusItemMenuTests.swift, SettingsWindowTests.swift,
+│   │   PluralRenderingTests.swift
 │   └── Support/         XCUIApplication+Backglance.swift
 └── Fixtures/
     ├── SystemStore/macOS14|macOS15|macOS26/   store.db, manifest.json, expected.json   (SYNTHETIC)
@@ -1033,6 +1034,13 @@ or by the developer's own Backglance — decides what the menu offers.
 `SettingsWindowTests` lives next to it: the settings window's tabs, asserted to all be visible
 (not folded into the toolbar's `»` overflow, which is how BACKGLANCE-249 shipped) and to each
 switch to the pane they name, opened by the route a user has — the status item's menu.
+
+`PluralRenderingTests` asserts the three catalog plurals nothing else can see rendered — the
+status item's spoken unread phrase, the delete toast, the export sheet's title — for a count of
+one and of several, against the running app
+([INTERNATIONALIZATION.md](../reference/INTERNATIONALIZATION.md#plural-rules) explains why the
+unit bundles cannot). Its rows come from `DebugSeeding` (`BACKGLANCE_SEED_UNREAD`, DEBUG-only),
+seeded into the test's own temporary archive at launch.
 
 Two suites are **planned, not written**: `PopoverTests` (open the popover from the status item,
 assert the timeline paints) and `TimelineWindowTests` (open the window, scroll 200 rows, type in

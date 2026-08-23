@@ -17,10 +17,16 @@ import XCTest
 struct BackglanceLaunch {
     // MARK: Lifecycle
 
-    init(fullDiskAccess: String, hasCompletedOnboarding: Bool = false, storePath: String? = nil) {
+    init(
+        fullDiskAccess: String,
+        hasCompletedOnboarding: Bool = false,
+        storePath: String? = nil,
+        seedUnread: Int? = nil
+    ) {
         self.fullDiskAccess = fullDiskAccess
         self.hasCompletedOnboarding = hasCompletedOnboarding
         self.storePath = storePath
+        self.seedUnread = seedUnread
     }
 
     // MARK: Internal
@@ -45,6 +51,12 @@ struct BackglanceLaunch {
     /// capture state — the status item's glyph, its label, the pause menu — would be asserted
     /// against the wrong state. `BACKGLANCE_STORE_PATH` is DEBUG-only, like the FDA override.
     let storePath: String?
+    /// Rows to put on the timeline before the first read, via `DebugSeeding` in the app
+    /// (DEBUG-only, like the two overrides above). This bundle deliberately links
+    /// nothing, so the app seeding its own (already-redirected) archive is the one way a
+    /// test gets a timeline with content on it — for the unread count in the status
+    /// item's label, the delete toast, the export sheet.
+    let seedUnread: Int?
 
     /// A launched app, waiting for its first screen.
     func app(archiveDirectory: URL) -> XCUIApplication {
@@ -54,6 +66,9 @@ struct BackglanceLaunch {
             .appendingPathComponent("archive.sqlite").path
         if let storePath {
             app.launchEnvironment["BACKGLANCE_STORE_PATH"] = storePath
+        }
+        if let seedUnread {
+            app.launchEnvironment["BACKGLANCE_SEED_UNREAD"] = String(seedUnread)
         }
         app.launchArguments += [
             "-onboarding.completedVersion", hasCompletedOnboarding ? "1" : "0",

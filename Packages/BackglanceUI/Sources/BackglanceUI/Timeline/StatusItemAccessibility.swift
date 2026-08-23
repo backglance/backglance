@@ -44,33 +44,22 @@ public enum StatusItemAccessibility {
 
     // MARK: Private
 
-    /// The `1` and default branches look like they should collapse into one
-    /// interpolated call with the plural in the catalog entry — which is what
-    /// ``StatusSettingsView`` and ``ImportProgressView`` now do, and what
-    /// docs/reference/INTERNATIONALIZATION.md#plural-rules asks for. They stay apart for
-    /// now because nothing in this package can prove the result: these tests have no host
-    /// bundle, so `Bundle.main` is the xctest runner and every lookup falls back to the
-    /// key (the same trade ``UndoToastView/message(count:)`` and ``ExportSheet/title(count:)``
-    /// document). What was verified, by making the swap and running
-    /// ``StatusItemAccessibilityTests``, is that the fallback answers with whichever
-    /// literal the key holds — so a test here would be asserting the key, not the plural.
+    /// The singular/plural of the exact-count phrase lives in the catalog entry's
+    /// plural variations, per docs/reference/INTERNATIONALIZATION.md#plural-rules;
+    /// the zero and above-cap phrases are their own keys because they are different
+    /// sentences, not grammatical variants of this one.
     ///
-    /// The mechanism itself does work in the built app: BACKGLANCE-248 proved catalog
-    /// plurals render correctly for both branches, `^[…](inflect: true)` does not, and
-    /// `OnboardingFDATests` now checks one of them against the running app. Converting
-    /// these three sites is a follow-up, and it needs a UI test to come with it — an
-    /// unverified conversion is how the singular got shipped to VoiceOver the first time.
+    /// Nothing in this package can see the variations render: these tests have no host
+    /// bundle, so `Bundle.main` is the xctest runner and every lookup falls back to
+    /// the key — which is why a first conversion once shipped the singular to
+    /// VoiceOver with eight green tests. The rendered forms are asserted where they
+    /// can be: `PluralRenderingTests` in `BackglanceAppUITests` reads this label off
+    /// the running app's status item for a count of 1 and of 3.
     private static func unreadPhrase(count: Int) -> String {
         switch count {
         case ..<1:
             String(
                 localized: "Backglance, no unread notifications",
-                comment: "Spoken by VoiceOver for the menu bar item; Backglance is the app name, do not translate it"
-            )
-
-        case 1:
-            String(
-                localized: "Backglance, 1 unread notification",
                 comment: "Spoken by VoiceOver for the menu bar item; Backglance is the app name, do not translate it"
             )
 
@@ -83,7 +72,7 @@ public enum StatusItemAccessibility {
         default:
             String(
                 localized: "Backglance, \(count) unread notifications",
-                comment: "Spoken by VoiceOver for the menu bar item; placeholder is the unread count (always 2–99)"
+                comment: "Spoken by VoiceOver for the menu bar item; count pluralized by the catalog (1–99)"
             )
         }
     }

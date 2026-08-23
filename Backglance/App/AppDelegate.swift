@@ -335,6 +335,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return
         }
 
+        DebugSeeding.seedIfAsked(archive, logger: logger) // UI-test rows; a no-op outside DEBUG
+
         // `expected()` rather than `current()`: on a fresh account `usernoted` has not
         // created its database yet, and the watcher has to be armed anyway so that capture
         // begins the moment it appears.
