@@ -71,6 +71,11 @@ public struct AppsSettingsView: View {
         Text(String(localized: "Select an app"))
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Identified like its sibling `apps.list.empty`, and for a second reason: this
+            // pane is a `NavigationSplitView`, so the `settings.tab.apps` identifier on it
+            // does not surface the way the other six panes' do. This placeholder is how a
+            // test knows the Apps pane is the one showing.
+            .accessibilityIdentifier("apps.detail.empty")
     }
 }
 

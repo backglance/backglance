@@ -67,7 +67,12 @@ struct SettingsView: View {
                 .tabItem { Label(String(localized: "Status"), systemImage: "waveform.path.ecg") }
                 .accessibilityIdentifier("settings.tab.status")
         }
-        .frame(minWidth: 480, minHeight: 420)
+        // 860 is where macOS 26 stops collapsing these seven tabs into the toolbar's
+        // overflow menu with the Apps pane selected, measured in BACKGLANCE-249 — its sidebar
+        // toggle shares the toolbar with them. The window opens wider still
+        // (``SettingsWindowController/contentWidth``); this is the floor that keeps a preview,
+        // or any other host, from drawing a settings window with no visible tabs.
+        .frame(minWidth: 860, minHeight: 420)
     }
 }
 
