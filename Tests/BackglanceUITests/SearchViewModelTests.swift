@@ -31,13 +31,15 @@ final class SearchViewModelTests: XCTestCase {
         engine.result = [SearchHit(notificationID: 1, score: 1, sources: [.fts])]
         let model = SearchViewModel(search: engine, debounce: .milliseconds(20))
 
+        // Waiting for each search rather than sleeping past its debounce: the sleeps this
+        // replaced were four times the debounce and still lost the race on a CI runner,
+        // because what has to elapse is not 100 ms of clock but one scheduled task actually
+        // getting to run (BACKGLANCE-252).
         model.text = "deploy"
-        try await Task.sleep(for: .milliseconds(100))
+        try await waitUntil { await engine.queries == ["deploy"] }
         model.text = "invoice"
-        try await Task.sleep(for: .milliseconds(100))
+        try await waitUntil { await engine.queries == ["deploy", "invoice"] }
 
-        let queries = await engine.queries
-        XCTAssertEqual(queries, ["deploy", "invoice"])
         XCTAssertEqual(model.hits.count, 1)
     }
 
@@ -157,6 +159,28 @@ final class SearchViewModelTests: XCTestCase {
 
         XCTAssertNotNil(model.inlineError)
         XCTAssertFalse(model.inlineError?.contains("invoice") ?? true, "the message never echoes the query")
+    }
+}
+
+// MARK: - Waiting
+
+private extension SearchViewModelTests {
+    /// Polls until the condition holds, instead of sleeping for a duration that was long
+    /// enough on the machine where the test was written.
+    func waitUntil(
+        timeout: TimeInterval = 5,
+        _ condition: () async -> Bool,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if await condition() {
+                return
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("condition not met within \(timeout)s", file: file, line: line)
     }
 }
 

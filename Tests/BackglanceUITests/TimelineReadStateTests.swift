@@ -250,9 +250,19 @@ final class TimelineReadStateTests: XCTestCase {
 
     /// A store held by the test case, so the subscription is not cancelled by
     /// `deinit` the moment the local goes out of scope.
+    /// Pinned to Istanbul for the reason ``TimelineFixtures/istanbul`` gives: day bucketing
+    /// asks a calendar where midnight is, and `.current` answers with wherever the machine
+    /// is. `Stubs.epoch` is 2026-01-01 00:00:00 **UTC**, so on a UTC machine — every CI
+    /// runner — rows seeded a second apart land on opposite sides of midnight and split into
+    /// two day sections. That is what made `testGroupingIsRememberedPerHostAndRegroupsImmediately`
+    /// pass here and fail there (BACKGLANCE-252).
     @discardableResult
     private func makeStore(archive: Archive, defaults: UserDefaults? = nil) -> TimelineStore {
-        let store = TimelineStore(archive: archive, defaults: defaults ?? makeDefaults() ?? .standard)
+        let store = TimelineStore(
+            archive: archive,
+            defaults: defaults ?? makeDefaults() ?? .standard,
+            calendar: TimelineFixtures.istanbul
+        )
         self.store = store
         return store
     }

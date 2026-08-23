@@ -1032,6 +1032,29 @@ or by the developer's own Backglance — decides what the menu offers.
 
 `PopoverTests` (hotkey-free: the test clicks the status item via `XCUIApplication(bundleIdentifier: "com.apple.systemuiserver")` fallback or the `--uitest-open-popover` argument) and `TimelineWindowTests` (open window, scroll 200 rows, type in search field, expect filtered rows) live next to it. UI tests run only on `macos-26` in CI because the XCUITest runner is the slowest part of the matrix and the app's UI does not vary by OS.
 
+### Reproducing the runner's time zone
+
+The CI runner is in UTC and the maintainer is not, which is enough to make a green suite here a
+red one there. `Stubs.epoch` is 2026-01-01 00:00:00 **UTC**, so rows seeded a second apart sit on
+opposite sides of midnight for a UTC machine and land in two day sections instead of one — a test
+that groups by day then counts headers gets a different answer depending on who ran it
+(BACKGLANCE-252).
+
+The fix belongs in the test: pin the calendar, the way `TimelineFixtures.istanbul` exists to be
+pinned, rather than letting `.current` answer "where is midnight" differently per machine. To check
+a suite for that dependence before CI does, add `TZ` to the test plan's configuration and run it:
+
+```jsonc
+// Backglance.xctestplan, temporarily — the environment in a configuration does reach the test
+// host, where `TZ=UTC xcodebuild test …` does not (the same gap PerfGate documents for
+// BACKGLANCE_PERF).
+{ "key": "TZ", "value": "UTC" }
+```
+
+That turns "fails only on CI" into a local failure in one run, which is how the three failures in
+BACKGLANCE-252 were diagnosed: one was genuinely time-zone dependent, and the other two were
+sleep-then-assert tests that a busy machine could lose.
+
 ## Timeline tests
 
 The timeline is tested at the view-model level, not through XCUITest, for everything except "does it render". `TimelineViewModel` takes an `Archive` and a clock and exposes pages of 200 rows.

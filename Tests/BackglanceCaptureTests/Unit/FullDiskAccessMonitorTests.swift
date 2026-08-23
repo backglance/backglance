@@ -2,6 +2,8 @@
 import Foundation
 import XCTest
 
+// MARK: - FullDiskAccessMonitorTests
+
 /// The cadence, which is the part with a design decision in it: activation catches nearly
 /// every real grant, and the timer is a fallback that must not outlive the screen it exists
 /// for.
@@ -79,13 +81,19 @@ final class FullDiskAccessMonitorTests: XCTestCase {
 
         monitor.startPolling()
         XCTAssertTrue(monitor.isPolling)
-        try await Task.sleep(for: .milliseconds(120))
+        // Wait for the second probe rather than for six intervals' worth of clock. The
+        // sleep this replaces was 120 ms against a 20 ms interval and still saw a single
+        // probe on a CI runner, where the timer's next tick queues behind everything else
+        // on the machine (BACKGLANCE-252).
+        try await waitUntil { monitor.probeCount > 1 }
         let whilePolling = monitor.probeCount
 
         monitor.stopPolling()
+        // This one has to be a wait: proving a timer stopped means giving it a window in
+        // which it could have fired and did not. A slow machine makes the window quieter,
+        // never falsely red.
         try await Task.sleep(for: .milliseconds(120))
 
-        XCTAssertGreaterThan(whilePolling, 1, "the timer should have re-probed")
         XCTAssertEqual(monitor.probeCount, whilePolling, "and stopped when told to")
         XCTAssertFalse(monitor.isPolling)
     }
@@ -135,5 +143,27 @@ final class FullDiskAccessMonitorTests: XCTestCase {
     private func makeMonitor(pollInterval: Duration = .seconds(30)) throws -> FullDiskAccessMonitor {
         let url = try XCTUnwrap(storeURL)
         return FullDiskAccessMonitor(probe: FullDiskAccessProbe { url }, pollInterval: pollInterval)
+    }
+}
+
+// MARK: - Waiting
+
+private extension FullDiskAccessMonitorTests {
+    /// Polls until the condition holds. A timer test that sleeps asserts how fast the
+    /// machine is; one that waits asserts that the timer fires.
+    func waitUntil(
+        timeout: TimeInterval = 5,
+        _ condition: @MainActor () -> Bool,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if await condition() {
+                return
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("condition not met within \(timeout)s", file: file, line: line)
     }
 }
