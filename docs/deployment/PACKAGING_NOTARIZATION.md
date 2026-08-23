@@ -1173,7 +1173,7 @@ Checking the image by hand: `hdiutil attach build/dist/Backglance-1.0.0.dmg -rea
 
 ## Homebrew cask
 
-The cask lives in the tap `backglance/homebrew-tap` as `Casks/backglance.rb`; users install with `brew install --cask backglance/tap/backglance`. It points at the release zip on GitHub Releases and pins its sha256.
+The cask lives in the tap `backglance/homebrew-tap` as `Casks/backglance.rb`; users install with `brew install --cask backglance/tap/backglance`. It points at the release zip on GitHub Releases and pins its sha256. Until the tap exists, the checked-in seed at `Scripts/tap/Casks/backglance.rb` carries this exact content (kept `brew style`-clean); `Scripts/tap/README.md` is the one-time tap creation procedure, after which the tap's copy is canonical.
 
 ### Casks/backglance.rb
 
@@ -1184,7 +1184,7 @@ cask "backglance" do
 
   url "https://github.com/backglance/backglance/releases/download/v#{version}/Backglance-#{version}.zip"
   name "Backglance"
-  desc "Searchable local archive of macOS notifications, in the menu bar"
+  desc "Searchable local archive of notifications, in the menu bar"
   homepage "https://github.com/backglance/backglance"
 
   # `brew livecheck backglance` reads the latest non-prerelease GitHub Release tag (vX.Y.Z)
@@ -1195,7 +1195,8 @@ cask "backglance" do
 
   # The app updates itself with Sparkle; brew upgrade is not the only path.
   auto_updates true
-  depends_on macos: ">= :sonoma"
+  # macos: :version means "this or newer"; brew style rejects the old ">= :sonoma" string form.
+  depends_on macos: :sonoma
 
   app "Backglance.app"
 
