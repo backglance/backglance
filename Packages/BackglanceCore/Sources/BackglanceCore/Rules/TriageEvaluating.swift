@@ -20,6 +20,33 @@ import Foundation
 public protocol TriageEvaluating: Sendable {
     /// Triage for one row. Pure and synchronous: no archive reads, no throwing.
     func evaluate(_ notification: ArchivedNotification) -> Triage
+
+    /// Whether any enabled `mute` rule is currently compiled.
+    ///
+    /// This exists for exactly one caller: `Archive.unreadBadgeCount(_:since:triage:)`.
+    /// The badge is a SQL `COUNT` that runs inside the timeline's `ValueObservation`, so
+    /// it fires on every write and has to stay cheap — but SQL can only see
+    /// `apps.is_muted`, while `Triage.muted` is decided here, in Swift. A `mute` rule
+    /// therefore collapsed its rows into the day's Muted group while they went on
+    /// lighting the badge (BACKGLANCE-240).
+    ///
+    /// Rather than move the badge off SQL for everybody, this lets the count keep its
+    /// exact, index-only form whenever there is nothing to correct for — which is the
+    /// default install, since Backglance ships with no rules at all
+    /// (docs/features/RULES.md#digest-search-and-defaults) — and pay for a bounded
+    /// row scan only once the user has actually written a `mute` rule.
+    var hasMuteRules: Bool { get }
+}
+
+// MARK: - Default
+
+public extension TriageEvaluating {
+    /// An evaluator that says nothing about muting is taken at its word: no rules, so
+    /// nothing for the badge to correct for. ``NoTriage`` and every test double get the
+    /// cheap path for free; only `RulesEngine` has a real answer to give.
+    var hasMuteRules: Bool {
+        false
+    }
 }
 
 // MARK: - NoTriage
@@ -36,6 +63,11 @@ public struct NoTriage: TriageEvaluating {
     public init() {}
 
     // MARK: Public
+
+    /// No rules at all, so nothing the badge query needs to second-guess.
+    public var hasMuteRules: Bool {
+        false
+    }
 
     public func evaluate(_: ArchivedNotification) -> Triage {
         .none

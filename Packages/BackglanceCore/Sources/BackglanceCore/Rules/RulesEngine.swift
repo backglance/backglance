@@ -65,6 +65,24 @@ public final class RulesEngine: TriageEvaluating, @unchecked Sendable {
         return snapshot.problems
     }
 
+    /// ``TriageEvaluating/hasMuteRules``: whether the installed snapshot holds any
+    /// enabled `mute` rule.
+    ///
+    /// Every `mute` rule counts, not only the keyword-scoped ones BACKGLANCE-240 was
+    /// filed about. `apps.is_muted` — the column the badge's SQL can see — is written by
+    /// ``setAppMuted(bundleID:muted:)`` alone. A `mute` *rule* is a different mechanism
+    /// that produces the same `Triage.muted`, and the badge query cannot see any of them,
+    /// including one whose `match_field` is `app`.
+    ///
+    /// Reads the compiled set rather than the raw rules: `compile(_:)` has already dropped
+    /// disabled rules and rules whose pattern would not compile, so a rule the engine
+    /// would never act on cannot push the badge onto its slower path either.
+    public var hasMuteRules: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return snapshot.compiled.entries.contains { $0.kind == .mute }
+    }
+
     /// Starts observing `rules` and `apps`, installing every snapshot as it arrives.
     ///
     /// Idempotent — a second call cancels the first observation before starting a new one,

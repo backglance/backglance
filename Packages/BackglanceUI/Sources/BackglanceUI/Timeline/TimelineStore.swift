@@ -22,7 +22,7 @@ import Observation
 /// subscription, so no view ever mutates its own copy of a row.
 ///
 /// The subscription itself lives in `BackglanceCore`
-/// (``BackglanceCore/Archive/timelineSnapshots(unreadSince:pageSize:)``): this
+/// (``BackglanceCore/Archive/timelineSnapshots(unreadSince:pageSize:triage:)``): this
 /// package does not import GRDB, and the store is easier to reason about when
 /// "the newest page changed" arrives as a value rather than as a query.
 ///
@@ -104,6 +104,11 @@ public final class TimelineStore {
     /// Unread, unmuted, delivered since the anchor — capped by the archive at
     /// ``BackglanceCore/Archive/unreadBadgeCap``, which the status item renders
     /// as "99+".
+    ///
+    /// "Unmuted" means both senses: the app's `is_muted` column, and any `mute` rule
+    /// that matches the row. The archive is handed this store's ``triage`` so the number
+    /// here and the rows collapsed into the day's Muted group are decided by the same
+    /// evaluator (BACKGLANCE-240).
     public internal(set) var unreadBadgeCount = 0
 
     /// A one-sentence, content-free explanation of a failed read, for the banner.
@@ -358,7 +363,13 @@ public final class TimelineStore {
 
     func startObserving() {
         observation?.cancel()
-        let stream = archive.timelineSnapshots(unreadSince: unreadAnchor, pageSize: Self.pageSize)
+        // The same `triage` `regroup()` evaluates rows with, so the badge and the day's
+        // Muted group cannot disagree about what "muted" means (BACKGLANCE-240).
+        let stream = archive.timelineSnapshots(
+            unreadSince: unreadAnchor,
+            pageSize: Self.pageSize,
+            triage: triage
+        )
         observation = Task { [weak self] in
             do {
                 for try await snapshot in stream {

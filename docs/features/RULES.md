@@ -391,10 +391,21 @@ The trade-off we accept: the first render after a rules change costs one evaluat
 |---|---|
 | `highlight` | `RoundedRectangle(…).fill(color.swiftUIColor.opacity(0.12))` behind the row; under Increase Contrast the tint becomes a border |
 | `pinned` | Floats to the top of its day group with the manual `is_pinned` rows (manual first, then VIP, then `delivered_at DESC`), with a pin glyph |
-| `muted` | Moves into the trailing "Muted (n)" group for its day, collapsed by default, and excluded from the unread badge (`… AND a.is_muted = 0`) |
+| `muted` | Moves into the trailing "Muted (n)" group for its day, collapsed by default, and excluded from the unread badge |
 | `matchedRuleIDs` | Feeds the row inspector's "Matched: Urgent, Deploys" line and the `is:vip` search filter |
 
 Nothing else reads `Triage`, and there is no code path from it to `UNUserNotificationCenter`, to the system store, or to any Apple API that affects delivery.
+
+**How `muted` reaches the badge.** Two different things produce `Triage.muted`, and only one of them is a column. `apps.is_muted` is written by `RulesEngine.setAppMuted(bundleID:muted:)` — the row context menu's "Mute ‹App› in Timeline". A `mute` **rule** is not written anywhere; it is evaluated in Swift, per row, at read time. `Archive.unreadBadgeCount(_:since:triage:)` therefore has two paths, chosen by `TriageEvaluating.hasMuteRules`:
+
+| Rules present | How the badge is counted | Exact? |
+|---|---|---|
+| No enabled `mute` rule — the default install, since Backglance ships with no rules | Index-only SQL `COUNT`, `… AND a.is_muted = 0`, capped by `LIMIT unreadBadgeCap` | Yes, to the cap |
+| At least one enabled `mute` rule | Up to `unreadBadgeScanCap` (3 × the cap) candidate rows are fetched newest-first and evaluated through `triage`, counting survivors until the cap is reached | Yes, unless more than `unreadBadgeScanCap` candidates exist |
+
+The second path is bounded on purpose. The badge is recomputed inside the timeline's `ValueObservation`, so it runs on every write; an unbounded scan there would make every captured notification pay for the rule set. Past `unreadBadgeScanCap` unread candidates the count can under-report — at which point the badge is already rendering "99+", a number that is approximate by design.
+
+Until BACKGLANCE-240 there was only the SQL path, so a `mute` rule collapsed its rows into the Muted group and went on counting them in the badge — the Rule Kinds table above promises both halves, and now both happen.
 
 ## UI Components
 
