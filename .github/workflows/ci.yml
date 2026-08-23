@@ -120,10 +120,36 @@ jobs:
     if: needs.changes.outputs.code == 'true'
     runs-on: macos-26
     timeout-minutes: 15
+    env:
+      # Pinned, like XCODE_APP above: `brew install` takes whatever is newest that
+      # day, and a linter release can turn this gate red on a commit that touches
+      # no Swift — SwiftFormat 0.62's new redundantSwiftUIGroup rule did exactly
+      # that to code 0.60 formatted clean (BACKGLANCE-251). A bump is deliberate:
+      # change the version and checksum together (the checksum is shasum -a 256 of
+      # the release zip), run the new binary over the repo, and commit whatever it
+      # reformats in the same PR. .swiftformat's rule set assumes at least the
+      # SwiftFormat version pinned here.
+      SWIFTFORMAT_VERSION: 0.62.1
+      SWIFTFORMAT_SHA256: 7cb1cb1fae04932047c7015441c543848e8e60e1572d808d080e0a1f1661114a
+      SWIFTLINT_VERSION: 0.63.2
+      SWIFTLINT_SHA256: c59a405c85f95b92ced677a500804e081596a4cae4a6a485af76065557d6ed29
     steps:
       - uses: actions/checkout@v4
-      - name: Install linters
-        run: brew install --quiet swiftformat swiftlint
+      - name: Install pinned linters
+        run: |
+          cd "$RUNNER_TEMP"
+          curl -sSL --retry 3 -o swiftformat.zip \
+            "https://github.com/nicklockwood/SwiftFormat/releases/download/${SWIFTFORMAT_VERSION}/swiftformat.zip"
+          echo "${SWIFTFORMAT_SHA256}  swiftformat.zip" | shasum -a 256 -c -
+          unzip -oq swiftformat.zip -d lint-tools/swiftformat
+          curl -sSL --retry 3 -o swiftlint.zip \
+            "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip"
+          echo "${SWIFTLINT_SHA256}  swiftlint.zip" | shasum -a 256 -c -
+          unzip -oq swiftlint.zip -d lint-tools/swiftlint
+          echo "$RUNNER_TEMP/lint-tools/swiftformat" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP/lint-tools/swiftlint" >> "$GITHUB_PATH"
+      - name: Linter versions
+        run: swiftformat --version && swiftlint version
       # --lint never rewrites; it exits non-zero on any file it would have changed.
       - name: SwiftFormat
         run: swiftformat --lint --reporter github-actions-log .

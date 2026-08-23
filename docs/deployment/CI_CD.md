@@ -170,16 +170,31 @@ jobs:
     if: needs.changes.outputs.code == 'true'
     runs-on: macos-26
     timeout-minutes: 15
+    env:
+      # Pinned: brew installs whatever is newest that day, and a linter release
+      # can turn this gate red on a commit that touches no Swift (BACKGLANCE-251).
+      # Bump the version and checksum together, run the new binary over the repo,
+      # and commit whatever it reformats in the same PR.
+      SWIFTFORMAT_VERSION: 0.62.1
+      SWIFTFORMAT_SHA256: 7cb1cb1fae04932047c7015441c543848e8e60e1572d808d080e0a1f1661114a
+      SWIFTLINT_VERSION: 0.63.2
+      SWIFTLINT_SHA256: c59a405c85f95b92ced677a500804e081596a4cae4a6a485af76065557d6ed29
     steps:
       - uses: actions/checkout@v4
-      - name: Install linters
-        run: brew install --quiet swiftformat swiftlint
+      - name: Install pinned linters
+        run: |
+          # Release binaries from each project's GitHub releases, checksummed;
+          # see ci.yml for the exact download-and-verify block.
+          ...
       # --lint never rewrites; it exits non-zero on any file it would have changed.
       - name: SwiftFormat
         run: swiftformat --lint --reporter github-actions-log .
       # --strict promotes every warning to an error, including no_content_in_logs.
       - name: SwiftLint
         run: swiftlint lint --strict --reporter github-actions-logging
+      # A custom rule that matches nothing passes forever, so prove the privacy rules bite.
+      - name: Privacy lint rules are live
+        run: Scripts/verify_lint_rules.sh
 
   adapter-guard:
     name: Adapter changes carry fixtures

@@ -58,7 +58,11 @@
 --enable markTypes
 --enable organizeDeclarations
 --enable sortDeclarations
---enable wrapConditionalBodies
+# wrapConditionalBodies split into these three in SwiftFormat 0.62; the trio is
+# behaviour-identical to the old rule. Requires the pinned version in ci.yml.
+--enable wrapGuardStatementBodies
+--enable wrapIfExpressionBodies
+--enable wrapIfStatementBodies
 --enable wrapEnumCases
 --enable wrapMultilineStatementBraces
 --enable wrapSwitchCases

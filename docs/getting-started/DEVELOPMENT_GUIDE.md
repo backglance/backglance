@@ -252,6 +252,10 @@ Language mode is Swift 5 (Swift 5.10+), building under the Swift 6 toolchain wit
 ```
 
 Run `swiftformat .` before committing; CI runs `swiftformat --lint .` and fails on any diff.
+CI pins both linters (versions and checksums live at the top of `ci.yml`'s `lint` job) because
+a floating `brew install` once turned the gate red on a commit that touched no Swift
+(BACKGLANCE-251) — match those versions locally, and note that `.swiftformat` enables rules the
+pinned SwiftFormat introduced, so an older local binary will reject the config outright.
 
 ### SwiftLint
 
