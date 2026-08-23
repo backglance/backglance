@@ -34,8 +34,14 @@ public struct WipeConfirmationSheet: View {
             notAffectedList
             Divider()
             confirmationField
-            Toggle(String(localized: "Also forget per-app settings"), isOn: $model.forgetPerAppSettings)
-                .accessibilityIdentifier("privacy.wipe.forgetSettings")
+            Toggle(
+                String(
+                    localized: "Also forget per-app settings",
+                    comment: "Toggle: the wipe also clears per-app exclusions, retention and redaction settings"
+                ),
+                isOn: $model.forgetPerAppSettings
+            )
+            .accessibilityIdentifier("privacy.wipe.forgetSettings")
             gateNote
             if let failure = model.failure {
                 Label(failure.userMessage, systemImage: "exclamationmark.triangle")
@@ -91,7 +97,7 @@ public struct WipeConfirmationSheet: View {
 
     private var notAffectedList: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "What this doesn’t reach"))
+            Text(String(localized: "What this doesn’t reach", comment: "Heading: data the wipe does not delete"))
                 .font(.callout.weight(.semibold))
             ForEach(Self.notAffected, id: \.text) { item in
                 Label(item.text, systemImage: item.icon)
@@ -106,10 +112,13 @@ public struct WipeConfirmationSheet: View {
 
     private var confirmationField: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(String(localized: "Type “wipe” to confirm"))
-                .font(.callout)
+            Text(String(
+                localized: "Type “wipe” to confirm",
+                comment: "Instruction: keep “wipe” untranslated — the app checks typed text against that word"
+            ))
+            .font(.callout)
             TextField(
-                String(localized: "Confirmation"),
+                String(localized: "Confirmation", comment: "Text field label: where the confirmation word is typed"),
                 text: $model.typed,
                 prompt: Text(verbatim: WipeConfirmationModel.confirmationWord)
             )
@@ -141,7 +150,7 @@ public struct WipeConfirmationSheet: View {
             if model.isBusy {
                 ProgressView()
                     .controlSize(.small)
-                Text(String(localized: "Wiping…"))
+                Text(String(localized: "Wiping…", comment: "Progress label: the archive is being erased"))
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -150,7 +159,10 @@ public struct WipeConfirmationSheet: View {
                 .keyboardShortcut(.cancelAction)
                 .disabled(model.isBusy)
                 .accessibilityIdentifier("privacy.wipe.cancel")
-            Button(String(localized: "Wipe Archive"), role: .destructive) {
+            Button(
+                String(localized: "Wipe Archive", comment: "Button: permanently erases the archive"),
+                role: .destructive
+            ) {
                 Task { await model.confirm() }
             }
             .disabled(!model.canWipe)

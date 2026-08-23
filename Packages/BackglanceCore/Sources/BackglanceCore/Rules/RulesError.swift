@@ -46,7 +46,10 @@ extension RulesError: LocalizedError {
             String(localized: "No archived app with bundle id \(bundleID).")
 
         case let .invalidEntry(index, reason):
-            String(localized: "Rule \(index + 1) in the file: \(reason).")
+            String(
+                localized: "Rule \(index + 1) in the file: \(reason).",
+                comment: "Import error; placeholders are the rule's number and a lowercase reason phrase"
+            )
 
         case let .importFormatMismatch(format):
             String(localized: "This file's format is \"\(format)\", not a rules file Backglance recognizes.")

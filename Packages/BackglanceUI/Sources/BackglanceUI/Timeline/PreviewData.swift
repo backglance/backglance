@@ -72,7 +72,10 @@ public enum PreviewData {
 
         let mutedGroup = TimelineSection.AppGroup(
             id: "muted",
-            name: String(localized: "Muted"),
+            name: String(
+                localized: "Muted",
+                comment: "Header of the collapsed group of muted notifications (hidden from view, not silenced)"
+            ),
             count: 3,
             isMuted: true,
             bundleID: nil

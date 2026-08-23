@@ -59,7 +59,7 @@ public struct AppsSettingsView: View {
             Image(systemName: "app.dashed")
                 .font(.largeTitle)
                 .foregroundStyle(.tertiary)
-            Text(String(localized: "No apps yet"))
+            Text(String(localized: "No apps yet", comment: "Empty-state placeholder: the archive holds no apps"))
                 .foregroundStyle(.secondary)
         }
         .frame(minWidth: 180)
@@ -68,7 +68,7 @@ public struct AppsSettingsView: View {
     }
 
     private var emptySelection: some View {
-        Text(String(localized: "Select an app"))
+        Text(String(localized: "Select an app", comment: "Placeholder in the detail pane when no app is selected"))
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             // Identified like its sibling `apps.list.empty`, and for a second reason: this
@@ -88,9 +88,12 @@ struct AppListRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(row.name)
-            Text(String(localized: "\(row.notificationCount) notifications"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text(String(
+                localized: "\(row.notificationCount) notifications",
+                comment: "Caption under the app's name; placeholder is a count of archived notifications"
+            ))
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
     }
 }
@@ -109,19 +112,29 @@ struct AppDetailForm: View {
     var body: some View {
         Form {
             Section {
-                Picker(String(localized: "Keep notifications for"), selection: retentionBinding) {
-                    Text(String(localized: "Inherit")).tag(AppRetention.inherit)
+                Picker(
+                    String(localized: "Keep notifications for", comment: "Picker label: per-app retention period"),
+                    selection: retentionBinding
+                ) {
+                    Text(String(localized: "Inherit", comment: "Picker option: use the global retention setting"))
+                        .tag(AppRetention.inherit)
                     ForEach(RetentionPolicy.allCases, id: \.self) { policy in
                         Text(retentionLabel(policy)).tag(AppRetention.policy(policy))
                     }
                 }
                 .accessibilityIdentifier("apps.detail.retention")
 
-                Toggle(String(localized: "Exclude this app"), isOn: excludedBinding)
-                    .accessibilityIdentifier("apps.detail.excluded")
+                Toggle(
+                    String(localized: "Exclude this app", comment: "Toggle: never archive this app's notifications"),
+                    isOn: excludedBinding
+                )
+                .accessibilityIdentifier("apps.detail.excluded")
 
-                Toggle(String(localized: "Redact one-time codes"), isOn: redactedBinding)
-                    .accessibilityIdentifier("apps.detail.redaction")
+                Toggle(
+                    String(localized: "Redact one-time codes", comment: "Toggle: replace codes before storing"),
+                    isOn: redactedBinding
+                )
+                .accessibilityIdentifier("apps.detail.redaction")
 
                 if let failure = model.failure {
                     Label(failure, systemImage: "exclamationmark.triangle")
@@ -135,8 +148,8 @@ struct AppDetailForm: View {
                 Choosing "Never store" above also turns on "Exclude this app", in the same write. \
                 Turning "Exclude this app" off on its own does not change the retention policy — \
                 pick a window above if you want capture to resume under one.
-                """))
-                .fixedSize(horizontal: false, vertical: true)
+                """, comment: "Footer; the quoted phrases must match the picker option and toggle labels above"))
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .formStyle(.grouped)

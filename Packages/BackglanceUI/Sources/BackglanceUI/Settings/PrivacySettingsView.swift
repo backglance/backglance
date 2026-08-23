@@ -51,13 +51,16 @@ public struct PrivacySettingsView: View {
     private var pauseDescription: String {
         switch model.pauseState {
         case .notPaused:
-            String(localized: "Running")
+            String(localized: "Running", comment: "Status label: notification capture is running")
 
         case .indefinite:
-            String(localized: "Paused")
+            String(localized: "Paused", comment: "Status label: capture is paused indefinitely")
 
         case let .until(date):
-            String(localized: "Paused until \(PauseCopy.deadlineText(for: date))")
+            String(
+                localized: "Paused until \(PauseCopy.deadlineText(for: date))",
+                comment: "Status label; placeholder is when the pause ends"
+            )
         }
     }
 
@@ -73,7 +76,10 @@ public struct PrivacySettingsView: View {
                             .monospacedDigit()
                     }
                     .accessibilityLabel(Text(
-                        String(localized: "\(row.name), \(row.count) codes redacted in the last 30 days")
+                        String(
+                            localized: "\(row.name), \(row.count) codes redacted in the last 30 days",
+                            comment: "VoiceOver label; placeholders are the app's name and a count"
+                        )
                     ))
                 }
             } else {
@@ -88,7 +94,7 @@ public struct PrivacySettingsView: View {
                     .foregroundStyle(.secondary)
             }
         } header: {
-            Text(String(localized: "Redaction activity"))
+            Text(String(localized: "Redaction activity", comment: "Section header: codes redacted per app"))
         } footer: {
             Text(String(localized: """
             How many codes were replaced, by app, over the last 30 days. Backglance cannot show \
@@ -101,12 +107,12 @@ public struct PrivacySettingsView: View {
 
     private var pauseSection: some View {
         Section {
-            LabeledContent(String(localized: "Capture")) {
+            LabeledContent(String(localized: "Capture", comment: "Notification capture (noun)")) {
                 HStack(spacing: 8) {
                     Text(pauseDescription)
                         .foregroundStyle(model.pauseState.isPaused ? .primary : .secondary)
                     if model.pauseState.isPaused {
-                        Button(String(localized: "Resume")) {
+                        Button(String(localized: "Resume", comment: "Button: resume notification capture")) {
                             Task { await model.resume() }
                         }
                         .accessibilityIdentifier("privacy.pause.resume")
@@ -120,7 +126,7 @@ public struct PrivacySettingsView: View {
             )
             .accessibilityIdentifier("privacy.pause.importWhilePaused")
         } header: {
-            Text(String(localized: "Pause"))
+            Text(String(localized: "Pause", comment: "Section header: pausing capture (noun)"))
         } footer: {
             Text(String(localized: """
             When off, notifications that arrive during a pause are never archived, even though \
@@ -135,7 +141,7 @@ public struct PrivacySettingsView: View {
     /// folder.
     private var archiveSection: some View {
         Section {
-            Button(String(localized: "Reveal Archive in Finder")) {
+            Button(String(localized: "Reveal Archive in Finder", comment: "Button; Finder's 'Reveal' wording")) {
                 guard let directory = model.archiveDirectory else {
                     return
                 }
@@ -144,13 +150,16 @@ public struct PrivacySettingsView: View {
             .disabled(model.archiveDirectory == nil)
             .accessibilityIdentifier("privacy.archive.reveal")
 
-            Button(String(localized: "Wipe Archive…"), role: .destructive) {
+            Button(
+                String(localized: "Wipe Archive…", comment: "Destructive button: opens the wipe confirmation"),
+                role: .destructive
+            ) {
                 model.wipe.reset()
                 isShowingWipeSheet = true
             }
             .accessibilityIdentifier("privacy.archive.wipe")
         } header: {
-            Text(String(localized: "Archive"))
+            Text(String(localized: "Archive", comment: "Section header: the notification archive (noun)"))
         } footer: {
             Text(String(localized: """
             Wiping deletes every notification Backglance has stored and starts over. \

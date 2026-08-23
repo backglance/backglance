@@ -39,11 +39,11 @@ public extension AwayReason {
     /// strings is two places for a translation to drift.
     var whileLabel: String {
         switch self {
-        case .locked: String(localized: "while locked")
-        case .asleep: String(localized: "while asleep")
-        case .focus: String(localized: "while in a Focus")
-        case .presenting: String(localized: "while presenting")
-        case .manual: String(localized: "while away")
+        case .locked: String(localized: "while locked", comment: "Fragment following a notification count")
+        case .asleep: String(localized: "while asleep", comment: "Fragment following a notification count")
+        case .focus: String(localized: "while in a Focus", comment: "Fragment following a notification count")
+        case .presenting: String(localized: "while presenting", comment: "Fragment following a notification count")
+        case .manual: String(localized: "while away", comment: "Fragment following a notification count")
         }
     }
 }

@@ -49,21 +49,30 @@ public struct OnboardingView: View {
 
     private var continueTitle: String {
         model.step == .done
-            ? String(localized: "Open Backglance")
-            : String(localized: "Continue")
+            ? String(
+                localized: "Open Backglance",
+                comment: "Button on setup's last screen: closes setup and opens the app; Backglance is the app name"
+            )
+            : String(localized: "Continue", comment: "Button: advances setup to the next screen")
     }
 
     private var footer: some View {
         HStack(spacing: 12) {
             if model.canGoBack {
-                Button(String(localized: "Back")) { model.back() }
+                Button(String(
+                    localized: "Back",
+                    comment: "Button: returns setup to the previous screen"
+                )) { model.back() }
                     .accessibilityIdentifier("onboarding.back")
             }
 
             Spacer()
 
             if model.canSkip {
-                Button(String(localized: "Skip for now")) { model.skip() }
+                Button(String(
+                    localized: "Skip for now",
+                    comment: "Link button: leaves setup without granting the permission; it can be granted later"
+                )) { model.skip() }
                     .buttonStyle(.link)
                     // Said plainly, because skipping is a supported outcome and someone
                     // hesitating over it deserves to know it is not a dead end.

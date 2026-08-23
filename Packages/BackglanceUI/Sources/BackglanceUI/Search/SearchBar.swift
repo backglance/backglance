@@ -75,7 +75,10 @@ public struct SearchBar: View {
         // never renders does the same job through the menu-key system,
         // which already knows the difference.
         .background {
-            Button(String(localized: "Focus search")) {
+            Button(String(
+                localized: "Focus search",
+                comment: "Hidden button carrying the Command-F shortcut; never drawn or spoken"
+            )) {
                 isFocused = true
             }
             .keyboardShortcut("f", modifiers: .command)
@@ -101,14 +104,17 @@ public struct SearchBar: View {
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
 
-            TextField(String(localized: "Search"), text: $model.text)
-                .textFieldStyle(.plain)
-                .focused($isFocused)
-                .onSubmit {
-                    Task { await model.searchNow() }
-                }
-                // docs/reference/ACCESSIBILITY.md#identifiers-for-ui-tests.
-                .accessibilityIdentifier("timeline.searchField")
+            TextField(
+                String(localized: "Search", comment: "Placeholder text in the empty search field (noun)"),
+                text: $model.text
+            )
+            .textFieldStyle(.plain)
+            .focused($isFocused)
+            .onSubmit {
+                Task { await model.searchNow() }
+            }
+            // docs/reference/ACCESSIBILITY.md#identifiers-for-ui-tests.
+            .accessibilityIdentifier("timeline.searchField")
 
             if showsSpinner {
                 ProgressView()
@@ -122,7 +128,10 @@ public struct SearchBar: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(String(localized: "Clear search"))
+                .accessibilityLabel(String(
+                    localized: "Clear search",
+                    comment: "Spoken by VoiceOver for the button that empties the search field"
+                ))
             }
         }
         .padding(.horizontal, 8)

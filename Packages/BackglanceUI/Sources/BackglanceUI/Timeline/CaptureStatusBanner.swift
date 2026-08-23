@@ -80,7 +80,10 @@ public struct CaptureStatusBanner: View {
 
         case let .paused(until):
             if let until {
-                String(localized: "Capture is paused until \(Self.time.string(from: until)).")
+                String(
+                    localized: "Capture is paused until \(Self.time.string(from: until)).",
+                    comment: "Timeline banner; placeholder is the clock time the pause ends"
+                )
             } else {
                 String(localized: "Capture is paused.")
             }
@@ -114,10 +117,16 @@ public struct CaptureStatusBanner: View {
     private var button: String? {
         switch state {
         case .noFullDiskAccess:
-            String(localized: "Grant Full Disk Access…")
+            String(
+                localized: "Grant Full Disk Access…",
+                comment: "Banner button: opens System Settings; must match the timeline empty state's button"
+            )
 
         case .paused:
-            String(localized: "Resume")
+            String(
+                localized: "Resume",
+                comment: "Banner button: starts archiving notifications again after a pause"
+            )
 
         case .running,
              .degraded,

@@ -56,15 +56,18 @@ public struct UndoToastView: View {
 
             Spacer(minLength: 8)
 
-            Button(String(localized: "Undo"), action: onUndo)
-                .buttonStyle(.link)
-                // Also reachable the way docs/features/ACTIONS.md's keyboard table
-                // specifies: ⌘Z while the toast is visible, no different from a click.
-                // SwiftUI only honours a `.keyboardShortcut` while the view carrying it
-                // is actually in the hierarchy, which is exactly "while the toast is
-                // visible" — no separate visibility check needed here.
-                .keyboardShortcut("z", modifiers: .command)
-                .accessibilityIdentifier("timeline.undoToast.undo")
+            Button(
+                String(localized: "Undo", comment: "Button on the delete toast: restores the deleted notifications"),
+                action: onUndo
+            )
+            .buttonStyle(.link)
+            // Also reachable the way docs/features/ACTIONS.md's keyboard table
+            // specifies: ⌘Z while the toast is visible, no different from a click.
+            // SwiftUI only honours a `.keyboardShortcut` while the view carrying it
+            // is actually in the hierarchy, which is exactly "while the toast is
+            // visible" — no separate visibility check needed here.
+            .keyboardShortcut("z", modifiers: .command)
+            .accessibilityIdentifier("timeline.undoToast.undo")
         }
     }
 
@@ -91,9 +94,15 @@ public struct UndoToastView: View {
     /// standing up a SwiftUI hierarchy to inspect.
     static func message(count: Int) -> String {
         if count == 1 {
-            String(localized: "Deleted 1 notification")
+            String(
+                localized: "Deleted 1 notification",
+                comment: "Toast message after a delete (statement, not a button)"
+            )
         } else {
-            String(localized: "Deleted \(count) notifications")
+            String(
+                localized: "Deleted \(count) notifications",
+                comment: "Toast message after a delete; placeholder is how many were deleted (always 2 or more)"
+            )
         }
     }
 }

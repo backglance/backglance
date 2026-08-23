@@ -109,7 +109,10 @@ enum NotificationRowMenu {
         // not this type's concern) when the bundle id does not resolve.
         result.append(Item(
             kind: .open,
-            title: String(localized: "Open in \(appName)"),
+            title: String(
+                localized: "Open in \(appName)",
+                comment: "Context-menu item: opens the notification in its app; placeholder is the app's display name"
+            ),
             isEnabled: canActivateApp
         ))
 
@@ -117,7 +120,14 @@ enum NotificationRowMenu {
         // disabled, when there is nothing more specific to offer than what
         // item 1 already does.
         if showsOpenLink {
-            result.append(Item(kind: .openLink, title: String(localized: "Open Link"), isEnabled: true))
+            result.append(Item(
+                kind: .openLink,
+                title: String(
+                    localized: "Open Link",
+                    comment: "Context-menu item: opens the notification's own deep link, not just the app"
+                ),
+                isEnabled: true
+            ))
         }
 
         result.append(.separator)
@@ -125,32 +135,17 @@ enum NotificationRowMenu {
         // 3–4. Copy / Copy with App and Time — act on the whole selection.
         // Always available: text stays copyable even when nothing else about
         // the row works (an uninstalled app, a dead link).
-        result.append(Item(kind: .copy, title: String(localized: "Copy"), isEnabled: true))
-        result.append(Item(
-            kind: .copyWithAppAndTime,
-            title: String(localized: "Copy with App and Time"),
-            isEnabled: true
-        ))
+        result.append(contentsOf: copyItems)
 
         result.append(.separator)
 
-        // 5. Pin / Unpin — acts on the whole selection. The label follows
-        // `item.notification.isPinned`, the *manual* flag this item actually
-        // flips, never `item.isPinned` (which also folds in a VIP-triage
-        // pin — see `TimelineItem.isPinned`). A row that is pinned only
-        // because a VIP rule matched it must still offer "Pin": clicking it
-        // is exactly what would set the manual flag, and offering "Unpin"
-        // instead would flip a flag that was never true, doing nothing to
-        // the row's actual pinned appearance.
-        result.append(item.notification.isPinned
-            ? Item(kind: .unpin, title: String(localized: "Unpin"), isEnabled: true)
-            : Item(kind: .pin, title: String(localized: "Pin"), isEnabled: true))
+        // 5. Pin / Unpin — acts on the whole selection; see
+        // ``pinItem(for:)`` for the toggle-label reasoning.
+        result.append(pinItem(for: item))
 
         // 6. Mark as Read / Mark as Unread — acts on the whole selection.
         // Same toggle-label reasoning as item 5, over `isRead` instead.
-        result.append(item.notification.isRead
-            ? Item(kind: .markUnread, title: String(localized: "Mark as Unread"), isEnabled: true)
-            : Item(kind: .markRead, title: String(localized: "Mark as Read"), isEnabled: true))
+        result.append(readItem(for: item))
 
         // 7. Snooze… is v1.x (docs/features/SNOOZE_RESURFACE.md) — omitted entirely, not disabled.
 
@@ -166,11 +161,7 @@ enum NotificationRowMenu {
 
         // 9. Notification Settings for ‹App›… — acts on the right-clicked
         // row's app, like items 1 and 2, never the selection.
-        result.append(Item(
-            kind: .notificationSettings,
-            title: String(localized: "Notification Settings for \(appName)…"),
-            isEnabled: true
-        ))
+        result.append(notificationSettingsItem(appName: appName))
 
         result.append(.separator)
 
@@ -180,29 +171,46 @@ enum NotificationRowMenu {
         if host == .window, selectionCount >= 1 {
             result.append(Item(
                 kind: .exportSelection,
-                title: String(localized: "Export Selection…"),
+                title: String(
+                    localized: "Export Selection…",
+                    comment: "Context-menu item: exports the selected notifications to a file"
+                ),
                 isEnabled: true
             ))
         }
 
-        // 11. Delete — acts on the whole selection. The only item whose
-        // title itself carries the count, per the table ("Delete 3
-        // Notifications" for multi-select). A lone right-clicked row with
-        // nothing else selected reads as plain "Delete", not "Delete 1
-        // Notification" — `selectionCount` is 0 or 1 in that case, never a
-        // count worth saying out loud.
-        result.append(selectionCount > 1
-            ? Item(
-                kind: .delete,
-                title: String(localized: "Delete \(selectionCount) Notifications"),
-                isEnabled: true
-            )
-            : Item(kind: .delete, title: String(localized: "Delete"), isEnabled: true))
+        // 11. Delete — acts on the whole selection; see
+        // ``deleteItem(selectionCount:)`` for why only a multi-select's title
+        // carries the count.
+        result.append(deleteItem(selectionCount: selectionCount))
 
         return result
     }
 
     // MARK: Private
+
+    /// Items 3–4, always enabled: text stays copyable even when nothing else
+    /// about the row works (an uninstalled app, a dead link).
+    private static var copyItems: [Item] {
+        [
+            Item(
+                kind: .copy,
+                title: String(
+                    localized: "Copy",
+                    comment: "Context-menu item: copies the notification's text to the clipboard"
+                ),
+                isEnabled: true
+            ),
+            Item(
+                kind: .copyWithAppAndTime,
+                title: String(
+                    localized: "Copy with App and Time",
+                    comment: "Context-menu item: copies the text prefixed with the app's name and the delivery time"
+                ),
+                isEnabled: true
+            ),
+        ]
+    }
 
     /// Item 8's `.mute`/`.unmute` entry, split out of
     /// ``items(for:appName:selectionCount:host:canActivateApp:showsOpenLink:)``
@@ -223,7 +231,111 @@ enum NotificationRowMenu {
     /// sibling from the same app still correctly says "Unmute".
     private static func muteItem(appName: String, isAppMuted: Bool) -> Item {
         isAppMuted
-            ? Item(kind: .unmute, title: String(localized: "Unmute \(appName)"), isEnabled: true)
-            : Item(kind: .mute, title: String(localized: "Mute \(appName) in Timeline"), isEnabled: true)
+            ? Item(
+                kind: .unmute,
+                title: String(
+                    localized: "Unmute \(appName)",
+                    comment: "Context-menu item: stops collapsing the app's timeline rows; placeholder is its name"
+                ),
+                isEnabled: true
+            )
+            : Item(
+                kind: .mute,
+                title: String(
+                    localized: "Mute \(appName) in Timeline",
+                    comment: "Context-menu item: collapses the app's rows (no effect on sound); placeholder is its name"
+                ),
+                isEnabled: true
+            )
+    }
+
+    /// Item 5's `.pin`/`.unpin` entry, split out the way
+    /// ``muteItem(appName:isAppMuted:)`` is, to keep the builder under
+    /// SwiftLint's body-length limit.
+    ///
+    /// The label follows `item.notification.isPinned`, the *manual* flag this
+    /// item actually flips, never `item.isPinned` (which also folds in a
+    /// VIP-triage pin — see `TimelineItem.isPinned`). A row that is pinned
+    /// only because a VIP rule matched it must still offer "Pin": clicking it
+    /// is exactly what would set the manual flag, and offering "Unpin"
+    /// instead would flip a flag that was never true, doing nothing to the
+    /// row's actual pinned appearance.
+    private static func pinItem(for item: TimelineItem) -> Item {
+        item.notification.isPinned
+            ? Item(
+                kind: .unpin,
+                title: String(
+                    localized: "Unpin",
+                    comment: "Context-menu item: stops keeping the notification at the top of its day"
+                ),
+                isEnabled: true
+            )
+            : Item(
+                kind: .pin,
+                title: String(
+                    localized: "Pin",
+                    comment: "Context-menu item (verb): keeps the notification at the top of its day"
+                ),
+                isEnabled: true
+            )
+    }
+
+    /// Item 11. The only item whose title itself carries the count, per the
+    /// table ("Delete 3 Notifications" for multi-select). A lone right-clicked
+    /// row with nothing else selected reads as plain "Delete", not "Delete 1
+    /// Notification" — `selectionCount` is 0 or 1 in that case, never a count
+    /// worth saying out loud.
+    private static func deleteItem(selectionCount: Int) -> Item {
+        selectionCount > 1
+            ? Item(
+                kind: .delete,
+                title: String(
+                    localized: "Delete \(selectionCount) Notifications",
+                    comment: "Context-menu item: deletes the selection; placeholder is how many rows are selected"
+                ),
+                isEnabled: true
+            )
+            : Item(
+                kind: .delete,
+                title: String(
+                    localized: "Delete",
+                    comment: "Context-menu item: deletes the right-clicked notification"
+                ),
+                isEnabled: true
+            )
+    }
+
+    /// Item 9's entry.
+    private static func notificationSettingsItem(appName: String) -> Item {
+        Item(
+            kind: .notificationSettings,
+            title: String(
+                localized: "Notification Settings for \(appName)…",
+                comment: "Context-menu item: opens macOS notification settings; placeholder is the app's display name"
+            ),
+            isEnabled: true
+        )
+    }
+
+    /// Item 6's `.markRead`/`.markUnread` entry — same toggle-label reasoning
+    /// as ``pinItem(for:)``, over `isRead` instead.
+    private static func readItem(for item: TimelineItem) -> Item {
+        item.notification.isRead
+            ? Item(
+                kind: .markUnread,
+                title: String(
+                    localized: "Mark as Unread",
+                    comment: "Context-menu item: flags the notification as not yet read"
+                ),
+                isEnabled: true
+            )
+            : Item(
+                kind: .markRead,
+                title: String(
+                    localized: "Mark as Read",
+                    comment: "Context-menu item: flags the notification as read"
+                ),
+                isEnabled: true
+            )
     }
 }

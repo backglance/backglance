@@ -216,13 +216,19 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private static func tooltip(count: Int, state: TimelineCaptureState) -> String {
         switch state {
         case let .paused(until):
-            String(localized: "Backglance — \(PauseCopy.pausedClause(until: until))")
+            String(
+                localized: "Backglance — \(PauseCopy.pausedClause(until: until))",
+                comment: "Status item tooltip; the placeholder is a paused-until phrase"
+            )
 
         case .noFullDiskAccess:
             String(localized: "Backglance — needs Full Disk Access")
 
         case let .degraded(message):
-            String(localized: "Backglance — \(message)")
+            String(
+                localized: "Backglance — \(message)",
+                comment: "Status item tooltip; the placeholder is a short capture status message"
+            )
 
         case .stopped:
             String(localized: "Backglance — capture stopped")
@@ -231,7 +237,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             if count == 0 {
                 String(localized: "Backglance")
             } else {
-                String(localized: "Backglance — \(count) unread")
+                String(localized: "Backglance — \(count) unread", comment: "Tooltip; placeholder is the unread count")
             }
         }
     }
@@ -277,21 +283,25 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
     private func contextMenu() -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(item(String(localized: "Open Full Window"), #selector(openWindow)))
+        menu.addItem(item(String(localized: "Open Full Window", comment: "Menu item: opens the full timeline window"),
+                          #selector(openWindow)))
         menu.addItem(.separator())
         if case .paused = store.captureState {
             menu.addItem(item(PauseCopy.resumeMenuTitle, #selector(resumeCapture)))
         } else {
             menu.addItem(pauseSubmenuItem())
         }
-        menu.addItem(item(String(localized: "Settings…"), #selector(openSettings), key: ","))
+        menu.addItem(item(String(localized: "Settings…", comment: "Menu item: opens the settings window"),
+                          #selector(openSettings),
+                          key: ","))
         // Only when there is an updater to ask. Clicking this is the user's consent for one
         // network request, and it works even with automatic checks turned off.
         if menuActions.checkForUpdates != nil {
-            menu.addItem(item(String(localized: "Check for Updates…"), #selector(checkForUpdates)))
+            menu.addItem(item(String(localized: "Check for Updates…", comment: "Menu item: checks for a new version"),
+                              #selector(checkForUpdates)))
         }
         menu.addItem(.separator())
-        menu.addItem(withTitle: String(localized: "Quit Backglance"),
+        menu.addItem(withTitle: String(localized: "Quit Backglance", comment: "Menu item: quits the app"),
                      action: #selector(NSApplication.terminate(_:)),
                      keyEquivalent: "q")
         return menu

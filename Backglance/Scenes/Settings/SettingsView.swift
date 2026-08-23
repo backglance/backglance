@@ -40,31 +40,48 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             GeneralSettingsView(model: general)
-                .tabItem { Label(String(localized: "General"), systemImage: "gearshape") }
+                .tabItem {
+                    Label(String(localized: "General", comment: "Settings tab title"), systemImage: "gearshape")
+                }
                 .accessibilityIdentifier("settings.tab.general")
 
             AppsSettingsView(model: apps)
-                .tabItem { Label(String(localized: "Apps"), systemImage: "square.grid.2x2") }
+                .tabItem {
+                    Label(String(localized: "Apps", comment: "Settings tab title"), systemImage: "square.grid.2x2")
+                }
                 .accessibilityIdentifier("settings.tab.apps")
 
             PrivacySettingsView(model: privacy)
-                .tabItem { Label(String(localized: "Privacy"), systemImage: "hand.raised") }
+                .tabItem {
+                    Label(String(localized: "Privacy", comment: "Settings tab title"), systemImage: "hand.raised")
+                }
                 .accessibilityIdentifier("settings.tab.privacy")
 
             RulesSettingsView(model: rules)
-                .tabItem { Label(String(localized: "Rules"), systemImage: "wand.and.stars") }
+                .tabItem {
+                    Label(
+                        String(localized: "Rules", comment: "Settings tab title: notification rules"),
+                        systemImage: "wand.and.stars"
+                    )
+                }
                 .accessibilityIdentifier("settings.tab.rules")
 
             UpdatesSettingsView(model: updates)
-                .tabItem { Label(String(localized: "Updates"), systemImage: "arrow.down.circle") }
+                .tabItem {
+                    Label(String(localized: "Updates", comment: "Settings tab title"), systemImage: "arrow.down.circle")
+                }
                 .accessibilityIdentifier("settings.tab.updates")
 
             PermissionsSettingsView(model: permissions)
-                .tabItem { Label(String(localized: "Permissions"), systemImage: "lock.shield") }
+                .tabItem {
+                    Label(String(localized: "Permissions", comment: "Settings tab title"), systemImage: "lock.shield")
+                }
                 .accessibilityIdentifier("settings.tab.permissions")
 
             StatusSettingsView(model: status)
-                .tabItem { Label(String(localized: "Status"), systemImage: "waveform.path.ecg") }
+                .tabItem {
+                    Label(String(localized: "Status", comment: "Settings tab title"), systemImage: "waveform.path.ecg")
+                }
                 .accessibilityIdentifier("settings.tab.status")
         }
         // 860 is where macOS 26 stops collapsing these seven tabs into the toolbar's

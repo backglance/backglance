@@ -91,8 +91,14 @@ public struct SearchEmptyState: View {
 
     private var buttonTitle: String? {
         switch kind {
-        case .noResults: String(localized: "Clear filters")
-        case .semanticOff: String(localized: "Turn on Semantic Search")
+        case .noResults: String(
+                localized: "Clear filters",
+                comment: "Button: removes the active search filters; must match the timeline empty state's button"
+            )
+        case .semanticOff: String(
+                localized: "Turn on Semantic Search",
+                comment: "Button: enables the semantic search option from Settings"
+            )
         case .noQuery: nil
         }
     }

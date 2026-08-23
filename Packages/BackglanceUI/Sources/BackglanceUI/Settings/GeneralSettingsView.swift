@@ -62,7 +62,10 @@ public struct GeneralSettingsView: View {
         guard model.loginItemStatus == .requiresApproval else {
             return nil
         }
-        return String(localized: "Waiting for approval in System Settings ▸ General ▸ Login Items.")
+        return String(
+            localized: "Waiting for approval in System Settings ▸ General ▸ Login Items.",
+            comment: "Status; the path must match macOS's System Settings names"
+        )
     }
 
     private var hotKeyStatusText: String {
@@ -73,8 +76,11 @@ public struct GeneralSettingsView: View {
 
     private var startupSection: some View {
         Section {
-            Toggle(String(localized: "Open Backglance at login"), isOn: $model.launchAtLoginEnabled)
-                .accessibilityIdentifier("general.launchAtLogin")
+            Toggle(
+                String(localized: "Open Backglance at login", comment: "Toggle: launch Backglance at login"),
+                isOn: $model.launchAtLoginEnabled
+            )
+            .accessibilityIdentifier("general.launchAtLogin")
 
             if let loginItemStatusText {
                 Label(loginItemStatusText, systemImage: "exclamationmark.triangle")
@@ -90,7 +96,9 @@ public struct GeneralSettingsView: View {
                     .accessibilityIdentifier("general.launchAtLogin.failure")
             }
 
-            LabeledContent(String(localized: "Global shortcut")) {
+            LabeledContent(
+                String(localized: "Global shortcut", comment: "Row label: the shortcut that opens Backglance")
+            ) {
                 Text(hotKeyStatusText)
                     .font(.caption)
                     .foregroundStyle(model.isHotKeyRegistered ? .secondary : .primary)
@@ -99,13 +107,13 @@ public struct GeneralSettingsView: View {
             .accessibilityIdentifier("general.hotKey.status")
 
             if !model.isHotKeyRegistered {
-                Button(String(localized: "Try Again")) {
+                Button(String(localized: "Try Again", comment: "Button: retry registering the global shortcut")) {
                     model.retryHotKeyRegistration()
                 }
                 .accessibilityIdentifier("general.hotKey.retry")
             }
         } header: {
-            Text(String(localized: "Startup"))
+            Text(String(localized: "Startup", comment: "Section header: how Backglance starts"))
         } footer: {
             Text(String(localized: """
             Backglance only archives notifications while it is running, so anything delivered \
@@ -117,9 +125,12 @@ public struct GeneralSettingsView: View {
 
     private var searchSection: some View {
         Section {
-            Toggle(String(localized: "Semantic search"), isOn: $model.semanticEnabled)
-                .disabled(!model.isSemanticAvailable)
-                .accessibilityIdentifier("general.search.semantic")
+            Toggle(
+                String(localized: "Semantic search", comment: "Toggle: search by meaning, using the on-device model"),
+                isOn: $model.semanticEnabled
+            )
+            .disabled(!model.isSemanticAvailable)
+            .accessibilityIdentifier("general.search.semantic")
 
             Text(searchExplanation)
                 .font(.caption)
@@ -130,13 +141,13 @@ public struct GeneralSettingsView: View {
                 SemanticIndexProgress(done: progress.done, total: progress.total)
             }
 
-            Button(String(localized: "Delete embeddings")) {
+            Button(String(localized: "Delete embeddings", comment: "Button: delete the semantic search index")) {
                 model.deleteEmbeddings()
             }
             .disabled(model.indexProgress == nil && !model.semanticEnabled)
             .accessibilityIdentifier("general.search.deleteEmbeddings")
         } header: {
-            Text(String(localized: "Search"))
+            Text(String(localized: "Search", comment: "Section header: search settings"))
         }
     }
 

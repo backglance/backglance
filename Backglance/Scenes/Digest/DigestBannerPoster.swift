@@ -78,7 +78,7 @@ struct DigestBannerPoster {
         }
 
         let content = UNMutableNotificationContent()
-        content.title = String(localized: "What did I miss")
+        content.title = String(localized: "What did I miss", comment: "Banner title; deliberately no question mark")
         content.body = Self.body(itemCount: digest.itemCount, appCount: appCount, reason: reason)
         // 🔒 Nothing from a captured notification reaches this content. The title is fixed
         // and the body is built from two counts and one enum — never a title, a sender or

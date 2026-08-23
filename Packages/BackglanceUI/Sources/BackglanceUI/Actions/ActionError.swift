@@ -70,25 +70,34 @@ public enum ActionError: Error, Equatable {
             String(localized: "Something went wrong — see log")
 
         case .appNotInstalled:
-            String(localized: "App not found")
+            String(localized: "App not found", comment: "Inline error: the notification's app is not installed")
 
         case let .launchFailed(bundleID, _):
             // No display name reaches this case — only the bundle id NSWorkspace was
             // given — so the bundle id stands in for "‹App›" rather than the row
             // re-deriving a name the error does not carry.
-            String(localized: "Couldn't open \(bundleID)")
+            String(
+                localized: "Couldn't open \(bundleID)",
+                comment: "Inline error: launching the app failed; placeholder is a bundle id, not a display name"
+            )
 
         case .deepLinkUnresolvable:
             nil
 
         case .pasteboardFailure:
-            String(localized: "Couldn't copy")
+            String(localized: "Couldn't copy", comment: "Inline error: copying to the clipboard failed")
 
         case let .exportFailed(reason):
-            String(localized: "Export failed: \(reason)")
+            String(
+                localized: "Export failed: \(reason)",
+                comment: "Inline error; placeholder is a system error description, already localized by macOS"
+            )
 
         case .systemSettingsUnavailable:
-            String(localized: "Couldn't open System Settings")
+            String(
+                localized: "Couldn't open System Settings",
+                comment: "Inline error; \"System Settings\" is the macOS app — use Apple's localized name for it"
+            )
         }
     }
 }

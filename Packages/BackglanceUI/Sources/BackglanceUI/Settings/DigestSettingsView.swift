@@ -23,7 +23,10 @@ public struct DigestSettingsView: View {
         @Bindable var model = model
 
         Section {
-            Picker(String(localized: "Show digest"), selection: $model.threshold) {
+            Picker(
+                String(localized: "Show digest", comment: "Picker label: when the missed digest appears"),
+                selection: $model.threshold
+            ) {
                 ForEach(DigestThreshold.allCases, id: \.self) { threshold in
                     Text(Self.label(for: threshold)).tag(threshold)
                 }
@@ -39,7 +42,7 @@ public struct DigestSettingsView: View {
                 banner
             }
         } header: {
-            Text(String(localized: "Digest"))
+            Text(String(localized: "Digest", comment: "Section header: the missed-notifications digest"))
         }
         .task {
             // Catches a refusal made in System Settings since the last look, which is the
@@ -54,10 +57,10 @@ public struct DigestSettingsView: View {
     /// bare word, because it is the one choice that switches a whole feature off.
     static func label(for threshold: DigestThreshold) -> String {
         switch threshold {
-        case .always: String(localized: "Always")
+        case .always: String(localized: "Always", comment: "Picker option: show the digest after every away session")
         case .after5min: String(localized: "After 5 minutes away")
         case .after15min: String(localized: "After 15 minutes away")
-        case .never: String(localized: "Never")
+        case .never: String(localized: "Never", comment: "Picker option: never show the digest")
         }
     }
 
@@ -65,11 +68,11 @@ public struct DigestSettingsView: View {
     /// fragment the card and the banner use; a list of checkboxes wants the other form.
     static func label(for reason: AwayReason) -> String {
         switch reason {
-        case .locked: String(localized: "Locked")
+        case .locked: String(localized: "Locked", comment: "Checkbox: the screen was locked")
         case .asleep: String(localized: "Asleep or lid closed")
-        case .focus: String(localized: "In a Focus")
+        case .focus: String(localized: "In a Focus", comment: "Checkbox; 'Focus' is the macOS feature name")
         case .presenting: String(localized: "Presenting or screen sharing")
-        case .manual: String(localized: "Marked away by hand")
+        case .manual: String(localized: "Marked away by hand", comment: "Checkbox: user marked themselves away")
         }
     }
 
@@ -96,7 +99,9 @@ public struct DigestSettingsView: View {
     private var reasons: some View {
         // Phrased as what counts, not what is excluded: a list of negatives is a list
         // people read backwards.
-        LabeledContent(String(localized: "Count time away when")) {
+        LabeledContent(
+            String(localized: "Count time away when", comment: "Label: the checkboxes below complete the sentence")
+        ) {
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(AwayReason.allCases, id: \.self) { reason in
                     Toggle(
@@ -127,10 +132,16 @@ public struct DigestSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } else if model.bannerEnabled {
-            Toggle(String(localized: "Banner for Focus sessions"), isOn: $model.bannerForFocus)
-                .accessibilityIdentifier("digest.banner.focus")
-            Toggle(String(localized: "Play a sound"), isOn: $model.bannerSound)
-                .accessibilityIdentifier("digest.banner.sound")
+            Toggle(
+                String(localized: "Banner for Focus sessions", comment: "Toggle; 'Focus' is the macOS feature name"),
+                isOn: $model.bannerForFocus
+            )
+            .accessibilityIdentifier("digest.banner.focus")
+            Toggle(
+                String(localized: "Play a sound", comment: "Toggle: the digest banner plays a sound"),
+                isOn: $model.bannerSound
+            )
+            .accessibilityIdentifier("digest.banner.sound")
         }
     }
 }

@@ -61,18 +61,23 @@ extension AppDelegate: URLRoutePerforming {
                     // The literal failure kind only — never the uuid itself, per
                     // `Log.automation`'s own doc comment and CLAUDE.md's logging rule.
                     Log.automation.error("open: uuid not found")
-                    windowStore.showMessage(String(localized: "Not in the archive"))
+                    windowStore.showMessage(
+                        String(localized: "Not in the archive", comment: "Toast: linked notification not archived")
+                    )
                     return
                 }
                 if await windowStore.reveal(notification) == .unreachable {
-                    windowStore.showMessage(String(localized: "Not in the archive"))
+                    windowStore.showMessage(
+                        String(localized: "Not in the archive", comment: "Toast: linked notification not archived")
+                    )
                 }
             } catch {
                 // A failed read, not a missing row — `ArchiveError.userMessage` already
                 // says something more useful than "Not in the archive" for this case
                 // (docs/api/API_DOCUMENTATION.md#error-behavior's "Archive being wiped
                 // or migrated" row).
-                let detail = (error as? ArchiveError)?.userMessage ?? String(localized: "Not in the archive")
+                let detail = (error as? ArchiveError)?.userMessage
+                    ?? String(localized: "Not in the archive", comment: "Toast: linked notification not archived")
                 windowStore.showMessage(detail)
             }
         }

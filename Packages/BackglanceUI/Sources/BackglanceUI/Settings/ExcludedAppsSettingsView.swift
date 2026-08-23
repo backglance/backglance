@@ -28,7 +28,7 @@ public struct ExcludedAppsSettingsView: View {
             ExcludedAppsList(model: model)
             addAppRow
 
-            Button(String(localized: "Restore defaults")) {
+            Button(String(localized: "Restore defaults", comment: "Button: put the shipped exclusions back")) {
                 Task { await model.restoreDefaults() }
             }
             .accessibilityIdentifier("privacy.exclusions.restore")
@@ -39,7 +39,7 @@ public struct ExcludedAppsSettingsView: View {
                     .foregroundStyle(.secondary)
             }
         } header: {
-            Text(String(localized: "Excluded apps"))
+            Text(String(localized: "Excluded apps", comment: "Section header in Privacy settings"))
         } footer: {
             Text(footer)
                 .fixedSize(horizontal: false, vertical: true)
@@ -66,7 +66,7 @@ public struct ExcludedAppsSettingsView: View {
 
         HStack {
             TextField(
-                String(localized: "Bundle identifier"),
+                String(localized: "Bundle identifier", comment: "Text field label: the app's bundle identifier"),
                 text: $model.pendingBundleID,
                 prompt: Text(verbatim: "com.example.app")
             )
@@ -74,7 +74,7 @@ public struct ExcludedAppsSettingsView: View {
             .accessibilityIdentifier("privacy.exclusions.addField")
             .onSubmit { Task { await model.addPendingBundleID() } }
 
-            Button(String(localized: "Add app…")) {
+            Button(String(localized: "Add app…", comment: "Button: exclude the typed bundle identifier")) {
                 Task { await model.addPendingBundleID() }
             }
             .disabled(!model.canAddPendingBundleID)
@@ -115,7 +115,7 @@ struct ExcludedAppsList: View {
 
                 Spacer()
 
-                Button(String(localized: "Remove")) {
+                Button(String(localized: "Remove", comment: "Button: take this app off the exclusion list")) {
                     Task { await model.remove(bundleID: row.bundleID) }
                 }
                 .accessibilityIdentifier("privacy.exclusions.remove.\(row.bundleID)")
@@ -132,10 +132,10 @@ struct ExcludedAppsList: View {
     private static func reasonText(_ reason: ExclusionList.ShippedDefault.Reason) -> String {
         switch reason {
         case .passwordManager:
-            String(localized: "Password manager")
+            String(localized: "Password manager", comment: "Caption: why this shipped default is excluded")
 
         case .ownNotifications:
-            String(localized: "Backglance's own notifications")
+            String(localized: "Backglance's own notifications", comment: "Caption: why this default is excluded")
         }
     }
 }

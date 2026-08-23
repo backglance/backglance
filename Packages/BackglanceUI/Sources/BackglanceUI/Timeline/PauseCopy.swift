@@ -23,27 +23,33 @@ public enum PauseCopy {
 
     /// The parent item the four choices hang off.
     public static var pauseMenuTitle: String {
-        String(localized: "Pause Capture")
+        String(
+            localized: "Pause Capture",
+            comment: "Menu item with a submenu of durations: temporarily stops archiving notifications"
+        )
     }
 
     /// The single item that replaces the submenu while capture is paused.
     public static var resumeMenuTitle: String {
-        String(localized: "Resume Capture")
+        String(localized: "Resume Capture", comment: "Menu item: starts archiving notifications again after a pause")
     }
 
     public static func menuTitle(for choice: PauseChoice) -> String {
         switch choice {
         case .fifteenMinutes:
-            String(localized: "For 15 Minutes")
+            String(localized: "For 15 Minutes", comment: "Submenu item under Pause Capture: how long to pause")
 
         case .oneHour:
-            String(localized: "For 1 Hour")
+            String(localized: "For 1 Hour", comment: "Submenu item under Pause Capture: how long to pause")
 
         case .untilTomorrow:
-            String(localized: "Until Tomorrow")
+            String(localized: "Until Tomorrow", comment: "Submenu item under Pause Capture: how long to pause")
 
         case .indefinitely:
-            String(localized: "Until I Resume")
+            String(
+                localized: "Until I Resume",
+                comment: "Submenu item under Pause Capture: pause with no end time, until resumed by hand"
+            )
         }
     }
 
@@ -58,10 +64,16 @@ public enum PauseCopy {
         calendar: Calendar = .current
     ) -> String {
         guard let date else {
-            return String(localized: "capture paused")
+            return String(
+                localized: "capture paused",
+                comment: "Status item tooltip clause; deliberately lowercase, follows the app name in the tooltip"
+            )
         }
         let when = deadlineText(for: date, now: now, calendar: calendar)
-        return String(localized: "capture paused until \(when)")
+        return String(
+            localized: "capture paused until \(when)",
+            comment: "Status item tooltip clause; deliberately lowercase; placeholder is the time the pause ends"
+        )
     }
 
     /// Just the time a pause ends — "17:00", or "23 Aug 17:00" when that is another day.

@@ -71,11 +71,11 @@ public struct SearchResultsList: View {
     private static let snippetLeadingInset: CGFloat = 38
 
     private var bestMatchesTitle: String {
-        String(localized: "Best matches")
+        String(localized: "Best matches", comment: "Section header over search results that matched the words typed")
     }
 
     private var similarTitle: String {
-        String(localized: "Similar")
+        String(localized: "Similar", comment: "Section header over search results that matched by meaning only")
     }
 
     /// FTS or fuzzy hits — a literal or typo-tolerant match on the words

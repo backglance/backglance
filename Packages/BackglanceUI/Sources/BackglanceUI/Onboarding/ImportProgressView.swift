@@ -66,9 +66,12 @@ public struct ImportProgressView: View {
             case let .finished(archived):
                 Text(countSentence(archived: archived))
                     .accessibilityIdentifier("onboarding.import.finished")
-                Text(String(localized: "This is everything the system still had."))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    localized: "This is everything the system still had.",
+                    comment: "Shown under the finished import count; \"the system\" is macOS's own notification store"
+                ))
+                .font(.callout)
+                .foregroundStyle(.secondary)
 
             case .failed:
                 Label(Self.failureText, systemImage: "exclamationmark.triangle")
@@ -117,7 +120,10 @@ public struct ImportProgressView: View {
     /// variations. It was written as `^[…](inflect: true)` until BACKGLANCE-248: automatic
     /// grammar agreement compiles to nothing here, so the markup reached the screen.
     private func countSentence(archived: Int) -> String {
-        String(localized: "Imported \(archived) notifications.")
+        String(
+            localized: "Imported \(archived) notifications.",
+            comment: "Import status line; placeholder is a count, pluralized by the string catalog"
+        )
     }
 }
 

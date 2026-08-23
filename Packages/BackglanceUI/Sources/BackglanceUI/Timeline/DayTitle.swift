@@ -22,12 +22,12 @@ public enum DayTitle {
     ///   - now: today, injectable so the "within the last week" threshold is testable.
     public static func string(for day: Date, calendar: Calendar = .current, now: Date = .now) -> String {
         if calendar.isDate(day, inSameDayAs: now) {
-            return String(localized: "Today")
+            return String(localized: "Today", comment: "Timeline day-section header for the current day")
         }
         if let yesterday = calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: now)),
            calendar.isDate(day, inSameDayAs: yesterday)
         {
-            return String(localized: "Yesterday")
+            return String(localized: "Yesterday", comment: "Timeline day-section header for the previous day")
         }
 
         let formatter = DateFormatter()

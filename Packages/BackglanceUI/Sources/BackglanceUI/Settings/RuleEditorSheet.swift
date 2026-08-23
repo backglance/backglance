@@ -54,7 +54,9 @@ public struct RuleEditorSheet: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(existingID == nil ? String(localized: "Add Rule") : String(localized: "Edit Rule"))
+            Text(existingID == nil
+                ? String(localized: "Add Rule", comment: "Sheet title: creating a new notification rule")
+                : String(localized: "Edit Rule", comment: "Sheet title: editing an existing notification rule"))
                 .font(.title3.weight(.semibold))
 
             Form {
@@ -68,18 +70,25 @@ public struct RuleEditorSheet: View {
                 }
                 matchFieldPicker
                 if matchField != .app, kind != .regex {
-                    Toggle(String(localized: "Whole word only"), isOn: $wholeWord)
-                        .accessibilityIdentifier("rules.editor.wholeWord")
+                    Toggle(
+                        String(localized: "Whole word only", comment: "Toggle: the pattern matches whole words only"),
+                        isOn: $wholeWord
+                    )
+                    .accessibilityIdentifier("rules.editor.wholeWord")
                 }
                 appScopeField
                 if kind == .highlight || kind == .regex {
                     colorPicker
                 }
                 Stepper(value: $priority, in: -100 ... 100) {
-                    LabeledContent(String(localized: "Priority"), value: priority, format: .number)
+                    LabeledContent(
+                        String(localized: "Priority", comment: "Rule priority; higher-priority rules win"),
+                        value: priority,
+                        format: .number
+                    )
                 }
                 .accessibilityIdentifier("rules.editor.priority")
-                Toggle(String(localized: "Enabled"), isOn: $isEnabled)
+                Toggle(String(localized: "Enabled", comment: "Toggle: whether the rule is active"), isOn: $isEnabled)
                     .accessibilityIdentifier("rules.editor.enabled")
             }
             .formStyle(.grouped)
@@ -120,18 +129,22 @@ public struct RuleEditorSheet: View {
     }
 
     private var kindPicker: some View {
-        Picker(String(localized: "Kind"), selection: $kind) {
-            Text(String(localized: "Highlight")).tag(Rule.Kind.highlight)
-            Text(String(localized: "VIP")).tag(Rule.Kind.vip)
-            Text(String(localized: "Mute")).tag(Rule.Kind.mute)
-            Text(String(localized: "Regex")).tag(Rule.Kind.regex)
+        Picker(String(localized: "Kind", comment: "Picker label: what type of rule this is"), selection: $kind) {
+            Text(String(localized: "Highlight", comment: "Rule kind: highlights matches in colour"))
+                .tag(Rule.Kind.highlight)
+            Text(String(localized: "VIP", comment: "Rule kind: marks matches as important"))
+                .tag(Rule.Kind.vip)
+            Text(String(localized: "Mute", comment: "Rule kind: hides matches in Backglance only"))
+                .tag(Rule.Kind.mute)
+            Text(String(localized: "Regex", comment: "Rule kind: regular-expression pattern"))
+                .tag(Rule.Kind.regex)
         }
         .accessibilityIdentifier("rules.editor.kind")
     }
 
     private var patternField: some View {
         TextField(
-            String(localized: "Pattern"),
+            String(localized: "Pattern", comment: "Text field label: the text or regex the rule matches"),
             text: $patternText,
             prompt: Text(verbatim: matchField == .app ? "com.example.app" : "invoice")
         )
@@ -139,12 +152,20 @@ public struct RuleEditorSheet: View {
     }
 
     private var matchFieldPicker: some View {
-        Picker(String(localized: "Match"), selection: $matchField) {
-            Text(String(localized: "Anywhere")).tag(Rule.MatchField.any)
-            Text(String(localized: "Title")).tag(Rule.MatchField.title)
-            Text(String(localized: "Body")).tag(Rule.MatchField.body)
-            Text(String(localized: "Sender")).tag(Rule.MatchField.sender)
-            Text(String(localized: "App bundle id")).tag(Rule.MatchField.app)
+        Picker(
+            String(localized: "Match", comment: "Picker label: which notification field the pattern applies to"),
+            selection: $matchField
+        ) {
+            Text(String(localized: "Anywhere", comment: "Match-field option: match in any field"))
+                .tag(Rule.MatchField.any)
+            Text(String(localized: "Title", comment: "Match-field option: the notification’s title"))
+                .tag(Rule.MatchField.title)
+            Text(String(localized: "Body", comment: "Match-field option: the notification’s body text"))
+                .tag(Rule.MatchField.body)
+            Text(String(localized: "Sender", comment: "Match-field option: the notification’s sender"))
+                .tag(Rule.MatchField.sender)
+            Text(String(localized: "App bundle id", comment: "Match-field option: the app’s bundle identifier"))
+                .tag(Rule.MatchField.app)
         }
         .accessibilityIdentifier("rules.editor.matchField")
     }
@@ -162,7 +183,7 @@ public struct RuleEditorSheet: View {
     }
 
     private var colorPicker: some View {
-        Picker(String(localized: "Colour"), selection: $colorToken) {
+        Picker(String(localized: "Colour", comment: "Picker label: highlight colour"), selection: $colorToken) {
             ForEach(HighlightColor.allCases, id: \.self) { color in
                 Label {
                     Text(Self.colorName(color))
@@ -180,7 +201,7 @@ public struct RuleEditorSheet: View {
     /// an error string anywhere in this view, only the screen.
     private var previewSection: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(String(localized: "Would have matched"))
+            Text(String(localized: "Would have matched", comment: "Heading: preview of what the rule matches"))
                 .font(.callout.weight(.semibold))
 
             if let previewError = model.previewError {
@@ -193,9 +214,12 @@ public struct RuleEditorSheet: View {
                     .foregroundStyle(.secondary)
             } else {
                 List(model.preview) { row in
-                    Text(row.title ?? row.body ?? String(localized: "(no title)"))
-                        .lineLimit(1)
-                        .accessibilityIdentifier("rules.editor.preview.row.\(row.id ?? -1)")
+                    Text(row.title ?? row.body ?? String(
+                        localized: "(no title)",
+                        comment: "Placeholder: preview row for a notification without a title"
+                    ))
+                    .lineLimit(1)
+                    .accessibilityIdentifier("rules.editor.preview.row.\(row.id ?? -1)")
                 }
                 .frame(height: 120)
                 .accessibilityIdentifier("rules.editor.preview")
@@ -224,11 +248,11 @@ public struct RuleEditorSheet: View {
 
     private static func colorName(_ color: HighlightColor) -> String {
         switch color {
-        case .amber: String(localized: "Amber")
-        case .red: String(localized: "Red")
-        case .green: String(localized: "Green")
-        case .blue: String(localized: "Blue")
-        case .purple: String(localized: "Purple")
+        case .amber: String(localized: "Amber", comment: "Colour name shown as a picker option")
+        case .red: String(localized: "Red", comment: "Colour name shown as a picker option")
+        case .green: String(localized: "Green", comment: "Colour name shown as a picker option")
+        case .blue: String(localized: "Blue", comment: "Colour name shown as a picker option")
+        case .purple: String(localized: "Purple", comment: "Colour name shown as a picker option")
         }
     }
 

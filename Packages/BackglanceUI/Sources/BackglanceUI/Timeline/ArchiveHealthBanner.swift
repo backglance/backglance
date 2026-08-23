@@ -43,8 +43,11 @@ public struct ArchiveHealthBanner: View {
             Spacer(minLength: 4)
 
             if let onRetry {
-                Button(String(localized: "Retry"), action: onRetry)
-                    .controlSize(.small)
+                Button(
+                    String(localized: "Retry", comment: "Banner button: tries the failed archive read again"),
+                    action: onRetry
+                )
+                .controlSize(.small)
             }
         }
         .padding(.vertical, 6)

@@ -157,13 +157,22 @@ public struct FDABanner: View {
 
     private var buttons: some View {
         HStack(spacing: 8) {
-            Button(String(localized: "Open System Settings")) { model.openSystemSettings() }
+            Button(String(
+                localized: "Open System Settings",
+                comment: "Button; \"System Settings\" is the macOS app — use Apple's localized name for it"
+            )) { model.openSystemSettings() }
                 .accessibilityIdentifier("capture.fdaBanner.openSettings")
 
-            Button(String(localized: "Check again")) { model.checkAgain() }
+            Button(String(
+                localized: "Check again",
+                comment: "Button: re-checks whether Full Disk Access has been granted yet"
+            )) { model.checkAgain() }
                 .accessibilityIdentifier("capture.fdaBanner.checkAgain")
 
-            Button(String(localized: "Learn why")) { model.learnWhy() }
+            Button(String(
+                localized: "Learn why",
+                comment: "Link button: opens the explanation of why Full Disk Access is needed"
+            )) { model.learnWhy() }
                 .buttonStyle(.link)
                 .accessibilityIdentifier("capture.fdaBanner.learnWhy")
         }
@@ -181,7 +190,10 @@ public struct FDABanner: View {
         }
         .buttonStyle(.borderless)
         .foregroundStyle(.secondary)
-        .accessibilityLabel(Text(String(localized: "Dismiss until next launch")))
+        .accessibilityLabel(Text(String(
+            localized: "Dismiss until next launch",
+            comment: "Spoken by VoiceOver for the banner's close button; the banner returns on the next launch"
+        )))
         .accessibilityIdentifier("capture.fdaBanner.dismiss")
     }
 }

@@ -36,7 +36,10 @@ public enum StatusItemAccessibility {
         guard let suffix = stateSuffix(for: state) else {
             return unread
         }
-        return String(localized: "\(unread), \(suffix)")
+        return String(
+            localized: "\(unread), \(suffix)",
+            comment: "Spoken by VoiceOver for the menu bar item: the unread phrase, then the capture-state clause"
+        )
     }
 
     // MARK: Private
@@ -60,16 +63,28 @@ public enum StatusItemAccessibility {
     private static func unreadPhrase(count: Int) -> String {
         switch count {
         case ..<1:
-            String(localized: "Backglance, no unread notifications")
+            String(
+                localized: "Backglance, no unread notifications",
+                comment: "Spoken by VoiceOver for the menu bar item; Backglance is the app name, do not translate it"
+            )
 
         case 1:
-            String(localized: "Backglance, 1 unread notification")
+            String(
+                localized: "Backglance, 1 unread notification",
+                comment: "Spoken by VoiceOver for the menu bar item; Backglance is the app name, do not translate it"
+            )
 
         case Archive.unreadBadgeCap...:
-            String(localized: "Backglance, more than 99 unread notifications")
+            String(
+                localized: "Backglance, more than 99 unread notifications",
+                comment: "Spoken by VoiceOver for the menu bar item; Backglance is the app name, do not translate it"
+            )
 
         default:
-            String(localized: "Backglance, \(count) unread notifications")
+            String(
+                localized: "Backglance, \(count) unread notifications",
+                comment: "Spoken by VoiceOver for the menu bar item; placeholder is the unread count (always 2–99)"
+            )
         }
     }
 
@@ -83,16 +98,28 @@ public enum StatusItemAccessibility {
             nil
 
         case .paused:
-            String(localized: "capture paused")
+            String(
+                localized: "capture paused",
+                comment: "Spoken by VoiceOver after the unread phrase; deliberately lowercase mid-sentence clause"
+            )
 
         case .noFullDiskAccess:
-            String(localized: "needs Full Disk Access")
+            String(
+                localized: "needs Full Disk Access",
+                comment: "Spoken by VoiceOver after the unread phrase; deliberately lowercase mid-sentence clause"
+            )
 
         case .degraded:
-            String(localized: "capture degraded")
+            String(
+                localized: "capture degraded",
+                comment: "Spoken by VoiceOver after the unread phrase; deliberately lowercase mid-sentence clause"
+            )
 
         case .stopped:
-            String(localized: "capture stopped")
+            String(
+                localized: "capture stopped",
+                comment: "Spoken by VoiceOver after the unread phrase; deliberately lowercase mid-sentence clause"
+            )
         }
     }
 }

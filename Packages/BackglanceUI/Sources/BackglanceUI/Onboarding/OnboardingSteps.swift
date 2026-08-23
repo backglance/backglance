@@ -10,8 +10,11 @@ import SwiftUI
 struct WelcomeStep: View {
     var body: some View {
         OnboardingScreen(
-            title: String(localized: "Backglance"),
-            subtitle: String(localized: "The notification history macOS never had."),
+            title: String(localized: "Backglance", comment: "Setup screen title: the app's name — do not translate"),
+            subtitle: String(
+                localized: "The notification history macOS never had.",
+                comment: "The app's tagline, under its name on setup's first screen"
+            ),
             identifier: "onboarding.welcome"
         ) {
             Text(String(localized: """
@@ -157,9 +160,15 @@ struct GrantStep: View {
     @ViewBuilder private var status: some View {
         switch model.fdaState {
         case .granted:
-            Label(String(localized: "Granted, thanks!"), systemImage: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-                .accessibilityIdentifier("onboarding.grant.status.granted")
+            Label(
+                String(
+                    localized: "Granted, thanks!",
+                    comment: "Status label on the setup screen once Full Disk Access has been granted"
+                ),
+                systemImage: "checkmark.circle.fill"
+            )
+            .foregroundStyle(.green)
+            .accessibilityIdentifier("onboarding.grant.status.granted")
 
         case .denied:
             Label(String(localized: "Waiting for permission…"), systemImage: "circle.dotted")
@@ -181,10 +190,16 @@ struct GrantStep: View {
 
     private var buttons: some View {
         HStack(spacing: 12) {
-            Button(String(localized: "Open System Settings")) { model.openFullDiskAccessSettings() }
+            Button(String(
+                localized: "Open System Settings",
+                comment: "Button; \"System Settings\" is the macOS app — use Apple's localized name for it"
+            )) { model.openFullDiskAccessSettings() }
                 .accessibilityIdentifier("onboarding.grant.openSettings")
 
-            Button(String(localized: "Check again")) { model.checkAgain() }
+            Button(String(
+                localized: "Check again",
+                comment: "Button: re-checks whether Full Disk Access has been granted yet"
+            )) { model.checkAgain() }
                 .accessibilityIdentifier("onboarding.grant.checkAgain")
         }
     }
@@ -203,7 +218,7 @@ struct DoneStep: View {
 
     var body: some View {
         OnboardingScreen(
-            title: String(localized: "You’re set."),
+            title: String(localized: "You’re set.", comment: "Title of setup's last screen: setup is complete"),
             identifier: "onboarding.done"
         ) {
             Text(String(localized: """

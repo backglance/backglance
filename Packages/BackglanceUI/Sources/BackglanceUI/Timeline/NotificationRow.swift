@@ -151,9 +151,15 @@ public struct NotificationRow: View {
                             chip
                         }
                         if item.notification.threadId != nil {
-                            Label(String(localized: "Thread"), systemImage: "bubble.left.and.bubble.right")
-                                .font(.caption2)
-                                .labelStyle(.titleAndIcon)
+                            Label(
+                                String(
+                                    localized: "Thread",
+                                    comment: "Small chip on a row: part of a conversation thread (messaging sense)"
+                                ),
+                                systemImage: "bubble.left.and.bubble.right"
+                            )
+                            .font(.caption2)
+                            .labelStyle(.titleAndIcon)
                         }
                     }
                 }
@@ -265,15 +271,29 @@ public struct NotificationRow: View {
     static func accessibilityValueText(for item: TimelineItem) -> String {
         var states: [String] = []
         if !item.notification.isRead {
-            states.append(String(localized: "unread"))
+            states.append(String(
+                localized: "unread",
+                comment: "Spoken by VoiceOver as a row's state; deliberately lowercase"
+            ))
         }
         if item.isPinned {
-            states.append(String(localized: "pinned"))
+            states.append(String(
+                localized: "pinned",
+                comment: "Spoken by VoiceOver as a row's state (kept at the top of its day); deliberately lowercase"
+            ))
         }
         if item.notification.redaction == .otp {
-            states.append(String(localized: "redacted"))
+            states.append(String(
+                localized: "redacted",
+                comment: "Spoken by VoiceOver as a row's state; deliberately lowercase"
+            ))
         }
-        return states.isEmpty ? String(localized: "read") : states.joined(separator: ", ")
+        return states.isEmpty
+            ? String(
+                localized: "read",
+                comment: "Spoken by VoiceOver as a row's state (past participle, already read); deliberately lowercase"
+            )
+            : states.joined(separator: ", ")
     }
 
     // MARK: Private
@@ -301,7 +321,10 @@ public struct NotificationRow: View {
     /// a body (or, from an import, neither) still shows something instead of
     /// going blank.
     private var displayTitle: String {
-        item.notification.title ?? item.notification.body ?? String(localized: "(no text)")
+        item.notification.title ?? item.notification.body ?? String(
+            localized: "(no text)",
+            comment: "Placeholder shown as a row's title when the notification had no title or body"
+        )
     }
 
     /// "2 attachments" chip — metadata only. The archive never stores

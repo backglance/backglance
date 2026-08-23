@@ -138,6 +138,6 @@ public final class UpdatesSettingsModel {
 
     private static func bundleVersion() -> String {
         let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-        return short ?? String(localized: "unknown")
+        return short ?? String(localized: "unknown", comment: "Fallback shown when the app version can’t be read")
     }
 }

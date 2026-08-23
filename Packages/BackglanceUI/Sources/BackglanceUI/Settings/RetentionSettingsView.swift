@@ -29,7 +29,10 @@ public struct RetentionSettingsView: View {
         @Bindable var model = model
 
         Section {
-            Picker(String(localized: "Keep notifications for"), selection: $model.global) {
+            Picker(
+                String(localized: "Keep notifications for", comment: "Picker label: completed by a duration option"),
+                selection: $model.global
+            ) {
                 ForEach(RetentionSettings.globalChoices, id: \.self) { policy in
                     Text(retentionLabel(policy)).tag(policy)
                 }
@@ -56,7 +59,7 @@ public struct RetentionSettingsView: View {
                     .foregroundStyle(.secondary)
             }
         } header: {
-            Text(String(localized: "Retention"))
+            Text(String(localized: "Retention", comment: "Section header: how long notifications are kept"))
         } footer: {
             Text(footer)
                 .fixedSize(horizontal: false, vertical: true)
@@ -97,7 +100,8 @@ struct PerAppRetentionList: View {
                     }
                 )
             ) {
-                Text(String(localized: "Inherit")).tag(AppRetention.inherit)
+                Text(String(localized: "Inherit", comment: "Per-app retention option: use the global setting"))
+                    .tag(AppRetention.inherit)
                 // Every `RetentionPolicy` case, including `.never` — the one choice the
                 // global picker above deliberately leaves out. Here it is the legitimate
                 // "never store this app" answer, not a way to switch the whole product off.
@@ -122,19 +126,19 @@ struct PerAppRetentionList: View {
 func retentionLabel(_ policy: RetentionPolicy) -> String {
     switch policy {
     case .hours24:
-        String(localized: "24 hours")
+        String(localized: "24 hours", comment: "Retention picker option: keep notifications for 24 hours")
 
     case .days7:
-        String(localized: "7 days")
+        String(localized: "7 days", comment: "Retention picker option: keep notifications for 7 days")
 
     case .days30:
-        String(localized: "30 days")
+        String(localized: "30 days", comment: "Retention picker option: keep notifications for 30 days")
 
     case .forever:
-        String(localized: "Forever")
+        String(localized: "Forever", comment: "Retention picker option: keep notifications forever")
 
     case .never:
-        String(localized: "Never store")
+        String(localized: "Never store", comment: "Retention picker option: never archive these notifications")
     }
 }
 

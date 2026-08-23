@@ -113,13 +113,22 @@ public struct EmptyStateView: View {
     private var buttonTitle: String? {
         switch kind {
         case .noFullDiskAccess:
-            String(localized: "Grant Full Disk Access…")
+            String(
+                localized: "Grant Full Disk Access…",
+                comment: "Button: opens System Settings; must match the capture banner's button"
+            )
 
         case .paused:
-            String(localized: "Resume")
+            String(
+                localized: "Resume",
+                comment: "Button: starts archiving notifications again after a pause"
+            )
 
         case .allFiltered:
-            String(localized: "Clear filters")
+            String(
+                localized: "Clear filters",
+                comment: "Button: removes the active filters; must match the search empty state's button"
+            )
 
         case .nothingYet:
             nil

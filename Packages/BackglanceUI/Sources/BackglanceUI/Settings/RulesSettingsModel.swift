@@ -268,7 +268,10 @@ public final class RulesSettingsModel {
                 let data = try Data(contentsOf: url)
                 return try engine.importRules(from: data)
             }.value
-            importResult = String(localized: "\(result.imported) imported, \(result.skipped) skipped")
+            importResult = String(
+                localized: "\(result.imported) imported, \(result.skipped) skipped",
+                comment: "Import result: count of rules imported, then count of rules skipped"
+            )
             failure = nil
         } catch {
             failure = Self.message(for: error)

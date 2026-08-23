@@ -28,8 +28,11 @@ public struct CodeRedactionSettingsView: View {
         @Bindable var model = model
 
         Section {
-            Toggle(String(localized: "Redact codes in all apps"), isOn: $model.redactsAllApps)
-                .accessibilityIdentifier("privacy.redaction.allApps")
+            Toggle(
+                String(localized: "Redact codes in all apps", comment: "Toggle: apply code redaction to every app"),
+                isOn: $model.redactsAllApps
+            )
+            .accessibilityIdentifier("privacy.redaction.allApps")
 
             Text(allAppsExplanation)
                 .font(.caption)
@@ -45,7 +48,7 @@ public struct CodeRedactionSettingsView: View {
                     .foregroundStyle(.secondary)
             }
         } header: {
-            Text(String(localized: "One-time code redaction"))
+            Text(String(localized: "One-time code redaction", comment: "Section header in Privacy settings"))
         } footer: {
             Text(footer)
                 .fixedSize(horizontal: false, vertical: true)
@@ -62,7 +65,7 @@ public struct CodeRedactionSettingsView: View {
                 }
             )
         ) {
-            Button(String(localized: "OK")) { model.dismissPlainTextWarning() }
+            Button(String(localized: "OK", comment: "Button: dismiss the alert")) { model.dismissPlainTextWarning() }
         } message: {
             Text(String(localized: """
             Future verification codes from this app will be archived exactly as they arrive. \
@@ -83,7 +86,7 @@ public struct CodeRedactionSettingsView: View {
         Off by default. The patterns are written for the way text messages and e-mail \
         announce a code, so running them everywhere turns the occasional ticket or order \
         number into “[code redacted]” too.
-        """)
+        """, comment: "Keep '[code redacted]' verbatim — it must match the stored replacement text")
     }
 
     private var footer: String {
@@ -91,7 +94,7 @@ public struct CodeRedactionSettingsView: View {
         Verification codes are replaced with “[code redacted]” before they are stored. \
         The original digits are never written to your archive, the search index or an \
         export. Turning redaction off cannot restore codes that were already redacted.
-        """)
+        """, comment: "Keep '[code redacted]' verbatim — it must match the stored replacement text")
     }
 
     /// Adding an app the archive has not seen. A plain text field rather than an app
@@ -102,7 +105,7 @@ public struct CodeRedactionSettingsView: View {
 
         HStack {
             TextField(
-                String(localized: "Bundle identifier"),
+                String(localized: "Bundle identifier", comment: "Text field label: the app's bundle identifier"),
                 text: $model.pendingBundleID,
                 prompt: Text(verbatim: "com.example.app")
             )
@@ -110,7 +113,7 @@ public struct CodeRedactionSettingsView: View {
             .accessibilityIdentifier("privacy.redaction.addField")
             .onSubmit { Task { await model.addPendingBundleID() } }
 
-            Button(String(localized: "Add")) {
+            Button(String(localized: "Add", comment: "Button: add the typed bundle identifier to the list")) {
                 Task { await model.addPendingBundleID() }
             }
             .disabled(!model.canAddPendingBundleID)

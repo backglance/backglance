@@ -73,9 +73,12 @@ public struct ExportSheet: View {
     /// `UndoToastView.message(count:)` uses.
     static func title(count: Int) -> String {
         if count == 1 {
-            String(localized: "Export 1 Notification")
+            String(localized: "Export 1 Notification", comment: "Export sheet title, single selection")
         } else {
-            String(localized: "Export \(count) Notifications")
+            String(
+                localized: "Export \(count) Notifications",
+                comment: "Export sheet title; placeholder is how many notifications are selected (always 2 or more)"
+            )
         }
     }
 
@@ -115,13 +118,19 @@ public struct ExportSheet: View {
     }
 
     private var formatPicker: some View {
-        Picker(String(localized: "Format"), selection: $format) {
+        Picker(
+            String(localized: "Format", comment: "Picker label: which file format the export is written in"),
+            selection: $format
+        ) {
             Text(String(localized: "CSV")).tag(ExportFormat.csv)
             Text(String(localized: "JSON")).tag(ExportFormat.json)
         }
         .pickerStyle(.segmented)
         .accessibilityIdentifier("export.formatPicker")
-        .accessibilityLabel(String(localized: "Export format"))
+        .accessibilityLabel(String(
+            localized: "Export format",
+            comment: "Spoken by VoiceOver for the CSV/JSON format picker"
+        ))
     }
 
     /// 🔒 docs/features/EXPORT_AUTOMATION.md's Security callout, said verbatim and before the
@@ -156,10 +165,17 @@ public struct ExportSheet: View {
     private var buttons: some View {
         HStack {
             Spacer()
-            Button(String(localized: "Cancel"), role: .cancel, action: onCancel)
-                .keyboardShortcut(.cancelAction)
-                .accessibilityIdentifier("export.cancel")
-            Button(String(localized: "Export…")) {
+            Button(
+                String(localized: "Cancel", comment: "Button: closes the export sheet without exporting"),
+                role: .cancel,
+                action: onCancel
+            )
+            .keyboardShortcut(.cancelAction)
+            .accessibilityIdentifier("export.cancel")
+            Button(String(
+                localized: "Export…",
+                comment: "Button: confirms the export and opens the save panel"
+            )) {
                 onExport(format)
             }
             .keyboardShortcut(.defaultAction)

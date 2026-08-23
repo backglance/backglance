@@ -45,7 +45,7 @@ public struct PermissionsSettingsView: View {
     private var fdaStatus: PermissionStatus {
         switch model.fdaState {
         case .granted:
-            .good(String(localized: "Granted"))
+            .good(String(localized: "Granted", comment: "Status label: Full Disk Access is granted"))
 
         case .denied:
             .attention(String(localized: "Not granted — capture is off"))
@@ -59,36 +59,36 @@ public struct PermissionsSettingsView: View {
     private var bannerStatus: PermissionStatus {
         switch model.bannerAuthorization {
         case .authorized:
-            .good(String(localized: "Allowed"))
+            .good(String(localized: "Allowed", comment: "Status label: notification banners are allowed"))
 
         case .denied:
             .neutral(String(localized: "Not allowed — the digest opens in the popover instead"))
 
         case .notDetermined:
-            .neutral(String(localized: "Not asked yet"))
+            .neutral(String(localized: "Not asked yet", comment: "Status label: banner permission not yet requested"))
         }
     }
 
     private var loginItemStatus: PermissionStatus {
         switch model.loginItemStatus {
         case .registered:
-            .good(String(localized: "On"))
+            .good(String(localized: "On", comment: "Status label: Open at Login is on"))
 
         case .notRegistered:
-            .neutral(String(localized: "Off"))
+            .neutral(String(localized: "Off", comment: "Status label: Open at Login is off"))
 
         case .requiresApproval:
             .attention(String(localized: "Waiting for approval in System Settings"))
 
         case .unavailable:
-            .neutral(String(localized: "Unavailable"))
+            .neutral(String(localized: "Unavailable", comment: "Status label: login item cannot be set"))
         }
     }
 
     private var fullDiskAccessSection: some View {
         Section {
             PermissionRow(
-                title: String(localized: "Full Disk Access"),
+                title: String(localized: "Full Disk Access", comment: "Permission name; matches System Settings"),
                 status: fdaStatus,
                 identifier: "permissions.fda"
             )
@@ -98,17 +98,17 @@ public struct PermissionsSettingsView: View {
             }
             .accessibilityIdentifier("permissions.fda.open")
 
-            Button(String(localized: "Check again")) {
+            Button(String(localized: "Check again", comment: "Button: re-check Full Disk Access status")) {
                 Task { await model.refresh() }
             }
             .accessibilityIdentifier("permissions.fda.check")
 
-            Button(String(localized: "Show setup again")) {
+            Button(String(localized: "Show setup again", comment: "Button: reopen the onboarding flow")) {
                 model.actions.showSetupAgain()
             }
             .accessibilityIdentifier("permissions.showSetup")
         } header: {
-            Text(String(localized: "Capture"))
+            Text(String(localized: "Capture", comment: "Notification capture (noun)"))
         } footer: {
             Text(String(localized: """
             Notification history lives in a system database macOS protects, and Full Disk Access is \
@@ -122,7 +122,7 @@ public struct PermissionsSettingsView: View {
     private var notificationsSection: some View {
         Section {
             PermissionRow(
-                title: String(localized: "Notifications"),
+                title: String(localized: "Notifications", comment: "The macOS notification permission"),
                 status: bannerStatus,
                 identifier: "permissions.notifications"
             )
@@ -132,7 +132,7 @@ public struct PermissionsSettingsView: View {
             }
             .accessibilityIdentifier("permissions.notifications.open")
         } header: {
-            Text(String(localized: "Notifications"))
+            Text(String(localized: "Notifications", comment: "The macOS notification permission"))
         } footer: {
             Text(String(localized: """
             Only used for the optional missed-notifications banner, and only asked for when you turn \
@@ -145,7 +145,7 @@ public struct PermissionsSettingsView: View {
     private var loginItemsSection: some View {
         Section {
             PermissionRow(
-                title: String(localized: "Open at Login"),
+                title: String(localized: "Open at Login", comment: "Row title; matches macOS's Login Items wording"),
                 status: loginItemStatus,
                 identifier: "permissions.loginItems"
             )
@@ -155,7 +155,7 @@ public struct PermissionsSettingsView: View {
             }
             .accessibilityIdentifier("permissions.loginItems.open")
         } header: {
-            Text(String(localized: "Startup"))
+            Text(String(localized: "Startup", comment: "Section header: how Backglance starts"))
         } footer: {
             Text(String(localized: """
             Backglance only archives notifications while it is running, so anything delivered before \
@@ -170,7 +170,12 @@ public struct PermissionsSettingsView: View {
     /// something the user is expected to do.
     private var troubleshootingSection: some View {
         Section {
-            DisclosureGroup(String(localized: "Full Disk Access isn’t sticking")) {
+            DisclosureGroup(
+                String(
+                    localized: "Full Disk Access isn’t sticking",
+                    comment: "Disclosure title: the granted permission keeps reverting"
+                )
+            ) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(String(localized: """
                     macOS sometimes keeps an old decision for an app that has been rebuilt or replaced. \
@@ -189,7 +194,7 @@ public struct PermissionsSettingsView: View {
                         .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
                         .accessibilityIdentifier("permissions.tccutil.command")
 
-                    Button(String(localized: "Copy command")) {
+                    Button(String(localized: "Copy command", comment: "Button: copy the Terminal command")) {
                         model.actions.copyToPasteboard(PermissionsSettingsModel.tccutilCommand)
                     }
                     .accessibilityIdentifier("permissions.tccutil.copy")
@@ -198,7 +203,7 @@ public struct PermissionsSettingsView: View {
             }
             .accessibilityIdentifier("permissions.troubleshooting")
         } header: {
-            Text(String(localized: "Troubleshooting"))
+            Text(String(localized: "Troubleshooting", comment: "Section header"))
         }
     }
 }

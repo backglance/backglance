@@ -107,7 +107,7 @@ public enum ArchiveError: Error, Sendable {
             String(localized: "Backglance couldn't upgrade its archive. Your data is untouched.")
 
         case .duplicate:
-            String(localized: "Already archived.")
+            String(localized: "Already archived.", comment: "Error: the notification was already archived")
 
         case .insertFailed:
             String(localized: "A notification couldn't be saved.")

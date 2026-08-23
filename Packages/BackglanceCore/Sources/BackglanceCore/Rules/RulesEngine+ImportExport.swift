@@ -135,13 +135,19 @@ extension RulesEngine {
     /// themselves, and the "never echo the pattern back" rule they follow, are unchanged.
     private static func invalidReason(for entry: RulesDocument.Entry) -> String? {
         if entry.pattern.isEmpty {
-            return String(localized: "the pattern is empty")
+            return String(localized: "the pattern is empty", comment: "Fragment in the rule-import error message")
         }
         if entry.pattern.count > RuleLimits.maxPatternLength {
-            return String(localized: "the pattern is over \(RuleLimits.maxPatternLength) characters")
+            return String(
+                localized: "the pattern is over \(RuleLimits.maxPatternLength) characters",
+                comment: "Fragment in the rule-import error message; the placeholder is a number"
+            )
         }
         if entry.kind == .regex, (try? NSRegularExpression(pattern: entry.pattern)) == nil {
-            return String(localized: "the regex pattern does not compile")
+            return String(
+                localized: "the regex pattern does not compile",
+                comment: "Fragment in the rule-import error message"
+            )
         }
         return nil
     }

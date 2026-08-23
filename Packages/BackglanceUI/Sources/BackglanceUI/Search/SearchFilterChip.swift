@@ -95,7 +95,10 @@ public struct SearchFilterChip: View {
     // MARK: Private
 
     private var removeLabel: String {
-        String(localized: "Remove filter, \(filter.label)")
+        String(
+            localized: "Remove filter, \(filter.label)",
+            comment: "Spoken by VoiceOver for a filter chip's close button; placeholder is the filter's own label"
+        )
     }
 }
 

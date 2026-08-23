@@ -36,7 +36,7 @@ public struct RulesSettingsView: View {
                 .accessibilityIdentifier("rules.table")
 
             HStack {
-                Button(String(localized: "Add Rule…")) {
+                Button(String(localized: "Add Rule…", comment: "Button: opens the editor to create a new rule")) {
                     editingRule = .new
                 }
                 .accessibilityIdentifier("rules.add")
@@ -75,7 +75,7 @@ public struct RulesSettingsView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(String(localized: "Rules"))
+            Text(String(localized: "Rules", comment: "Pane title: notification highlight, VIP and mute rules"))
                 .font(.title2.weight(.semibold))
             Text(String(localized: """
             Rules change how Backglance shows notifications. They do not change what macOS delivers.
@@ -94,12 +94,21 @@ public struct RulesSettingsView: View {
     /// archive would not open).
     private var menu: some View {
         Menu {
-            Button(String(localized: "Export Rules…")) { exportRules() }
-                .disabled(!model.canImportExport)
-            Button(String(localized: "Import Rules…")) { importRules() }
-                .disabled(!model.canImportExport)
+            Button(String(localized: "Export Rules…", comment: "Menu item: saves all rules to a JSON file")) {
+                exportRules()
+            }
+            .disabled(!model.canImportExport)
+            Button(String(localized: "Import Rules…", comment: "Menu item: loads rules from a JSON file")) {
+                importRules()
+            }
+            .disabled(!model.canImportExport)
             Divider()
-            Button(String(localized: "Open Notification Settings…")) { openNotificationSettings() }
+            Button(String(
+                localized: "Open Notification Settings…",
+                comment: "Menu item: opens the Notifications pane of macOS System Settings"
+            )) {
+                openNotificationSettings()
+            }
         } label: {
             Image(systemName: "ellipsis.circle")
         }
@@ -182,8 +191,8 @@ struct RulesTable: View {
 
     var body: some View {
         Table(model.rules) {
-            TableColumn(String(localized: "On")) { rule in
-                Toggle(String(localized: "Enabled"), isOn: Binding(
+            TableColumn(String(localized: "On", comment: "Column header: whether the rule is enabled")) { rule in
+                Toggle(String(localized: "Enabled", comment: "Toggle: whether the rule is active"), isOn: Binding(
                     get: { rule.isEnabled },
                     set: { newValue in Task { await model.setEnabled(newValue, for: rule) } }
                 ))
@@ -192,7 +201,7 @@ struct RulesTable: View {
             }
             .width(36)
 
-            TableColumn(String(localized: "!")) { rule in
+            TableColumn(String(localized: "!", comment: "Column header: warning badge for broken rules")) { rule in
                 if let id = rule.id, let problem = model.problemsByRuleID[id] {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
@@ -202,12 +211,15 @@ struct RulesTable: View {
             }
             .width(24)
 
-            TableColumn(String(localized: "Rule")) { rule in
+            TableColumn(String(localized: "Rule", comment: "Column header: summary of what each rule does")) { rule in
                 VStack(alignment: .leading, spacing: 2) {
                     Text(Self.summary(rule))
                         .accessibilityIdentifier("rules.list.summary.\(rule.id ?? -1)")
                     if rule.kind == .mute, let appBundleID = rule.appBundleId {
-                        Button(String(localized: "Notification Settings for \(appBundleID)…")) {
+                        Button(String(
+                            localized: "Notification Settings for \(appBundleID)…",
+                            comment: "Button: placeholder is an app’s bundle id; opens its notification settings"
+                        )) {
                             try? SystemSettingsLink(workspace: NSWorkspaceAppLauncher()).open(bundleID: appBundleID)
                         }
                         .buttonStyle(.link)
@@ -217,7 +229,7 @@ struct RulesTable: View {
                 }
             }
 
-            TableColumn(String(localized: "Priority")) { rule in
+            TableColumn(String(localized: "Priority", comment: "Rule priority; higher-priority rules win")) { rule in
                 Text(rule.priority, format: .number)
                     .monospacedDigit()
             }
@@ -245,22 +257,28 @@ struct RulesTable: View {
     /// content.
     private static func summary(_ rule: Rule) -> String {
         let kind = switch rule.kind {
-        case .highlight: String(localized: "Highlight")
-        case .vip: String(localized: "VIP")
-        case .mute: String(localized: "Mute")
-        case .regex: String(localized: "Regex")
+        case .highlight: String(localized: "Highlight", comment: "Rule kind: highlights matches in colour")
+        case .vip: String(localized: "VIP", comment: "Rule kind: marks matches as important")
+        case .mute: String(localized: "Mute", comment: "Rule kind: hides matches in Backglance only")
+        case .regex: String(localized: "Regex", comment: "Rule kind: regular-expression pattern")
         }
         let field = switch rule.matchField {
-        case .any: String(localized: "anywhere")
-        case .title: String(localized: "title")
-        case .body: String(localized: "body")
-        case .sender: String(localized: "sender")
-        case .app: String(localized: "app")
+        case .any: String(localized: "anywhere", comment: "Match field name, lowercase, shown inside a rule summary")
+        case .title: String(localized: "title", comment: "Match field name, lowercase, shown inside a rule summary")
+        case .body: String(localized: "body", comment: "Match field name, lowercase, shown inside a rule summary")
+        case .sender: String(localized: "sender", comment: "Match field name, lowercase, shown inside a rule summary")
+        case .app: String(localized: "app", comment: "Match field name, lowercase, shown inside a rule summary")
         }
         guard let scope = rule.appBundleId else {
-            return String(localized: "\(kind) · \(field) · “\(rule.pattern)”")
+            return String(
+                localized: "\(kind) · \(field) · “\(rule.pattern)”",
+                comment: "Rule summary: kind name, match-field name, then the rule’s pattern"
+            )
         }
-        return String(localized: "\(kind) · \(field) · “\(rule.pattern)” · \(scope)")
+        return String(
+            localized: "\(kind) · \(field) · “\(rule.pattern)” · \(scope)",
+            comment: "Rule summary: kind, match field, the rule’s pattern, then the app bundle id it is limited to"
+        )
     }
 }
 

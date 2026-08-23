@@ -116,7 +116,7 @@ struct MenuBarPopoverView: View {
 
             Spacer(minLength: 8)
 
-            Picker(String(localized: "View mode"), selection: $store.viewMode) {
+            Picker(String(localized: "View mode", comment: "Picker: timeline density"), selection: $store.viewMode) {
                 Image(systemName: "list.bullet").tag(TimelineViewMode.compact)
                 Image(systemName: "list.bullet.rectangle").tag(TimelineViewMode.detailed)
             }
@@ -125,12 +125,15 @@ struct MenuBarPopoverView: View {
             .frame(width: 76)
 
             Menu {
-                Toggle(String(localized: "Group by app"), isOn: $store.groupByApp)
-                Button(String(localized: "Mark All as Read")) {
+                Toggle(
+                    String(localized: "Group by app", comment: "Menu toggle: groups the timeline by app"),
+                    isOn: $store.groupByApp
+                )
+                Button(String(localized: "Mark All as Read", comment: "Menu item: marks all notifications read")) {
                     store.markAllRead()
                 }
                 Divider()
-                Button(String(localized: "Open Full Window")) {
+                Button(String(localized: "Open Full Window", comment: "Menu item: opens the full timeline window")) {
                     actions.openWindow?()
                 }
                 .disabled(actions.openWindow == nil)
@@ -140,7 +143,7 @@ struct MenuBarPopoverView: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .accessibilityLabel(String(localized: "Timeline options"))
+            .accessibilityLabel(String(localized: "Timeline options", comment: "VoiceOver label for the toolbar menu"))
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)

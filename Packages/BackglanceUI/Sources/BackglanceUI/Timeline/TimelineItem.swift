@@ -65,7 +65,10 @@ public struct TimelineItem: Identifiable, Equatable, Sendable {
         self.init(
             id: id,
             notification: row,
-            appName: app?.displayName ?? app?.bundleId ?? String(localized: "Unknown app"),
+            appName: app?.displayName ?? app?.bundleId ?? String(
+                localized: "Unknown app",
+                comment: "Placeholder shown in place of an app's name when its record is gone from the archive"
+            ),
             bundleID: app?.bundleId,
             triage: triage,
             isSelected: isSelected,

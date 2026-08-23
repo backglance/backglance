@@ -21,16 +21,22 @@ public struct UnreadDivider: View {
     public var body: some View {
         HStack(spacing: 8) {
             Rectangle().fill(.tint).frame(height: 1)
-            Text(String(localized: "new since you were away"))
-                .font(.caption2.smallCaps())
-                .foregroundStyle(.tint)
-                .fixedSize()
+            Text(String(
+                localized: "new since you were away",
+                comment: "Label on the timeline's unread divider line; deliberately lowercase, rendered in small caps"
+            ))
+            .font(.caption2.smallCaps())
+            .foregroundStyle(.tint)
+            .fixedSize()
             Rectangle().fill(.tint).frame(height: 1)
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 10)
         .accessibilityElement()
-        .accessibilityLabel(String(localized: "New notifications since you were away start here"))
+        .accessibilityLabel(String(
+            localized: "New notifications since you were away start here",
+            comment: "Spoken by VoiceOver for the unread divider"
+        ))
         .accessibilityAddTraits(.isHeader)
     }
 }

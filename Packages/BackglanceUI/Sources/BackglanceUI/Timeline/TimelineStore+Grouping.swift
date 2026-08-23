@@ -78,7 +78,7 @@ extension TimelineStore {
                 // count separately, so baking "(n)" in here would print it twice.
                 slots.append(.appHeader(.init(
                     id: "muted",
-                    name: String(localized: "Muted"),
+                    name: mutedGroupName,
                     count: muted.count,
                     isMuted: true
                 )))
@@ -91,6 +91,15 @@ extension TimelineStore {
                 mutedItems: muted
             )
         }
+    }
+
+    /// The collapsed muted group's header title. `PreviewData` renders the
+    /// same key with the same comment; keep the two in lockstep.
+    private static var mutedGroupName: String {
+        String(
+            localized: "Muted",
+            comment: "Header of the collapsed group of muted notifications (hidden from view, not silenced)"
+        )
     }
 
     /// The order within the pinned bucket of one day: manual pin before a

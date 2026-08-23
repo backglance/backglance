@@ -150,7 +150,7 @@ extension URLRouteError: LocalizedError {
     /// *log* line is what tells a maintainer which case fired, not the toast a caller of
     /// the URL scheme sees.
     public var errorDescription: String? {
-        String(localized: "Couldn't open link")
+        String(localized: "Couldn't open link", comment: "Toast shown when a backglance:// link fails")
     }
 }
 

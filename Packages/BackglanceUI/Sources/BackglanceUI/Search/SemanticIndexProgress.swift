@@ -40,7 +40,10 @@ public struct SemanticIndexProgress: View {
     private var statusText: String {
         let doneText = done.formatted(.number)
         let totalText = total.formatted(.number)
-        return String(localized: "Indexing \(doneText) of \(totalText)")
+        return String(
+            localized: "Indexing \(doneText) of \(totalText)",
+            comment: "Spoken by VoiceOver for the index progress bar; placeholders are notifications done and total"
+        )
     }
 }
 

@@ -75,7 +75,7 @@ public enum ExportError: Error, LocalizedError, Equatable, Sendable {
             String(localized: "Export cancelled.")
 
         case let .io(msg):
-            String(localized: "Couldn't write the export file: \(msg)")
+            String(localized: "Couldn't write the export file: \(msg)", comment: "Placeholder is a filesystem error")
         }
     }
 }

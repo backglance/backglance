@@ -30,7 +30,10 @@ public enum WipeConfirmationError: Error, Equatable, Sendable {
     public var userMessage: String {
         switch self {
         case .confirmationMismatch:
-            String(localized: "Type “wipe” to confirm.")
+            String(
+                localized: "Type “wipe” to confirm.",
+                comment: "Error: keep “wipe” untranslated — the app checks the typed text against that exact word"
+            )
 
         case .biometricsFailed:
             String(localized: "Touch ID didn’t succeed. Nothing was deleted.")
@@ -190,7 +193,10 @@ public final class WipeConfirmationModel {
     // MARK: Private
 
     private static var biometricReason: String {
-        String(localized: "Wipe the Backglance archive")
+        String(
+            localized: "Wipe the Backglance archive",
+            comment: "Touch ID prompt reason: completes the system sentence “Backglance is trying to …”"
+        )
     }
 
     private let archive: Archive?

@@ -47,11 +47,16 @@ public struct AppGroupHeader: View {
     private var reduceMotion
 
     private var accessibilityLabel: String {
-        String(localized: "\(group.name), \(group.count) notifications")
+        String(
+            localized: "\(group.name), \(group.count) notifications",
+            comment: "Spoken by VoiceOver for a group header; placeholders are the group's name and its row count"
+        )
     }
 
     private var expandedStateText: String {
-        isExpanded ? String(localized: "Expanded") : String(localized: "Collapsed")
+        isExpanded
+            ? String(localized: "Expanded", comment: "Spoken by VoiceOver: the muted group's rows are showing")
+            : String(localized: "Collapsed", comment: "Spoken by VoiceOver: the muted group's rows are hidden")
     }
 
     private var content: some View {

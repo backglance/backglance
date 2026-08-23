@@ -26,8 +26,11 @@ public struct UpdatesSettingsView: View {
     public var body: some View {
         Form {
             Section {
-                LabeledContent(String(localized: "Version"), value: model.version)
-                    .accessibilityIdentifier("settings.updates.version")
+                LabeledContent(
+                    String(localized: "Version", comment: "Label: the app’s version number"),
+                    value: model.version
+                )
+                .accessibilityIdentifier("settings.updates.version")
 
                 Toggle(String(localized: "Check for updates automatically"), isOn: Binding(
                     get: { model.automaticChecksEnabled },
@@ -46,11 +49,11 @@ public struct UpdatesSettingsView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             } header: {
-                Text(String(localized: "Updates"))
+                Text(String(localized: "Updates", comment: "Section header: app update settings"))
             }
 
             Section {
-                Button(String(localized: "Check for Updates…")) {
+                Button(String(localized: "Check for Updates…", comment: "Button: starts a manual update check")) {
                     model.checkForUpdates()
                 }
                 .disabled(!model.isConfigured || !model.canCheckForUpdates)

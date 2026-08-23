@@ -2,10 +2,12 @@
   "sourceLanguage": "en",
   "strings": {
     "!": {
+      "comment": "Column header: warning badge for broken rules",
       "extractionState": "manual",
       "localizations": {}
     },
     "%@ (%lld records)": {
+      "comment": "Status value: when capture last ran, then how many records that pass read",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -29,14 +31,17 @@
       }
     },
     "%@ · %@ · “%@”": {
+      "comment": "Rule summary: kind name, match-field name, then the rule’s pattern",
       "extractionState": "manual",
       "localizations": {}
     },
     "%@ · %@ · “%@” · %@": {
+      "comment": "Rule summary: kind, match field, the rule’s pattern, then the app bundle id it is limited to",
       "extractionState": "manual",
       "localizations": {}
     },
     "%@ · %lld notifications": {
+      "comment": "Status value: the archive’s file size, then its notification count",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -60,14 +65,17 @@
       }
     },
     "%@, %@": {
+      "comment": "Spoken by VoiceOver for the menu bar item: the unread phrase, then the capture-state clause",
       "extractionState": "manual",
       "localizations": {}
     },
     "%@, %lld codes redacted in the last 30 days": {
+      "comment": "VoiceOver label; placeholders are the app's name and a count",
       "extractionState": "manual",
       "localizations": {}
     },
     "%@, %lld notifications": {
+      "comment": "Spoken by VoiceOver for a group header; placeholders are the group's name and its row count",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -95,6 +103,7 @@
       "localizations": {}
     },
     "%lld imported, %lld skipped": {
+      "comment": "Import result: count of rules imported, then count of rules skipped",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -103,6 +112,7 @@
       "localizations": {}
     },
     "%lld notifications": {
+      "comment": "Caption under the app's name; placeholder is a count of archived notifications",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -111,22 +121,27 @@
       "localizations": {}
     },
     "(no text)": {
+      "comment": "Placeholder shown as a row's title when the notification had no title or body",
       "extractionState": "manual",
       "localizations": {}
     },
     "(no title)": {
+      "comment": "Placeholder: preview row for a notification without a title",
       "extractionState": "manual",
       "localizations": {}
     },
     "24 hours": {
+      "comment": "Retention picker option: keep notifications for 24 hours",
       "extractionState": "manual",
       "localizations": {}
     },
     "30 days": {
+      "comment": "Retention picker option: keep notifications for 30 days",
       "extractionState": "manual",
       "localizations": {}
     },
     "7 days": {
+      "comment": "Retention picker option: keep notifications for 7 days",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -143,22 +158,27 @@
       "localizations": {}
     },
     "Adapter": {
+      "comment": "Label: which store adapter capture is using",
       "extractionState": "manual",
       "localizations": {}
     },
     "Add": {
+      "comment": "Button: add the typed bundle identifier to the list",
       "extractionState": "manual",
       "localizations": {}
     },
     "Add Rule": {
+      "comment": "Sheet title: creating a new notification rule",
       "extractionState": "manual",
       "localizations": {}
     },
     "Add Rule…": {
+      "comment": "Button: opens the editor to create a new rule",
       "extractionState": "manual",
       "localizations": {}
     },
     "Add app…": {
+      "comment": "Button: exclude the typed bundle identifier",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -171,14 +191,17 @@
       "localizations": {}
     },
     "Allowed": {
+      "comment": "Status label: notification banners are allowed",
       "extractionState": "manual",
       "localizations": {}
     },
     "Already archived.": {
+      "comment": "Error: the notification was already archived",
       "extractionState": "manual",
       "localizations": {}
     },
     "Also forget per-app settings": {
+      "comment": "Toggle: the wipe also clears per-app exclusions, retention and redaction settings",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -187,18 +210,22 @@
       "localizations": {}
     },
     "Always": {
+      "comment": "Picker option: show the digest after every away session",
       "extractionState": "manual",
       "localizations": {}
     },
     "Amber": {
+      "comment": "Colour name shown as a picker option",
       "extractionState": "manual",
       "localizations": {}
     },
     "Anywhere": {
+      "comment": "Match-field option: match in any field",
       "extractionState": "manual",
       "localizations": {}
     },
     "App bundle id": {
+      "comment": "Match-field option: the app’s bundle identifier",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -207,6 +234,7 @@
       "localizations": {}
     },
     "App not found": {
+      "comment": "Inline error: the notification's app is not installed",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -215,6 +243,7 @@
       "localizations": {}
     },
     "Archive": {
+      "comment": "Label and section header: Backglance’s notification archive\nSection header: the notification archive (noun)",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -223,10 +252,12 @@
       "localizations": {}
     },
     "Back": {
+      "comment": "Button: returns setup to the previous screen",
       "extractionState": "manual",
       "localizations": {}
     },
     "Backglance": {
+      "comment": "Setup screen title: the app's name — do not translate",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -327,22 +358,27 @@
       "localizations": {}
     },
     "Backglance's own notifications": {
+      "comment": "Caption: why this default is excluded",
       "extractionState": "manual",
       "localizations": {}
     },
     "Backglance, %lld unread notifications": {
+      "comment": "Spoken by VoiceOver for the menu bar item; placeholder is the unread count (always 2–99)",
       "extractionState": "manual",
       "localizations": {}
     },
     "Backglance, 1 unread notification": {
+      "comment": "Spoken by VoiceOver for the menu bar item; Backglance is the app name, do not translate it",
       "extractionState": "manual",
       "localizations": {}
     },
     "Backglance, more than 99 unread notifications": {
+      "comment": "Spoken by VoiceOver for the menu bar item; Backglance is the app name, do not translate it",
       "extractionState": "manual",
       "localizations": {}
     },
     "Backglance, no unread notifications": {
+      "comment": "Spoken by VoiceOver for the menu bar item; Backglance is the app name, do not translate it",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -351,6 +387,7 @@
       "localizations": {}
     },
     "Banner for Focus sessions": {
+      "comment": "Toggle; 'Focus' is the macOS feature name",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -359,18 +396,22 @@
       "localizations": {}
     },
     "Best matches": {
+      "comment": "Section header over search results that matched the words typed",
       "extractionState": "manual",
       "localizations": {}
     },
     "Blue": {
+      "comment": "Colour name shown as a picker option",
       "extractionState": "manual",
       "localizations": {}
     },
     "Body": {
+      "comment": "Match-field option: the notification’s body text",
       "extractionState": "manual",
       "localizations": {}
     },
     "Bundle identifier": {
+      "comment": "Text field label: the app's bundle identifier",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -379,14 +420,17 @@
       "localizations": {}
     },
     "Cancel": {
+      "comment": "Button: closes the export sheet without exporting",
       "extractionState": "manual",
       "localizations": {}
     },
     "Capture": {
+      "comment": "Label and section header: the notification-capture subsystem\nNotification capture (noun)",
       "extractionState": "manual",
       "localizations": {}
     },
     "Capture is paused until %@.": {
+      "comment": "Timeline banner; placeholder is the clock time the pause ends",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -399,10 +443,12 @@
       "localizations": {}
     },
     "Check again": {
+      "comment": "Button: re-check Full Disk Access status\nButton: re-checks whether Full Disk Access has been granted yet",
       "extractionState": "manual",
       "localizations": {}
     },
     "Check for Updates…": {
+      "comment": "Button: starts a manual update check",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -411,14 +457,17 @@
       "localizations": {}
     },
     "Choosing \"Never store\" above also turns on \"Exclude this app\", in the same write. Turning \"Exclude this app\" off on its own does not change the retention policy — pick a window above if you want capture to resume under one.": {
+      "comment": "Footer; the quoted phrases must match the picker option and toggle labels above",
       "extractionState": "manual",
       "localizations": {}
     },
     "Clear filters": {
+      "comment": "Button: removes the active filters; must match the search empty state's button\nButton: removes the active search filters; must match the timeline empty state's button",
       "extractionState": "manual",
       "localizations": {}
     },
     "Clear search": {
+      "comment": "Spoken by VoiceOver for the button that empties the search field",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -435,10 +484,12 @@
       "localizations": {}
     },
     "Collapsed": {
+      "comment": "Spoken by VoiceOver: the muted group's rows are hidden",
       "extractionState": "manual",
       "localizations": {}
     },
     "Colour": {
+      "comment": "Picker label: highlight colour",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -447,42 +498,52 @@
       "localizations": {}
     },
     "Confirmation": {
+      "comment": "Text field label: where the confirmation word is typed",
       "extractionState": "manual",
       "localizations": {}
     },
     "Continue": {
+      "comment": "Button: advances setup to the next screen",
       "extractionState": "manual",
       "localizations": {}
     },
     "Copy": {
+      "comment": "Context-menu item: copies the notification's text to the clipboard",
       "extractionState": "manual",
       "localizations": {}
     },
     "Copy command": {
+      "comment": "Button: copy the Terminal command",
       "extractionState": "manual",
       "localizations": {}
     },
     "Copy with App and Time": {
+      "comment": "Context-menu item: copies the text prefixed with the app's name and the delivery time",
       "extractionState": "manual",
       "localizations": {}
     },
     "Couldn't copy": {
+      "comment": "Inline error: copying to the clipboard failed",
       "extractionState": "manual",
       "localizations": {}
     },
     "Couldn't open %@": {
+      "comment": "Inline error: launching the app failed; placeholder is a bundle id, not a display name",
       "extractionState": "manual",
       "localizations": {}
     },
     "Couldn't open System Settings": {
+      "comment": "Inline error; \"System Settings\" is the macOS app — use Apple's localized name for it",
       "extractionState": "manual",
       "localizations": {}
     },
     "Couldn't open link": {
+      "comment": "Toast shown when a backglance:// link fails",
       "extractionState": "manual",
       "localizations": {}
     },
     "Couldn't write the export file: %@": {
+      "comment": "Placeholder is a filesystem error",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -495,10 +556,12 @@
       "localizations": {}
     },
     "Count time away when": {
+      "comment": "Label: the checkboxes below complete the sentence",
       "extractionState": "manual",
       "localizations": {}
     },
     "Degraded — %@": {
+      "comment": "Status value: the placeholder is a short reason capture stopped",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -507,30 +570,37 @@
       "localizations": {}
     },
     "Delete": {
+      "comment": "Context-menu item: deletes the right-clicked notification",
       "extractionState": "manual",
       "localizations": {}
     },
     "Delete %lld Notifications": {
+      "comment": "Context-menu item: deletes the selection; placeholder is how many rows are selected",
       "extractionState": "manual",
       "localizations": {}
     },
     "Delete embeddings": {
+      "comment": "Button: delete the semantic search index",
       "extractionState": "manual",
       "localizations": {}
     },
     "Deleted %lld notifications": {
+      "comment": "Toast message after a delete; placeholder is how many were deleted (always 2 or more)",
       "extractionState": "manual",
       "localizations": {}
     },
     "Deleted 1 notification": {
+      "comment": "Toast message after a delete (statement, not a button)",
       "extractionState": "manual",
       "localizations": {}
     },
     "Diagnostics": {
+      "comment": "Section header: the diagnostics export",
       "extractionState": "manual",
       "localizations": {}
     },
     "Digest": {
+      "comment": "Section header: the missed-notifications digest",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -539,10 +609,12 @@
       "localizations": {}
     },
     "Dismiss until next launch": {
+      "comment": "Spoken by VoiceOver for the banner's close button; the banner returns on the next launch",
       "extractionState": "manual",
       "localizations": {}
     },
     "Edit Rule": {
+      "comment": "Sheet title: editing an existing notification rule",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -551,6 +623,7 @@
       "localizations": {}
     },
     "Enabled": {
+      "comment": "Toggle: whether the rule is active",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -563,22 +636,27 @@
       "localizations": {}
     },
     "Exclude this app": {
+      "comment": "Toggle: never archive this app's notifications",
       "extractionState": "manual",
       "localizations": {}
     },
     "Excluded apps": {
+      "comment": "Section header in Privacy settings",
       "extractionState": "manual",
       "localizations": {}
     },
     "Expanded": {
+      "comment": "Spoken by VoiceOver: the muted group's rows are showing",
       "extractionState": "manual",
       "localizations": {}
     },
     "Export %lld Notifications": {
+      "comment": "Export sheet title; placeholder is how many notifications are selected (always 2 or more)",
       "extractionState": "manual",
       "localizations": {}
     },
     "Export 1 Notification": {
+      "comment": "Export sheet title, single selection",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -587,10 +665,12 @@
       "localizations": {}
     },
     "Export Rules…": {
+      "comment": "Menu item: saves all rules to a JSON file",
       "extractionState": "manual",
       "localizations": {}
     },
     "Export Selection…": {
+      "comment": "Context-menu item: exports the selected notifications to a file",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -599,10 +679,12 @@
       "localizations": {}
     },
     "Export failed: %@": {
+      "comment": "Inline error; placeholder is a system error description, already localized by macOS",
       "extractionState": "manual",
       "localizations": {}
     },
     "Export format": {
+      "comment": "Spoken by VoiceOver for the CSV/JSON format picker",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -611,10 +693,12 @@
       "localizations": {}
     },
     "Export…": {
+      "comment": "Button: confirms the export and opens the save panel",
       "extractionState": "manual",
       "localizations": {}
     },
     "Failed %@ — see the log": {
+      "comment": "Status value: check failed; placeholder is a relative time",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -623,30 +707,37 @@
       "localizations": {}
     },
     "Focus search": {
+      "comment": "Hidden button carrying the Command-F shortcut; never drawn or spoken",
       "extractionState": "manual",
       "localizations": {}
     },
     "For 1 Hour": {
+      "comment": "Submenu item under Pause Capture: how long to pause",
       "extractionState": "manual",
       "localizations": {}
     },
     "For 15 Minutes": {
+      "comment": "Submenu item under Pause Capture: how long to pause",
       "extractionState": "manual",
       "localizations": {}
     },
     "Forever": {
+      "comment": "Retention picker option: keep notifications forever",
       "extractionState": "manual",
       "localizations": {}
     },
     "Format": {
+      "comment": "Picker label: which file format the export is written in",
       "extractionState": "manual",
       "localizations": {}
     },
     "Full Disk Access": {
+      "comment": "Label: use Apple’s localized name for the Full Disk Access permission\nPermission name; matches System Settings",
       "extractionState": "manual",
       "localizations": {}
     },
     "Full Disk Access isn’t sticking": {
+      "comment": "Disclosure title: the granted permission keeps reverting",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -663,6 +754,7 @@
       "localizations": {}
     },
     "Global shortcut": {
+      "comment": "Row label: the shortcut that opens Backglance",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -671,10 +763,12 @@
       "localizations": {}
     },
     "Grant Full Disk Access…": {
+      "comment": "Banner button: opens System Settings; must match the timeline empty state's button\nButton: opens System Settings; must match the capture banner's button",
       "extractionState": "manual",
       "localizations": {}
     },
     "Granted": {
+      "comment": "Status label: Full Disk Access is granted\nStatus value: Full Disk Access is granted",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -687,10 +781,12 @@
       "localizations": {}
     },
     "Granted, thanks!": {
+      "comment": "Status label on the setup screen once Full Disk Access has been granted",
       "extractionState": "manual",
       "localizations": {}
     },
     "Green": {
+      "comment": "Colour name shown as a picker option",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -703,6 +799,7 @@
       "localizations": {}
     },
     "Highlight": {
+      "comment": "Rule kind: highlights matches in colour",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -711,6 +808,7 @@
       "localizations": {}
     },
     "Import Rules…": {
+      "comment": "Menu item: loads rules from a JSON file",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -719,6 +817,7 @@
       "localizations": {}
     },
     "Imported %lld notifications.": {
+      "comment": "Import status line; placeholder is a count, pluralized by the string catalog",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -742,22 +841,27 @@
       }
     },
     "In a Focus": {
+      "comment": "Checkbox; 'Focus' is the macOS feature name",
       "extractionState": "manual",
       "localizations": {}
     },
     "Include app names": {
+      "comment": "Toggle: include app names in the diagnostics export",
       "extractionState": "manual",
       "localizations": {}
     },
     "Indexing %@ of %@": {
+      "comment": "Spoken by VoiceOver for the index progress bar; placeholders are notifications done and total",
       "extractionState": "manual",
       "localizations": {}
     },
     "Inherit": {
+      "comment": "Per-app retention option: use the global setting\nPicker option: use the global retention setting",
       "extractionState": "manual",
       "localizations": {}
     },
     "Integrity": {
+      "comment": "Label: result of the archive integrity check",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -766,22 +870,27 @@
       "localizations": {}
     },
     "Keep notifications for": {
+      "comment": "Picker label: completed by a duration option\nPicker label: per-app retention period",
       "extractionState": "manual",
       "localizations": {}
     },
     "Kind": {
+      "comment": "Picker label: what type of rule this is",
       "extractionState": "manual",
       "localizations": {}
     },
     "Last capture": {
+      "comment": "Label: when capture last read the store",
       "extractionState": "manual",
       "localizations": {}
     },
     "Learn why": {
+      "comment": "Link button: opens the explanation of why Full Disk Access is needed",
       "extractionState": "manual",
       "localizations": {}
     },
     "Locked": {
+      "comment": "Checkbox: the screen was locked",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -798,50 +907,62 @@
       "localizations": {}
     },
     "Mark as Read": {
+      "comment": "Context-menu item: flags the notification as read",
       "extractionState": "manual",
       "localizations": {}
     },
     "Mark as Unread": {
+      "comment": "Context-menu item: flags the notification as not yet read",
       "extractionState": "manual",
       "localizations": {}
     },
     "Marked away by hand": {
+      "comment": "Checkbox: user marked themselves away",
       "extractionState": "manual",
       "localizations": {}
     },
     "Match": {
+      "comment": "Picker label: which notification field the pattern applies to",
       "extractionState": "manual",
       "localizations": {}
     },
     "Mute": {
+      "comment": "Rule kind: hides matches in Backglance only",
       "extractionState": "manual",
       "localizations": {}
     },
     "Mute %@ in Timeline": {
+      "comment": "Context-menu item: collapses the app's rows (no effect on sound); placeholder is its name",
       "extractionState": "manual",
       "localizations": {}
     },
     "Muted": {
+      "comment": "Header of the collapsed group of muted notifications (hidden from view, not silenced)",
       "extractionState": "manual",
       "localizations": {}
     },
     "Never": {
+      "comment": "Picker option: never show the digest",
       "extractionState": "manual",
       "localizations": {}
     },
     "Never store": {
+      "comment": "Retention picker option: never archive these notifications",
       "extractionState": "manual",
       "localizations": {}
     },
     "Never this launch": {
+      "comment": "Status value: no capture pass has run since the app started",
       "extractionState": "manual",
       "localizations": {}
     },
     "New notifications since you were away start here": {
+      "comment": "Spoken by VoiceOver for the unread divider",
       "extractionState": "manual",
       "localizations": {}
     },
     "No apps yet": {
+      "comment": "Empty-state placeholder: the archive holds no apps",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -858,6 +979,7 @@
       "localizations": {}
     },
     "None — capture isn’t reading": {
+      "comment": "Status value: shown when no store adapter is active",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -866,6 +988,7 @@
       "localizations": {}
     },
     "Not asked yet": {
+      "comment": "Status label: banner permission not yet requested",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -874,10 +997,12 @@
       "localizations": {}
     },
     "Not checked this launch": {
+      "comment": "Status value: no integrity check has run since the app started",
       "extractionState": "manual",
       "localizations": {}
     },
     "Not granted": {
+      "comment": "Status value: Full Disk Access is not granted",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -890,10 +1015,12 @@
       "localizations": {}
     },
     "Not read yet": {
+      "comment": "Status value: the store hasn’t been read yet",
       "extractionState": "manual",
       "localizations": {}
     },
     "Not running": {
+      "comment": "Status value: capture never started",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -922,6 +1049,7 @@
       "localizations": {}
     },
     "Notification Settings for %@…": {
+      "comment": "Button: placeholder is an app’s bundle id; opens its notification settings\nContext-menu item: opens macOS notification settings; placeholder is the app's display name",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -934,6 +1062,7 @@
       "localizations": {}
     },
     "Notifications": {
+      "comment": "The macOS notification permission",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -950,22 +1079,27 @@
       "localizations": {}
     },
     "OK": {
+      "comment": "Button: dismiss the alert",
       "extractionState": "manual",
       "localizations": {}
     },
     "OK %@": {
+      "comment": "Status value: check passed; placeholder is a relative time",
       "extractionState": "manual",
       "localizations": {}
     },
     "Off": {
+      "comment": "Status label: Open at Login is off",
       "extractionState": "manual",
       "localizations": {}
     },
     "Off by default. The patterns are written for the way text messages and e-mail announce a code, so running them everywhere turns the occasional ticket or order number into “[code redacted]” too.": {
+      "comment": "Keep '[code redacted]' verbatim — it must match the stored replacement text",
       "extractionState": "manual",
       "localizations": {}
     },
     "On": {
+      "comment": "Column header: whether the rule is enabled\nStatus label: Open at Login is on",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -974,6 +1108,7 @@
       "localizations": {}
     },
     "One-time code redaction": {
+      "comment": "Section header in Privacy settings",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -986,10 +1121,12 @@
       "localizations": {}
     },
     "Open Backglance": {
+      "comment": "Button on setup's last screen: closes setup and opens the app; Backglance is the app name",
       "extractionState": "manual",
       "localizations": {}
     },
     "Open Backglance at login": {
+      "comment": "Toggle: launch Backglance at login",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1002,6 +1139,7 @@
       "localizations": {}
     },
     "Open Link": {
+      "comment": "Context-menu item: opens the notification's own deep link, not just the app",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1014,18 +1152,22 @@
       "localizations": {}
     },
     "Open Notification Settings…": {
+      "comment": "Menu item: opens the Notifications pane of macOS System Settings",
       "extractionState": "manual",
       "localizations": {}
     },
     "Open System Settings": {
+      "comment": "Button; \"System Settings\" is the macOS app — use Apple's localized name for it",
       "extractionState": "manual",
       "localizations": {}
     },
     "Open at Login": {
+      "comment": "Row title; matches macOS's Login Items wording",
       "extractionState": "manual",
       "localizations": {}
     },
     "Open in %@": {
+      "comment": "Context-menu item: opens the notification in its app; placeholder is the app's display name",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1043,10 +1185,12 @@
       "localizations": {}
     },
     "Password manager": {
+      "comment": "Caption: why this shipped default is excluded",
       "extractionState": "manual",
       "localizations": {}
     },
     "Pattern": {
+      "comment": "Text field label: the text or regex the rule matches",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1059,18 +1203,22 @@
       "localizations": {}
     },
     "Pause": {
+      "comment": "Section header: pausing capture (noun)",
       "extractionState": "manual",
       "localizations": {}
     },
     "Pause Capture": {
+      "comment": "Menu item with a submenu of durations: temporarily stops archiving notifications",
       "extractionState": "manual",
       "localizations": {}
     },
     "Paused": {
+      "comment": "Status label: capture is paused indefinitely\nStatus value: capture is paused with no end time",
       "extractionState": "manual",
       "localizations": {}
     },
     "Paused until %@": {
+      "comment": "Status label; placeholder is when the pause ends\nStatus value: the placeholder is the time capture will resume",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1079,10 +1227,12 @@
       "localizations": {}
     },
     "Pin": {
+      "comment": "Context-menu item (verb): keeps the notification at the top of its day",
       "extractionState": "manual",
       "localizations": {}
     },
     "Play a sound": {
+      "comment": "Toggle: the digest banner plays a sound",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1095,6 +1245,7 @@
       "localizations": {}
     },
     "Priority": {
+      "comment": "Rule priority; higher-priority rules win",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1103,6 +1254,7 @@
       "localizations": {}
     },
     "Purple": {
+      "comment": "Colour name shown as a picker option",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1120,18 +1272,22 @@
       "localizations": {}
     },
     "Red": {
+      "comment": "Colour name shown as a picker option",
       "extractionState": "manual",
       "localizations": {}
     },
     "Redact codes in all apps": {
+      "comment": "Toggle: apply code redaction to every app",
       "extractionState": "manual",
       "localizations": {}
     },
     "Redact one-time codes": {
+      "comment": "Toggle: replace codes before storing",
       "extractionState": "manual",
       "localizations": {}
     },
     "Redaction activity": {
+      "comment": "Section header: codes redacted per app",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1140,6 +1296,7 @@
       "localizations": {}
     },
     "Regex": {
+      "comment": "Rule kind: regular-expression pattern",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1148,46 +1305,57 @@
       "localizations": {}
     },
     "Remove": {
+      "comment": "Button: take this app off the exclusion list",
       "extractionState": "manual",
       "localizations": {}
     },
     "Remove filter, %@": {
+      "comment": "Spoken by VoiceOver for a filter chip's close button; placeholder is the filter's own label",
       "extractionState": "manual",
       "localizations": {}
     },
     "Restore defaults": {
+      "comment": "Button: put the shipped exclusions back",
       "extractionState": "manual",
       "localizations": {}
     },
     "Resume": {
+      "comment": "Banner button: starts archiving notifications again after a pause\nButton: resume notification capture\nButton: starts archiving notifications again after a pause",
       "extractionState": "manual",
       "localizations": {}
     },
     "Resume Capture": {
+      "comment": "Menu item: starts archiving notifications again after a pause",
       "extractionState": "manual",
       "localizations": {}
     },
     "Retention": {
+      "comment": "Section header: how long notifications are kept",
       "extractionState": "manual",
       "localizations": {}
     },
     "Retry": {
+      "comment": "Banner button: tries the failed archive read again",
       "extractionState": "manual",
       "localizations": {}
     },
     "Reveal Archive in Finder": {
+      "comment": "Button; Finder's 'Reveal' wording",
       "extractionState": "manual",
       "localizations": {}
     },
     "Rule": {
+      "comment": "Column header: summary of what each rule does",
       "extractionState": "manual",
       "localizations": {}
     },
     "Rule %lld in the file: %@.": {
+      "comment": "Import error; placeholders are the rule's number and a lowercase reason phrase",
       "extractionState": "manual",
       "localizations": {}
     },
     "Rules": {
+      "comment": "Pane title: notification highlight, VIP and mute rules",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1212,6 +1380,7 @@
       "localizations": {}
     },
     "Running": {
+      "comment": "Status label: notification capture is running\nStatus value: capture is running",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1220,10 +1389,12 @@
       "localizations": {}
     },
     "Saved": {
+      "comment": "Label: file name of the last diagnostics export",
       "extractionState": "manual",
       "localizations": {}
     },
     "Search": {
+      "comment": "Placeholder text in the empty search field (noun)\nSection header: search settings",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1240,14 +1411,17 @@
       "localizations": {}
     },
     "Select an app": {
+      "comment": "Placeholder in the detail pane when no app is selected",
       "extractionState": "manual",
       "localizations": {}
     },
     "Semantic search": {
+      "comment": "Toggle: search by meaning, using the on-device model",
       "extractionState": "manual",
       "localizations": {}
     },
     "Sender": {
+      "comment": "Match-field option: the notification’s sender",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1260,18 +1434,22 @@
       "localizations": {}
     },
     "Show digest": {
+      "comment": "Picker label: when the missed digest appears",
       "extractionState": "manual",
       "localizations": {}
     },
     "Show setup again": {
+      "comment": "Button: reopen the onboarding flow",
       "extractionState": "manual",
       "localizations": {}
     },
     "Similar": {
+      "comment": "Section header over search results that matched by meaning only",
       "extractionState": "manual",
       "localizations": {}
     },
     "Skip for now": {
+      "comment": "Link button: leaves setup without granting the permission; it can be granted later",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1284,6 +1462,7 @@
       "localizations": {}
     },
     "Startup": {
+      "comment": "Section header: how Backglance starts",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1292,6 +1471,7 @@
       "localizations": {}
     },
     "Store fingerprint": {
+      "comment": "Label: schema fingerprint of the system store",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1324,6 +1504,7 @@
       "localizations": {}
     },
     "The notification history macOS never had.": {
+      "comment": "The app's tagline, under its name on setup's first screen",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1364,6 +1545,7 @@
       "localizations": {}
     },
     "This is everything the system still had.": {
+      "comment": "Shown under the finished import count; \"the system\" is macOS's own notification store",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1376,6 +1558,7 @@
       "localizations": {}
     },
     "Thread": {
+      "comment": "Small chip on a row: part of a conversation thread (messaging sense)",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1384,10 +1567,12 @@
       "localizations": {}
     },
     "Title": {
+      "comment": "Match-field option: the notification’s title",
       "extractionState": "manual",
       "localizations": {}
     },
     "Today": {
+      "comment": "Timeline day-section header for the current day",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1396,6 +1581,7 @@
       "localizations": {}
     },
     "Troubleshooting": {
+      "comment": "Section header",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1404,10 +1590,12 @@
       "localizations": {}
     },
     "Try Again": {
+      "comment": "Button: retry registering the global shortcut",
       "extractionState": "manual",
       "localizations": {}
     },
     "Turn on Semantic Search": {
+      "comment": "Button: enables the semantic search option from Settings",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1420,22 +1608,27 @@
       "localizations": {}
     },
     "Type “wipe” to confirm": {
+      "comment": "Instruction: keep “wipe” untranslated — the app checks typed text against that word",
       "extractionState": "manual",
       "localizations": {}
     },
     "Type “wipe” to confirm.": {
+      "comment": "Error: keep “wipe” untranslated — the app checks the typed text against that exact word",
       "extractionState": "manual",
       "localizations": {}
     },
     "Unavailable": {
+      "comment": "Status label: login item cannot be set",
       "extractionState": "manual",
       "localizations": {}
     },
     "Undo": {
+      "comment": "Button on the delete toast: restores the deleted notifications",
       "extractionState": "manual",
       "localizations": {}
     },
     "Unknown app": {
+      "comment": "Placeholder shown in place of an app's name when its record is gone from the archive",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1444,34 +1637,42 @@
       "localizations": {}
     },
     "Unmute %@": {
+      "comment": "Context-menu item: stops collapsing the app's timeline rows; placeholder is its name",
       "extractionState": "manual",
       "localizations": {}
     },
     "Unpin": {
+      "comment": "Context-menu item: stops keeping the notification at the top of its day",
       "extractionState": "manual",
       "localizations": {}
     },
     "Until I Resume": {
+      "comment": "Submenu item under Pause Capture: pause with no end time, until resumed by hand",
       "extractionState": "manual",
       "localizations": {}
     },
     "Until Tomorrow": {
+      "comment": "Submenu item under Pause Capture: how long to pause",
       "extractionState": "manual",
       "localizations": {}
     },
     "Updates": {
+      "comment": "Section header: app update settings",
       "extractionState": "manual",
       "localizations": {}
     },
     "VIP": {
+      "comment": "Rule kind: marks matches as important",
       "extractionState": "manual",
       "localizations": {}
     },
     "Verification codes are replaced with “[code redacted]” before they are stored. The original digits are never written to your archive, the search index or an export. Turning redaction off cannot restore codes that were already redacted.": {
+      "comment": "Keep '[code redacted]' verbatim — it must match the stored replacement text",
       "extractionState": "manual",
       "localizations": {}
     },
     "Version": {
+      "comment": "Label: the app’s version number",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1484,6 +1685,7 @@
       "localizations": {}
     },
     "Waiting for approval in System Settings ▸ General ▸ Login Items.": {
+      "comment": "Status; the path must match macOS's System Settings names",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1508,6 +1710,7 @@
       "localizations": {}
     },
     "What this doesn’t reach": {
+      "comment": "Heading: data the wipe does not delete",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1524,18 +1727,22 @@
       "localizations": {}
     },
     "Whole word only": {
+      "comment": "Toggle: the pattern matches whole words only",
       "extractionState": "manual",
       "localizations": {}
     },
     "Wipe Archive": {
+      "comment": "Button: permanently erases the archive",
       "extractionState": "manual",
       "localizations": {}
     },
     "Wipe Archive…": {
+      "comment": "Destructive button: opens the wipe confirmation",
       "extractionState": "manual",
       "localizations": {}
     },
     "Wipe the Backglance archive": {
+      "comment": "Touch ID prompt reason: completes the system sentence “Backglance is trying to …”",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1548,14 +1755,17 @@
       "localizations": {}
     },
     "Wiping…": {
+      "comment": "Progress label: the archive is being erased",
       "extractionState": "manual",
       "localizations": {}
     },
     "Would have matched": {
+      "comment": "Heading: preview of what the rule matches",
       "extractionState": "manual",
       "localizations": {}
     },
     "Yesterday": {
+      "comment": "Timeline day-section header for the previous day",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1627,6 +1837,7 @@
       "localizations": {}
     },
     "You’re set.": {
+      "comment": "Title of setup's last screen: setup is complete",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1635,30 +1846,37 @@
       "localizations": {}
     },
     "anywhere": {
+      "comment": "Match field name, lowercase, shown inside a rule summary",
       "extractionState": "manual",
       "localizations": {}
     },
     "app": {
+      "comment": "Match field name, lowercase, shown inside a rule summary",
       "extractionState": "manual",
       "localizations": {}
     },
     "body": {
+      "comment": "Match field name, lowercase, shown inside a rule summary",
       "extractionState": "manual",
       "localizations": {}
     },
     "capture degraded": {
+      "comment": "Spoken by VoiceOver after the unread phrase; deliberately lowercase mid-sentence clause",
       "extractionState": "manual",
       "localizations": {}
     },
     "capture paused": {
+      "comment": "Spoken by VoiceOver after the unread phrase; deliberately lowercase mid-sentence clause\nStatus item tooltip clause; deliberately lowercase, follows the app name in the tooltip",
       "extractionState": "manual",
       "localizations": {}
     },
     "capture paused until %@": {
+      "comment": "Status item tooltip clause; deliberately lowercase; placeholder is the time the pause ends",
       "extractionState": "manual",
       "localizations": {}
     },
     "capture stopped": {
+      "comment": "Spoken by VoiceOver after the unread phrase; deliberately lowercase mid-sentence clause",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1693,70 +1911,87 @@
       "localizations": {}
     },
     "needs Full Disk Access": {
+      "comment": "Spoken by VoiceOver after the unread phrase; deliberately lowercase mid-sentence clause",
       "extractionState": "manual",
       "localizations": {}
     },
     "new since you were away": {
+      "comment": "Label on the timeline's unread divider line; deliberately lowercase, rendered in small caps",
       "extractionState": "manual",
       "localizations": {}
     },
     "pinned": {
+      "comment": "Spoken by VoiceOver as a row's state (kept at the top of its day); deliberately lowercase",
       "extractionState": "manual",
       "localizations": {}
     },
     "read": {
+      "comment": "Spoken by VoiceOver as a row's state (past participle, already read); deliberately lowercase",
       "extractionState": "manual",
       "localizations": {}
     },
     "redacted": {
+      "comment": "Spoken by VoiceOver as a row's state; deliberately lowercase",
       "extractionState": "manual",
       "localizations": {}
     },
     "sender": {
+      "comment": "Match field name, lowercase, shown inside a rule summary",
       "extractionState": "manual",
       "localizations": {}
     },
     "the pattern is empty": {
+      "comment": "Fragment in the rule-import error message",
       "extractionState": "manual",
       "localizations": {}
     },
     "the pattern is over %lld characters": {
+      "comment": "Fragment in the rule-import error message; the placeholder is a number",
       "extractionState": "manual",
       "localizations": {}
     },
     "the regex pattern does not compile": {
+      "comment": "Fragment in the rule-import error message",
       "extractionState": "manual",
       "localizations": {}
     },
     "title": {
+      "comment": "Match field name, lowercase, shown inside a rule summary",
       "extractionState": "manual",
       "localizations": {}
     },
     "unknown": {
+      "comment": "Fallback shown when the app version can’t be read",
       "extractionState": "manual",
       "localizations": {}
     },
     "unread": {
+      "comment": "Spoken by VoiceOver as a row's state; deliberately lowercase",
       "extractionState": "manual",
       "localizations": {}
     },
     "while asleep": {
+      "comment": "Fragment following a notification count",
       "extractionState": "manual",
       "localizations": {}
     },
     "while away": {
+      "comment": "Fragment following a notification count",
       "extractionState": "manual",
       "localizations": {}
     },
     "while in a Focus": {
+      "comment": "Fragment following a notification count",
       "extractionState": "manual",
       "localizations": {}
     },
     "while locked": {
+      "comment": "Fragment following a notification count",
       "extractionState": "manual",
       "localizations": {}
     },
     "while presenting": {
+      "comment": "Fragment following a notification count",
       "extractionState": "manual",
       "localizations": {}
     },

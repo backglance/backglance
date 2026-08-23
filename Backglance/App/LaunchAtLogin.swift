@@ -89,6 +89,9 @@ enum LaunchAtLogin {
     /// here is notification content, so this is one of the few app-shell error paths this
     /// project is not obliged to keep off the pane.
     private static func message(for error: Error) -> String {
-        String(localized: "Backglance couldn’t change this: \(error.localizedDescription)")
+        String(
+            localized: "Backglance couldn’t change this: \(error.localizedDescription)",
+            comment: "Error under the launch-at-login toggle; the placeholder is a system error message"
+        )
     }
 }
