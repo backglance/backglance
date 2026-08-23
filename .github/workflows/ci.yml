@@ -176,7 +176,10 @@ jobs:
     steps:
       - name: Fail if any required job did not succeed
         run: |
-          results='${{ join(needs.*.result, " ") }}'
+          # Single quotes: an Actions expression takes '…' for a string literal, and a
+          # double-quoted one is a parse error that fails the whole file before any job
+          # starts (BACKGLANCE-219 — this is what the first real run found).
+          results='${{ join(needs.*.result, ' ') }}'
           echo "job results: $results"
           for r in $results; do
             case "$r" in
