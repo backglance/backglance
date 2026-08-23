@@ -1,4 +1,4 @@
-import BackglanceCore
+@testable import BackglanceCore
 @testable import BackglanceSearch
 import BackglanceTestSupport
 import Foundation
@@ -182,9 +182,9 @@ final class HybridSearchTests: XCTestCase {
         XCTAssertEqual(hits.first?.sources, [.fuzzy])
     }
 
-    /// `is:vip` before the rules engine ships: the user's own pins, which is a
+    /// `is:vip` with no rules engine behind it: the user's own pins, which is a
     /// smaller answer than the grammar promises but a true one.
-    func testVIPFiltersToPinnedUntilTheRulesEngineShips() async throws {
+    func testVIPFiltersToPinnedWhenNoRulesEngineIsSupplied() async throws {
         let archive = try XCTUnwrap(archive)
         let pinned = try seed(title: "Invoice 2231 paid", isPinned: true)
         _ = try seed(title: "Invoice 2230 paid")
@@ -192,6 +192,55 @@ final class HybridSearchTests: XCTestCase {
         let hits = try await HybridSearch(archive: archive).search(SearchQuery(text: "invoice is:vip"))
 
         XCTAssertEqual(hits.map(\.notificationID), [pinned])
+    }
+
+    /// `is:vip` with the rules engine wired in — the answer the grammar actually promises.
+    ///
+    /// This is what BACKGLANCE-241 was about. `HybridSearch` always took a `triage` and
+    /// always used it here, but the app constructed it without one, so the post-filter ran
+    /// against `NoTriage()` and a `vip` rule matched nothing in search while colouring rows
+    /// in the timeline. The engine is installed directly rather than through `start()`'s
+    /// observation so the test asserts the filter, not GRDB's delivery timing.
+    func testVIPMatchesARuleAndNotOnlyAHandPin() async throws {
+        let archive = try XCTUnwrap(archive)
+        let byRule = try seed(title: "Invoice 2231 paid", bundleID: Stubs.BundleID.slack, appName: "Slack")
+        let unrelated = try seed(title: "Invoice 2230 paid", bundleID: "com.example.other", appName: "Other")
+
+        let engine = RulesEngine(archive: archive)
+        try engine.install(rules: [vipRule(pattern: Stubs.BundleID.slack, matchField: .app)], apps: apps())
+
+        let hits = try await HybridSearch(archive: archive, triage: engine)
+            .search(SearchQuery(text: "invoice is:vip"))
+
+        XCTAssertEqual(hits.map(\.notificationID), [byRule])
+        XCTAssertFalse(hits.map(\.notificationID).contains(unrelated))
+    }
+
+    /// The distinction `is:vip` and `is:pinned` are supposed to keep, asserted so a later
+    /// change cannot quietly collapse them.
+    ///
+    /// BACKGLANCE-241's title asks for `is:pinned` to honour VIP rules too. It must not:
+    /// docs/features/SEARCH.md defines `is:pinned` as `n.is_pinned = 1` — the rows the
+    /// user pinned by hand — while `is:vip` is the post-filter that also counts rules. A
+    /// rule that started answering `is:pinned` would leave the user no way to ask for
+    /// their own pins, which is the more specific and less recoverable question.
+    func testAVIPRuleDoesNotMakeARowMatchIsPinned() async throws {
+        let archive = try XCTUnwrap(archive)
+        let handPinned = try seed(
+            title: "Invoice 2230 paid",
+            bundleID: "com.example.other",
+            appName: "Other",
+            isPinned: true
+        )
+        _ = try seed(title: "Invoice 2231 paid", bundleID: Stubs.BundleID.slack, appName: "Slack")
+
+        let engine = RulesEngine(archive: archive)
+        try engine.install(rules: [vipRule(pattern: Stubs.BundleID.slack, matchField: .app)], apps: apps())
+
+        let hits = try await HybridSearch(archive: archive, triage: engine)
+            .search(SearchQuery(text: "invoice is:pinned"))
+
+        XCTAssertEqual(hits.map(\.notificationID), [handPinned])
     }
 
     func testTheLimitBoundsTheResult() async throws {
@@ -228,7 +277,29 @@ final class HybridSearchTests: XCTestCase {
 
     private var archive: Archive?
 
+    /// One enabled `vip` rule, saved to the archive so `install(rules:apps:)` gets a row
+    /// with a real id — `compile(_:)` keys its problems and its tie-break on `id`, and a
+    /// draft id would make the tie-break meaningless.
     @discardableResult
+    private func vipRule(pattern: String, matchField: Rule.MatchField) throws -> Rule {
+        let archive = try XCTUnwrap(archive)
+        var rule = Rule(
+            kind: .vip,
+            pattern: pattern,
+            matchField: matchField,
+            createdAt: UnixDate(Stubs.epoch)
+        )
+        try archive.pool.write { db in try rule.insert(db) }
+        return rule
+    }
+
+    /// Every app the archive holds, which is what app-scoped and `match_field = 'app'`
+    /// rules resolve a bundle id against — `RulesEngine` fails closed without them.
+    private func apps() throws -> [AppRecord] {
+        let archive = try XCTUnwrap(archive)
+        return try archive.pool.read { db in try AppRecord.fetchAll(db) }
+    }
+
     private func seed(
         title: String,
         bundleID: String = Stubs.BundleID.slack,

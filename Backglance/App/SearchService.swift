@@ -20,13 +20,25 @@ import Observation
 final class SearchService: SearchRunning {
     // MARK: Lifecycle
 
-    init(archive: Archive, defaults: UserDefaults = .standard) {
+    /// - Parameter triage: the app's one `RulesEngine`, so `is:vip` and pinned-first
+    ///   ordering in search settle against the same rules the timeline draws with.
+    ///   `HybridSearch` already took a `triage` and already used it — for the `is:vip`
+    ///   post-filter and the pinned tier — but this type never passed one, so it silently
+    ///   defaulted to `NoTriage()` and evaluated every row as `Triage.none`: a VIP rule
+    ///   matched nothing in search while highlighting rows in the timeline
+    ///   (BACKGLANCE-241). Defaulted here too, for previews and for tests that do not
+    ///   care, but the app always supplies the shared instance.
+    init(
+        archive: Archive,
+        triage: any TriageEvaluating = NoTriage(),
+        defaults: UserDefaults = .standard
+    ) {
         self.archive = archive
         self.defaults = defaults
         let index = SemanticIndex(archive: archive)
         semantic = index
         indexer = EmbeddingIndexer(archive: archive, index: index)
-        hybrid = HybridSearch(archive: archive, semantic: index)
+        hybrid = HybridSearch(archive: archive, semantic: index, triage: triage)
         semanticEnabled = defaults.bool(forKey: Self.semanticEnabledKey)
     }
 
