@@ -17,16 +17,34 @@ import XCTest
 struct BackglanceLaunch {
     // MARK: Lifecycle
 
-    init(fullDiskAccess: String, hasCompletedOnboarding: Bool = false) {
+    init(fullDiskAccess: String, hasCompletedOnboarding: Bool = false, storePath: String? = nil) {
         self.fullDiskAccess = fullDiskAccess
         self.hasCompletedOnboarding = hasCompletedOnboarding
+        self.storePath = storePath
     }
 
     // MARK: Internal
 
+    /// The synthetic macOS 26 store, which is the one every fixture test already reads.
+    static var fixtureStorePath: String {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent() // Support/
+            .deletingLastPathComponent() // BackglanceAppUITests/
+            .deletingLastPathComponent() // Tests/
+            .deletingLastPathComponent() // the repository root
+            .appendingPathComponent("Tests/Fixtures/SystemStore/macOS26/store.db")
+            .path
+    }
+
     /// `granted`, `denied`, or `storeMissing`.
     let fullDiskAccess: String
     let hasCompletedOnboarding: Bool
+    /// A fixture store to capture from, for a test that needs capture *running* rather than
+    /// degraded. Faking the permission does not conjure a readable store: on a Mac without the
+    /// real grant the engine still ends up in `noFullDiskAccess`, and anything that varies by
+    /// capture state — the status item's glyph, its label, the pause menu — would be asserted
+    /// against the wrong state. `BACKGLANCE_STORE_PATH` is DEBUG-only, like the FDA override.
+    let storePath: String?
 
     /// A launched app, waiting for its first screen.
     func app(archiveDirectory: URL) -> XCUIApplication {
@@ -34,9 +52,17 @@ struct BackglanceLaunch {
         app.launchEnvironment["BACKGLANCE_FAKE_FDA"] = fullDiskAccess
         app.launchEnvironment["BACKGLANCE_ARCHIVE_PATH"] = archiveDirectory
             .appendingPathComponent("archive.sqlite").path
+        if let storePath {
+            app.launchEnvironment["BACKGLANCE_STORE_PATH"] = storePath
+        }
         app.launchArguments += [
             "-onboarding.completedVersion", hasCompletedOnboarding ? "1" : "0",
             "-onboarding.skippedFDA", "NO",
+            // `BACKGLANCE_ARCHIVE_PATH` redirects the archive, but not `UserDefaults` — pause
+            // lives there (`PauseSettings.pausedUntilKey`) so that it survives a relaunch, and
+            // the domain is the real app's. Without this a pause left behind by an earlier run,
+            // or by the developer's own Backglance, decides what this run's menu offers.
+            "-capture.pausedUntil", "0",
         ]
         return app
     }

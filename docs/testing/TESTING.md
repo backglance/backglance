@@ -1013,6 +1013,23 @@ without the permission; the grant acknowledged and setup finishing with it; Back
 closing setup and leaving the app running (it is an agent app, so finishing is the *window*
 going away, not the process); and setup not reopening on a Mac that has already been through it.
 
+`StatusItemMenuTests` drives the menu bar item's right-click menu, which nothing outside the app
+could read before: the menu is attached only for the duration of the click, and `screencapture`
+cannot photograph it on a Mac whose terminal has no Screen Recording permission. XCUITest right-clicks
+for real and the menu lands in the app's own accessibility tree, so the pause submenu's four choices
+are asserted by title *and by order* (shortest first), and pausing is asserted to swap the submenu for
+"Resume Capture" and to reach the item's accessibility label. Queries are scoped to the status item's
+own menu rather than to `app.menuItems`, because the main menu bar has a "Settings…" and a "Quit
+Backglance" of its own and an app-wide query would answer even when the context menu never opened.
+
+Two things have to be forced for that suite, both through `BackglanceLaunch`. Capture must be
+*running* — a faked FDA grant does not conjure a readable store, so it points
+`BACKGLANCE_STORE_PATH` at the macOS 26 fixture; otherwise the item reports `noFullDiskAccess` and
+the menu is a different menu. And pause lives in `UserDefaults` so that it survives a relaunch
+(`PauseSettings.pausedUntilKey`), which `BACKGLANCE_ARCHIVE_PATH` does not redirect, so every launch
+passes `-capture.pausedUntil 0` in the argument domain. Without it a pause left by an earlier run —
+or by the developer's own Backglance — decides what the menu offers.
+
 `PopoverTests` (hotkey-free: the test clicks the status item via `XCUIApplication(bundleIdentifier: "com.apple.systemuiserver")` fallback or the `--uitest-open-popover` argument) and `TimelineWindowTests` (open window, scroll 200 rows, type in search field, expect filtered rows) live next to it. UI tests run only on `macos-26` in CI because the XCUITest runner is the slowest part of the matrix and the app's UI does not vary by OS.
 
 ## Timeline tests
