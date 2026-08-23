@@ -137,6 +137,14 @@ public enum PanicWipe {
     /// hardcoded list is a table nobody remembered, full of exactly the data the user asked
     /// to destroy.
     ///
+    /// Each name is interpolated into `DELETE FROM \(table.quotedDatabaseIdentifier)`
+    /// below rather than bound — GRDB has no placeholder for a table name — which holds
+    /// only because the name came from `sqlite_master` on this same connection, one
+    /// statement earlier, never from anything outside the archive
+    /// (docs/security/SECURITY.md#parameterized-sql-only). `quotedDatabaseIdentifier`
+    /// still escapes it as an identifier, so a table a migration ever named with a
+    /// double quote in it would not break the statement either.
+    ///
     /// `notifications_fts`'s shadow tables are skipped and left to the `notifications_ad`
     /// trigger, which is the only supported way to take a row out of an FTS5 index;
     /// deleting from a shadow table directly corrupts the index and would abort the wipe

@@ -108,6 +108,16 @@ enum ArchiveMigrations {
     ///
     /// > Note: writing `sender_key` does not disturb `notifications_fts` — the update
     /// > trigger fires only on `title`, `subtitle`, `body` and `sender`.
+    ///
+    /// `table`, `source` and `target` are interpolated into the SQL text below rather
+    /// than bound — GRDB has no placeholder for an identifier — which is only safe
+    /// because the two triples come from the two-element literal array right here, not
+    /// from a caller or from anything the archive has ever stored. The rule is the same
+    /// one `Archive+Digest.swift`'s `stamp(column:onDigest:at:)` and
+    /// `Archive+Actions.swift`'s `setFlag(_:ids:to:)` already document: an interpolated
+    /// identifier is only ever a compile-time literal, never a value that could vary at
+    /// the call site (docs/security/SECURITY.md#parameterized-sql-only). Every value
+    /// that *can* vary — the folded text, the row id — is still a `?` placeholder.
     static func backfillMatchKeys(_ db: Database) throws {
         for (table, source, target) in [
             ("apps", "display_name", "display_name_key"),
