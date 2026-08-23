@@ -14,8 +14,8 @@ final class SettingsWindowController: NSWindowController {
     // MARK: Lifecycle
 
     convenience init(
-        search: SearchService,
-        digest: DigestSettingsModel,
+        general: GeneralSettingsModel,
+        apps: AppsSettingsModel,
         privacy: PrivacySettingsModel,
         rules: RulesSettingsModel,
         permissions: PermissionsSettingsModel,
@@ -31,8 +31,8 @@ final class SettingsWindowController: NSWindowController {
         window.setFrameAutosaveName("SettingsWindow")
         let hosting = NSHostingController(
             rootView: SettingsView(
-                search: search,
-                digest: digest,
+                general: general,
+                apps: apps,
                 privacy: privacy,
                 rules: rules,
                 permissions: permissions,

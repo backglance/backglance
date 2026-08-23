@@ -30,8 +30,10 @@ public enum LoginItemStatus: Sendable, Equatable {
 /// only detected and pointed at. Notifications can be requested, but only from an explicit
 /// action and only once, so this pane deliberately does not offer to — it reports, and the
 /// Digest pane owns the one toggle that asks. Login Items can be set outright, and that
-/// toggle arrives with `LaunchAtLogin` in Phase 4.3; until then this reports its state so a
-/// Mac that is waiting for approval says so rather than looking simply "off".
+/// toggle lives on the General pane (`GeneralSettingsModel`, BACKGLANCE-213); this pane keeps
+/// its own read-only row anyway, so a Mac that is waiting for approval — or one where a
+/// managed-Mac MDM policy has quietly revoked it — says so here too, next to the other two
+/// permissions this pane already answers for.
 ///
 /// Everything is read through injected closures because none of the three APIs is reachable
 /// from `BackglanceUI` — TCC through `open(2)`, `UNUserNotificationCenter`, and

@@ -40,7 +40,22 @@ extension AppDelegate {
         // handler needing a dispatcher returned `.ignored`: the whole actions layer was
         // unreachable in the shipping app despite being implemented and tested
         // (BACKGLANCE-242).
-        let actionHandler = NotificationActionHandler(archive: archive, triage: triage)
+        //
+        // `muting: triage as? RulesEngine` reaches past `any TriageEvaluating` to the
+        // same seam `NotificationRow+ContextMenu.swift`'s `canActivateApp` already
+        // downcasts `actionDispatcher` through — `triage` is always the app's one
+        // `RulesEngine` once `startRules()` has run (see `AppDelegate.triage`'s own doc
+        // comment), and `RulesEngine` conforms to `AppMuting` by simple declaration
+        // (`AppMuting.swift`) since `setAppMuted(bundleID:muted:)` already matches that
+        // protocol's one requirement exactly. Falls back to `NoAppMuting()` only when
+        // rules have not started yet, which cannot happen here — `startRules()` always
+        // runs before `startInterface()` — but a `nil`-coalescing fallback costs nothing
+        // and keeps this line correct even if that ordering ever changes.
+        let actionHandler = NotificationActionHandler(
+            archive: archive,
+            triage: triage,
+            muting: (triage as? RulesEngine) ?? NoAppMuting()
+        )
         self.actionHandler = actionHandler
         // No window is built here. It gets its own `host: .window` store, and building
         // both eagerly would open a second timeline subscription and a second page cache

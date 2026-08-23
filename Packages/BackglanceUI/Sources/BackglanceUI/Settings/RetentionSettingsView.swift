@@ -116,8 +116,10 @@ struct PerAppRetentionList: View {
 /// the per-app picker (which offers all five plus "Inherit").
 ///
 /// A free function rather than a method on either view: both need it, and neither owns it
-/// any more than the other does.
-private func retentionLabel(_ policy: RetentionPolicy) -> String {
+/// any more than the other does. `internal` rather than `private`, so ``AppsSettingsView``'s
+/// consolidated per-app picker can show the same words this file's pickers do, instead of a
+/// second copy of the same five strings drifting from these.
+func retentionLabel(_ policy: RetentionPolicy) -> String {
     switch policy {
     case .hours24:
         String(localized: "24 hours")

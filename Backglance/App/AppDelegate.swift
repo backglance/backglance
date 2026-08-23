@@ -209,23 +209,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let pause: @Sendable () async -> Void = { [weak self] in await self?.engine?.pause() }
         let resume: @Sendable () async -> Void = { [weak self] in await self?.engine?.resume() }
         let wipe = WipeConfirmationModel(archive: archive, pauseCapture: pause, resumeCapture: resume)
+        // Built once and shared between Privacy and Apps, not one instance per pane: both
+        // panes write the same three per-app settings, and two separate models would mean a
+        // change made in one pane sitting stale in the other's list until the next appearance
+        // re-triggered its own `.task { await model.load() }`.
+        let retentionModel = RetentionSettingsModel(archive: archive, job: retention)
+        let exclusionsModel = ExcludedAppsSettingsModel(archive: archive)
+        let redactionModel = CodeRedactionSettingsModel(archive: archive)
         let privacy = PrivacySettingsModel(
             archive: archive,
-            retention: RetentionSettingsModel(archive: archive, job: retention),
-            exclusions: ExcludedAppsSettingsModel(archive: archive),
-            redaction: CodeRedactionSettingsModel(archive: archive),
+            retention: retentionModel,
+            exclusions: exclusionsModel,
+            redaction: redactionModel,
             wipe: wipe,
             resumeCapture: resume
         )
+        let apps = AppsSettingsModel(retention: retentionModel, exclusions: exclusionsModel, redaction: redactionModel)
         // `rulesEngine` is already built and observing by the time this runs —
         // `applicationDidFinishLaunching(_:)` calls `startRules()` before `startInterface()`,
         // which is the only caller of this method — so the Rules pane's export/import menu
         // has a live engine from the moment the window can first be shown, the same as every
         // other model built here.
         let rules = RulesSettingsModel(archive: archive, engine: rulesEngine)
-        return SettingsWindowController(
-            search: search,
+        let general = GeneralSettingsModel(
             digest: Self.digestSettings(),
+            search: Self.semanticSearchControl(search),
+            launchAtLogin: Self.launchAtLoginControl(),
+            hotKey: hotKeyControl()
+        )
+        return SettingsWindowController(
+            general: general,
+            apps: apps,
             privacy: privacy,
             rules: rules,
             permissions: makePermissionsModel(),

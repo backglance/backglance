@@ -1,7 +1,6 @@
 import AppKit
 import BackglanceCapture
 import BackglanceUI
-import ServiceManagement
 import UserNotifications
 
 // MARK: - AppDelegate + onboarding
@@ -115,16 +114,12 @@ extension AppDelegate {
         }
     }
 
-    /// Read only. Registering is `LaunchAtLogin`'s, which arrives with its toggle in Phase 4.3;
-    /// reporting the state now is what stops a Mac that is waiting for approval looking simply
-    /// "off".
+    /// Read only, on purpose: registering is `GeneralSettingsModel`'s toggle now
+    /// (BACKGLANCE-213), reached through `LaunchAtLogin`. Permissions keeps its own read —
+    /// rather than losing the row now that General owns the write — because this pane's job
+    /// is "what has macOS allowed", the same question it asks of Full Disk Access and
+    /// Notifications; a Mac waiting for approval should say so here too, not only in General.
     private static func loginItemStatus() -> LoginItemStatus {
-        switch SMAppService.mainApp.status {
-        case .enabled: .registered
-        case .notRegistered: .notRegistered
-        case .requiresApproval: .requiresApproval
-        case .notFound: .unavailable
-        @unknown default: .unavailable
-        }
+        LaunchAtLogin.status
     }
 }

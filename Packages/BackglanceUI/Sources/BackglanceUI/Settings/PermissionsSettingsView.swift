@@ -9,7 +9,9 @@ import SwiftUI
 /// has no prompt for it. Notifications is reported here but asked for in the Digest pane, on
 /// the one toggle that needs it: a permissions pane that requests things while you read it is
 /// how people end up denying something they would have allowed later. Login Items can simply
-/// be set, and its toggle arrives with `LaunchAtLogin`.
+/// be set, and its toggle is on the General pane (`GeneralSettingsView`) — this row stays
+/// read-only, the same posture as the other two, so "what has macOS allowed" has one answer
+/// regardless of which pane someone opened to ask it.
 ///
 /// The `tccutil` command is shown and copyable, never run. An app that resets its own TCC
 /// grants is indistinguishable from one probing what else it can reset, and the point of this
