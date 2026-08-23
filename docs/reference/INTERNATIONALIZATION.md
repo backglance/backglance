@@ -319,6 +319,16 @@ Before v2.0 translation begins, and periodically in v1.x, the UI is smoke-tested
 
 - Run with `-NSDoubleLocalizedStrings YES` (doubles every localized string — catches truncation) and `-NSShowNonLocalizedStrings YES` (SHOUTS non-localized strings — catches strings that bypassed the catalog). Both are already in the shared scheme, unticked: Edit Scheme ▸ Run ▸ Arguments, tick the two, run, untick. They are shipped off because doubling every string on an ordinary debug run is noise, and shipped at all so the pass is two clicks rather than a thing to look up.
 - Run `Scripts/sync_string_catalog.sh` first. `-NSShowNonLocalizedStrings` reports anything missing from the catalog, and until the sync has run that is *every* string in the four packages — which drowns the real finding.
+- On a Mac whose terminal has no Screen Recording permission, `screencapture` cannot photograph any of
+  this ("could not create image from display"). XCUITest is not affected: `XCUIScreen.main.screenshot()`
+  and `XCUIElement.screenshot()` work from the test runner, so a throwaway test in
+  `Tests/BackglanceAppUITests` that adds the two arguments to `launchArguments`, walks the screens and
+  writes PNGs is a working substitute for the Xcode-and-eyes route. Reading each screen's static text
+  out of the accessibility tree in the same pass is worth more than the pictures for one of the two
+  checks: a string that bypassed the catalog is SHOUTED, and `grep` finds that more reliably than a
+  person scanning a screenshot does. Run it twice, once with the arguments and once without, and
+  compare — half of what looks wrong under doubling is wrong without it too, which is a different
+  (and usually worse) finding.
 - Xcode's scheme App Language settings also offer "Double-Length Pseudolanguage" and "Right-to-Left Pseudolanguage"; the latter verifies the [RTL](#right-to-left) non-breakage promise.
 - German is a natural double-length test on its own ("Bestätigungscode" vs "code"); popover layouts are checked at German lengths even in v1.0.
 
