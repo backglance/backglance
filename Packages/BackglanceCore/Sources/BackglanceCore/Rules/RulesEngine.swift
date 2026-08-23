@@ -29,10 +29,9 @@ import GRDB
 /// `RuleLimits.regexRulesEnabled` is `false` for the whole of v1.0 — `compile(_:)` rejects
 /// every regex rule before a matcher is ever built for one, so there is nothing here a
 /// budget could ever be charged against. The v1.x task that flips that flag adds
-/// `BudgetLedger` alongside it. Import/export (`RulesError.invalidEntry`,
-/// `.importFormatMismatch`, `.importVersionUnsupported`) is BACKGLANCE-210's problem, not
-/// this one's — inventing their shape here would commit that task to a choice it should make
-/// itself.
+/// `BudgetLedger` alongside it. Import/export lives in `RulesEngine+ImportExport.swift`,
+/// not here — `exportRules()`/`importRules(from:)` reuse `archive` and nothing else this
+/// file owns.
 ///
 /// `@unchecked Sendable` because `Snapshot` is mutable state the compiler cannot verify on
 /// its own; `lock` is what actually makes it safe to call `evaluate(_:)` synchronously from
@@ -204,6 +203,13 @@ public final class RulesEngine: TriageEvaluating, @unchecked Sendable {
 
     // MARK: Internal
 
+    /// The archive `start()` observes and `setAppMuted(bundleID:muted:)` writes to.
+    /// Not `private`, for the same reason `debugSnapshot` above isn't:
+    /// `RulesEngine+ImportExport.swift`'s `exportRules()`/`importRules(from:)` are the
+    /// second file in this module that need a direct read/write path to `rules`, and
+    /// `private` would not reach across that file boundary.
+    let archive: Archive
+
     /// Test-only window into the snapshot. `install`'s version bump and cache reset are
     /// otherwise only observable indirectly — through whether `evaluate(_:)` returns a stale
     /// or a freshly recomputed `Triage` — so `RulesEngineTests` reads this directly instead.
@@ -258,7 +264,6 @@ public final class RulesEngine: TriageEvaluating, @unchecked Sendable {
         var triage: [Int64: Triage]
     }
 
-    private let archive: Archive
     private let lock = NSLock()
     private var snapshot = Snapshot.empty
 
