@@ -34,7 +34,8 @@ public struct TimelineItem: Identifiable, Equatable, Sendable {
         appName: String,
         bundleID: String? = nil,
         triage: Triage = .none,
-        isSelected: Bool = false
+        isSelected: Bool = false,
+        isAppMuted: Bool = false
     ) {
         self.id = id
         self.notification = notification
@@ -42,6 +43,7 @@ public struct TimelineItem: Identifiable, Equatable, Sendable {
         self.bundleID = bundleID
         self.triage = triage
         self.isSelected = isSelected
+        self.isAppMuted = isAppMuted
     }
 
     /// Builds an item for a stored row, resolving app metadata from the app
@@ -66,7 +68,8 @@ public struct TimelineItem: Identifiable, Equatable, Sendable {
             appName: app?.displayName ?? app?.bundleId ?? String(localized: "Unknown app"),
             bundleID: app?.bundleId,
             triage: triage,
-            isSelected: isSelected
+            isSelected: isSelected,
+            isAppMuted: app?.isMuted ?? false
         )
     }
 
@@ -92,6 +95,23 @@ public struct TimelineItem: Identifiable, Equatable, Sendable {
     /// Whether this is the keyboard selection. Part of the value so a selection
     /// change redraws exactly two rows.
     public var isSelected: Bool
+
+    /// The raw `apps.is_muted` flag for this row's app, carried onto the item
+    /// at build time so the context menu's item 8 ("Mute ‹App› in Timeline" /
+    /// "Unmute ‹App›", BACKGLANCE-239) can label itself without a synchronous
+    /// archive read from inside menu construction.
+    ///
+    /// Deliberately **not** the same question as ``Triage/muted``. VIP beats
+    /// mute (docs/features/RULES.md#edge-cases-and-error-handling): a row that
+    /// matched both a `mute` rule for its app and a `vip` rule for itself has
+    /// `triage.muted == false` — it is not collapsed into the Muted group —
+    /// even though `apps.is_muted` is still `true` underneath. Labelling item
+    /// 8 from `triage.muted` would flip to "Mute" on exactly that one
+    /// VIP-pinned row while every unmatched sibling notification from the same
+    /// app still correctly says "Unmute", which is confusing in a way a raw
+    /// per-app flag is not: this property answers "is the app muted", not "is
+    /// this particular row showing muted".
+    public let isAppMuted: Bool
 
     /// Pinned by the user's own toggle or by a VIP rule — either floats the row
     /// to the top of its day.

@@ -22,10 +22,10 @@ import Observation
 /// the shared ``fetch(_:)`` helper every action reads through, and the
 /// ``ActionDispatching`` seam view code reaches it by. Open (BACKGLANCE-197), Copy
 /// (BACKGLANCE-198), Delete/Undo (BACKGLANCE-199), Pin/Read (BACKGLANCE-200),
-/// System Settings (BACKGLANCE-201) and Export (BACKGLANCE-204) have landed on top
-/// of it. Every action in docs/features/ACTIONS.md's context menu has now shipped
-/// except Mute (item 8), which waits on the `RulesEngine` Phase 4.2 introduces —
-/// see docs/features/ACTIONS.md#notificationactionhandler for the full shape this
+/// System Settings (BACKGLANCE-201), Export (BACKGLANCE-204) and Mute
+/// (BACKGLANCE-239) have landed on top of it. Every action in
+/// docs/features/ACTIONS.md's context menu has now shipped — see
+/// docs/features/ACTIONS.md#notificationactionhandler for the full shape this
 /// class grows into.
 ///
 /// `@MainActor` because `NSWorkspace` and `NSPasteboard` (used by the actions layered
@@ -75,6 +75,10 @@ public final class NotificationActionHandler: ActionDispatching {
     ///     tests pass a fake that records the suggested name/format and returns a scripted
     ///     `URL?`, so a cancelled or confirmed panel can be asserted without a modal window ever
     ///     opening.
+    ///   - muting: the seam ``setAppMuted(bundleID:_:)`` reaches `apps.is_muted` through — see
+    ///     ``AppMuting``. Defaults to ``NoAppMuting``, the same "nothing real behind this yet"
+    ///     role ``NoTriage`` plays for `triage:` above; the app wires in its shared `RulesEngine`
+    ///     (see `AppDelegate+Interface.swift`), tests pass a fake that records the call.
     public init(
         archive: Archive,
         triage: any TriageEvaluating = NoTriage(),
@@ -82,7 +86,8 @@ public final class NotificationActionHandler: ActionDispatching {
         pasteboard: any PasteboardWriting = NSPasteboard.general,
         undoClock: any UndoClock = SystemUndoClock(),
         exportService: ExportService? = nil,
-        savePanel: any SavePanelPresenting = NSSavePanelPresenter()
+        savePanel: any SavePanelPresenting = NSSavePanelPresenter(),
+        muting: any AppMuting = NoAppMuting()
     ) {
         self.archive = archive
         self.triage = triage
@@ -91,6 +96,7 @@ public final class NotificationActionHandler: ActionDispatching {
         self.undoClock = undoClock
         self.exportService = exportService ?? ExportService(archive: archive)
         self.savePanel = savePanel
+        self.muting = muting
     }
 
     // MARK: Public
@@ -297,6 +303,34 @@ public final class NotificationActionHandler: ActionDispatching {
         try SystemSettingsLink(workspace: workspace).open(bundleID: bundleID)
     }
 
+    /// Item 8 of the context menu ("Mute ‹App› in Timeline" / "Unmute ‹App›") and its
+    /// ⇧⌘M shortcut — see docs/features/ACTIONS.md#mute-this-app-in-timeline.
+    ///
+    /// Routes through ``muting`` (``AppMuting``), never a direct `Archive` write to
+    /// `apps.is_muted`: the real conformance is `RulesEngine`, whose own write
+    /// reinstalls the rules snapshot and drops the triage cache the moment it
+    /// commits, which a bare `pool.write { AppRecord…updateAll… }` from this handler
+    /// would not do — the timeline would keep showing the app under its old muted
+    /// state until some unrelated rules change happened to refresh it.
+    ///
+    /// - Throws: ``ActionError/archive(reason:)`` for both failure shapes
+    ///   ``AppMuting/setAppMuted(bundleID:muted:)`` can produce — a genuine write
+    ///   failure, or `RulesError.unknownApp(_:)` when `bundleID` does not resolve to
+    ///   an archived app. Neither tells the user anything actionable beyond
+    ///   "something went wrong", the same reasoning ``fetch(_:)``'s
+    ///   `.notFound`/`.archive` pairing already gives — a bundle id logged either way
+    ///   is safe (CLAUDE.md's privacy invariants allow bundle ids in logs), unlike a
+    ///   notification's own content.
+    public func setAppMuted(bundleID: String, _ muted: Bool) throws {
+        do {
+            try muting.setAppMuted(bundleID: bundleID, muted: muted)
+        } catch {
+            let detail = ArchiveError.detail(from: error)
+            Log.ui.error("setAppMuted failed for bundle id \(bundleID): \(detail)")
+            throw ActionError.archive(reason: detail)
+        }
+    }
+
     /// Item 10 of the context menu ("Export Selection…") — see
     /// docs/features/ACTIONS.md#select-and-export. Runs the save panel first and, only if the
     /// user confirms a destination, streams `ids` through ``ExportService``.
@@ -416,6 +450,7 @@ public final class NotificationActionHandler: ActionDispatching {
     private let undoClock: any UndoClock
     private let exportService: ExportService
     private let savePanel: any SavePanelPresenting
+    private let muting: any AppMuting
 
     /// The task counting down the current undo toast, if one is showing.
     /// `@ObservationIgnored` because a view has no business redrawing when this is

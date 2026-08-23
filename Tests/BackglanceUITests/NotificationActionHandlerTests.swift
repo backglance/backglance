@@ -4,6 +4,8 @@ import BackglanceTestSupport
 import Foundation
 import XCTest
 
+// MARK: - NotificationActionHandlerTests
+
 @MainActor
 final class NotificationActionHandlerTests: XCTestCase {
     // MARK: Internal
@@ -156,6 +158,69 @@ final class NotificationActionHandlerTests: XCTestCase {
         )
     }
 
+    // MARK: - setAppMuted(bundleID:_:)
+
+    /// The whole point of BACKGLANCE-239's seam: muting routes through the
+    /// injected ``AppMuting`` (``FakeAppMuting`` here), never through a direct
+    /// `Archive` write to `apps.is_muted` — this asserts the fake recorded
+    /// exactly the call the handler was asked to make, with no archive access
+    /// on the fake's side at all to have gone through instead.
+    func testSetAppMutedRoutesThroughTheInjectedMutingSeamNotADirectArchiveWrite() throws {
+        let archive = try XCTUnwrap(archive)
+        let muting = FakeAppMuting()
+
+        try NotificationActionHandler(archive: archive, muting: muting)
+            .setAppMuted(bundleID: Stubs.BundleID.slack, true)
+
+        XCTAssertEqual(muting.calls, [FakeAppMuting.Call(bundleID: Stubs.BundleID.slack, muted: true)])
+    }
+
+    /// The `false` direction routes the same way, with the same seam.
+    func testSetAppMutedUnmuteRoutesThroughTheInjectedMutingSeam() throws {
+        let archive = try XCTUnwrap(archive)
+        let muting = FakeAppMuting()
+
+        try NotificationActionHandler(archive: archive, muting: muting)
+            .setAppMuted(bundleID: Stubs.BundleID.slack, false)
+
+        XCTAssertEqual(muting.calls, [FakeAppMuting.Call(bundleID: Stubs.BundleID.slack, muted: false)])
+    }
+
+    /// A failure from the seam (`RulesError.unknownApp`, or any other throw) is
+    /// wrapped as `.archive`, the same shape every other write method in this
+    /// handler already uses — the caller never sees a raw `RulesError`.
+    func testSetAppMutedSurfacesAMutingFailureAsActionErrorArchive() throws {
+        let archive = try XCTUnwrap(archive)
+        let muting = FakeAppMuting()
+        muting.error = RulesError.unknownApp("com.example.ghost")
+
+        XCTAssertThrowsError(
+            try NotificationActionHandler(archive: archive, muting: muting)
+                .setAppMuted(bundleID: "com.example.ghost", true)
+        ) { error in
+            guard case .archive = error as? ActionError else {
+                return XCTFail("expected .archive, got \(error)")
+            }
+        }
+    }
+
+    /// A handler built with no `muting:` argument falls back to `NoAppMuting`,
+    /// which has no real `RulesEngine` behind it and throws every time — this is
+    /// the same "nothing wired yet" default `NoTriage` plays for `triage:`, and
+    /// it must still surface as `.archive`, never crash or silently pretend the
+    /// app is now muted.
+    func testSetAppMutedWithNoMutingConfiguredSurfacesAsActionErrorArchive() throws {
+        let archive = try XCTUnwrap(archive)
+
+        XCTAssertThrowsError(
+            try makeHandler(archive: archive).setAppMuted(bundleID: Stubs.BundleID.slack, true)
+        ) { error in
+            guard case .archive = error as? ActionError else {
+                return XCTFail("expected .archive, got \(error)")
+            }
+        }
+    }
+
     // MARK: - ActionError.userMessage
 
     func testUserMessageForEveryCase() {
@@ -218,5 +283,32 @@ final class NotificationActionHandlerTests: XCTestCase {
             capturedAt: UnixDate(Stubs.epoch)
         ))
         return try XCTUnwrap(inserted.id)
+    }
+}
+
+// MARK: - FakeAppMuting
+
+/// Records every call it receives and returns scripted results — nothing here
+/// ever reaches a real `RulesEngine` or writes `apps.is_muted` directly, which
+/// is exactly what `testSetAppMutedRoutesThroughTheInjectedMutingSeamNotADirectArchiveWrite`
+/// needs to be able to tell apart from a handler that reached the archive on
+/// its own. See ``AppMuting``.
+@MainActor
+final class FakeAppMuting: AppMuting {
+    struct Call: Equatable {
+        let bundleID: String
+        let muted: Bool
+    }
+
+    private(set) var calls: [Call] = []
+
+    /// When set, `setAppMuted(bundleID:muted:)` throws this instead of recording.
+    var error: Error?
+
+    func setAppMuted(bundleID: String, muted: Bool) throws {
+        if let error {
+            throw error
+        }
+        calls.append(Call(bundleID: bundleID, muted: muted))
     }
 }

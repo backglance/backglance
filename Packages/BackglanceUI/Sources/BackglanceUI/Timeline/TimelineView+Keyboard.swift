@@ -5,8 +5,8 @@ import SwiftUI
 
 /// Every `.onKeyPress` `TimelineView` wires up — ↑/↓, ↩, ⌘↩, Space, Esc, and
 /// the eight BACKGLANCE-203 part 2 adds (⌘C, ⌥⌘C, ⌫, ⌦, ⌘Z, ⇧⌘P, ⇧⌘U, ⌘E,
-/// ⌘A) — docs/features/ACTIONS.md#keyboard-shortcuts and
-/// docs/features/TIMELINE.md#keyboard-navigation.
+/// ⌘A), plus ⇧⌘M (BACKGLANCE-239) below — docs/features/ACTIONS.md#keyboard-shortcuts
+/// and docs/features/TIMELINE.md#keyboard-navigation.
 ///
 /// Split out of `TimelineView.swift` for the same reason part 1 split
 /// `NotificationRow+ContextMenu.swift` off `NotificationRow.swift`: this is
@@ -108,6 +108,8 @@ struct TimelineKeyboardShortcuts: ViewModifier {
             .onKeyPress(KeyEquivalent("P"), phases: .down, action: handlePinToggle)
             .onKeyPress(KeyEquivalent("u"), phases: .down, action: handleReadToggle)
             .onKeyPress(KeyEquivalent("U"), phases: .down, action: handleReadToggle)
+            .onKeyPress(KeyEquivalent("m"), phases: .down, action: handleMuteToggle)
+            .onKeyPress(KeyEquivalent("M"), phases: .down, action: handleMuteToggle)
             .onKeyPress(KeyEquivalent("e"), phases: .down, action: handleExportRequest)
             .onKeyPress(KeyEquivalent("a"), phases: .down, action: handleSelectAll)
     }
@@ -285,6 +287,34 @@ struct TimelineKeyboardShortcuts: ViewModifier {
         )
         ActionDispatchRouting.run {
             try apply(dispatcher, ids, newValue)
+        } onError: {
+            actionError = $0
+        }
+        return .handled
+    }
+
+    /// ⇧⌘M — item 8's keyboard shortcut. Unlike ``handlePinToggle(_:)`` and
+    /// ``handleReadToggle(_:)``, this does not go through ``toggle(current:apply:)``:
+    /// those two apply one derived value to the *whole selection*, but item 8
+    /// (docs/features/ACTIONS.md#context-menu-specification) always acts on a
+    /// single app — the keyboard-focused row's — never the selection, the same
+    /// scoping ``handleCommandReturn(_:)`` and item 9 already give ⌘↩ and
+    /// "Notification Settings for ‹App›…". ``TimelineKeyboard/muteTarget(focusedID:items:)``
+    /// resolves both which app and which way in one step and returns `nil`
+    /// exactly when there is nothing for this shortcut to reach, so a stray
+    /// ⇧⌘M with no focused row (or a focused row with no bundle id) falls
+    /// through as `.ignored` rather than being swallowed for no effect.
+    private func handleMuteToggle(_ press: KeyPress) -> KeyPress.Result {
+        guard press.modifiers.contains(.command), press.modifiers.contains(.shift) else {
+            return .ignored
+        }
+        guard let target = TimelineKeyboard.muteTarget(focusedID: store.selectedID, items: store.visibleItems),
+              let dispatcher = actionDispatcher
+        else {
+            return .ignored
+        }
+        ActionDispatchRouting.run {
+            try dispatcher.setAppMuted(bundleID: target.bundleID, target.muted)
         } onError: {
             actionError = $0
         }

@@ -71,10 +71,10 @@ extension NotificationRow {
 
     /// Dispatches one tapped menu item.
     ///
-    /// Selection-wide items pass ``targetIDs``; the three that are about one
-    /// app — Open, Open Link and Notification Settings — pass this row's own
-    /// id or bundle id, never the selection's, since "open 3 apps at once" is
-    /// not a thing the menu offers.
+    /// Selection-wide items pass ``targetIDs``; the four that are about one
+    /// app — Open, Open Link, Mute/Unmute and Notification Settings — pass
+    /// this row's own id or bundle id, never the selection's, since "mute 3
+    /// apps at once" is not a thing the menu offers.
     private func perform(_ kind: NotificationRowMenu.Kind, dispatcher: any ActionDispatching) {
         switch kind {
         case .open:
@@ -101,6 +101,12 @@ extension NotificationRow {
         case .markUnread:
             dispatchThrowing { try dispatcher.setRead(ids: targetIDs, false) }
 
+        case .mute:
+            performMuteToggle(true, dispatcher: dispatcher)
+
+        case .unmute:
+            performMuteToggle(false, dispatcher: dispatcher)
+
         case .notificationSettings:
             // No bundle id, no app to send System Settings to. The menu
             // still shows this item enabled (docs/features/ACTIONS.md lists
@@ -125,6 +131,22 @@ extension NotificationRow {
         case .separator:
             break // Never tapped: `contextMenuContent` draws a `Divider()` for this kind instead of a `Button`.
         }
+    }
+
+    /// Item 8's `.mute` and `.unmute` share this one body — split out of
+    /// ``perform(_:dispatcher:)`` only to keep that `switch` under SwiftLint's
+    /// cyclomatic-complexity limit, not because the two branches ever
+    /// differed in anything but `muted`.
+    ///
+    /// `NotificationRowMenu.items(...)` only ever offers `.mute`/`.unmute`
+    /// when `item.bundleID` is non-nil (item 8 is hidden, not disabled,
+    /// otherwise), so this guard is defensive rather than a path the menu can
+    /// actually reach with nothing to act on.
+    private func performMuteToggle(_ muted: Bool, dispatcher: any ActionDispatching) {
+        guard let bundleID = item.bundleID else {
+            return
+        }
+        dispatchThrowing { try dispatcher.setAppMuted(bundleID: bundleID, muted) }
     }
 
     /// Runs a synchronous dispatch call through ``ActionDispatchRouting/run(_:onError:)``,

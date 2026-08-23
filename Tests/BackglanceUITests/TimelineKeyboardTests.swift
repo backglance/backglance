@@ -116,6 +116,56 @@ final class TimelineKeyboardTests: XCTestCase {
         XCTAssertFalse(value, "falls back to id 1 (already read), so the toggle turns read off")
     }
 
+    // MARK: - ⇧⌘M: muteTarget(focusedID:items:)
+
+    /// The ordinary case: the focused row's app is not muted, so the target
+    /// flips it on.
+    func testMuteTargetTurnsMutingOnWhenTheFocusedAppIsNotMuted() {
+        let item = makeItem(id: 1, bundleID: "app.backglance.fixture.chat", isAppMuted: false)
+
+        let target = TimelineKeyboard.muteTarget(focusedID: 1, items: [item])
+
+        XCTAssertEqual(target?.bundleID, "app.backglance.fixture.chat")
+        XCTAssertEqual(target?.muted, true)
+    }
+
+    /// The reverse: an already-muted app's focused row flips muting off.
+    func testMuteTargetTurnsMutingOffWhenTheFocusedAppIsAlreadyMuted() {
+        let item = makeItem(id: 1, bundleID: "app.backglance.fixture.chat", isAppMuted: true)
+
+        let target = TimelineKeyboard.muteTarget(focusedID: 1, items: [item])
+
+        XCTAssertEqual(target?.bundleID, "app.backglance.fixture.chat")
+        XCTAssertEqual(target?.muted, false)
+    }
+
+    /// No focused row — the same "nothing to act on" answer
+    /// `NotificationRowMenu`'s item 8 gives by hiding itself.
+    func testMuteTargetIsNilWhenNothingIsFocused() {
+        let item = makeItem(id: 1, bundleID: "app.backglance.fixture.chat")
+
+        XCTAssertNil(TimelineKeyboard.muteTarget(focusedID: nil, items: [item]))
+    }
+
+    /// The focused row's app has no bundle id to mute — the keyboard shortcut
+    /// must agree with the menu's item 8, which hides itself for exactly this
+    /// row rather than ever offering something ``ActionDispatching/setAppMuted(bundleID:_:)``
+    /// could not act on.
+    func testMuteTargetIsNilWhenTheFocusedRowsBundleIDDoesNotResolve() {
+        let item = makeItem(id: 1, bundleID: nil)
+
+        XCTAssertNil(TimelineKeyboard.muteTarget(focusedID: 1, items: [item]))
+    }
+
+    /// A stale or off-screen focused id resolves to nothing, the same "no row
+    /// to read from" outcome ``TimelineKeyboard/nextSelectedID(afterDeleting:in:)``
+    /// gives for an id that is not in `items`.
+    func testMuteTargetIsNilWhenTheFocusedIDIsNotInItems() {
+        let item = makeItem(id: 1, bundleID: "app.backglance.fixture.chat")
+
+        XCTAssertNil(TimelineKeyboard.muteTarget(focusedID: 99, items: [item]))
+    }
+
     // MARK: - Esc: escapeOutcome(hasSelection:canDismiss:)
 
     /// With a multi-selection present, Esc clears it and stops there — it
@@ -149,7 +199,13 @@ final class TimelineKeyboardTests: XCTestCase {
 
     /// Synthetic rows built directly, mirroring `NotificationRowMenuTests.makeItem`.
     /// All text is fabricated fixture content, per CLAUDE.md's Privacy Invariant #5.
-    private func makeItem(id: Int64, isPinned: Bool = false, isRead: Bool = false) -> TimelineItem {
+    private func makeItem(
+        id: Int64,
+        isPinned: Bool = false,
+        isRead: Bool = false,
+        bundleID: String? = nil,
+        isAppMuted: Bool = false
+    ) -> TimelineItem {
         let deliveredAt = UnixDate(Stubs.epoch.addingTimeInterval(Double(id)))
         let notification = ArchivedNotification(
             uuid: "FIXTURE-KEYBOARD-\(id)",
@@ -160,7 +216,13 @@ final class TimelineKeyboardTests: XCTestCase {
             isRead: isRead,
             isPinned: isPinned
         )
-        return TimelineItem(id: id, notification: notification, appName: "Fixture Chat")
+        return TimelineItem(
+            id: id,
+            notification: notification,
+            appName: "Fixture Chat",
+            bundleID: bundleID,
+            isAppMuted: isAppMuted
+        )
     }
 
     private func makeItems(ids: [Int64]) -> [TimelineItem] {

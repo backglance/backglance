@@ -19,10 +19,10 @@ import SwiftUI
 /// Open (BACKGLANCE-197) was the first action to land on top of it; Copy
 /// (BACKGLANCE-198) was the second; Delete/Undo (BACKGLANCE-199) was the third;
 /// Pin/Read (BACKGLANCE-200) was the fourth; System Settings (BACKGLANCE-201) was
-/// the fifth; Export (BACKGLANCE-204) is the sixth, added below. Every action in
-/// docs/features/ACTIONS.md's context menu has now shipped except Mute (item 8),
-/// which waits on the `RulesEngine` Phase 4.2 introduces and will add its own
-/// method here the same way each of these did.
+/// the fifth; Export (BACKGLANCE-204) was the sixth; Mute (BACKGLANCE-239) is the
+/// seventh and last, added below now that the `RulesEngine` Phase 4.2 introduced
+/// has landed. Every action in docs/features/ACTIONS.md's context menu has now
+/// shipped.
 ///
 /// See docs/features/ACTIONS.md#notificationactionhandler.
 @MainActor
@@ -89,6 +89,21 @@ public protocol ActionDispatching: AnyObject {
     /// itself synchronous, unlike ``openNotification(id:)``'s app-activation
     /// fallback.
     func openNotificationSettings(bundleID: String) throws
+
+    /// Item 8 of the context menu ("Mute ‹App› in Timeline" / "Unmute ‹App›") and
+    /// its ⇧⌘M shortcut — see docs/features/ACTIONS.md#mute-this-app-in-timeline.
+    /// Acts on the right-clicked (or keyboard-focused) row's app, like
+    /// ``openNotificationSettings(bundleID:)``, never the whole selection —
+    /// "mute 3 different apps at once" has no single meaning the way "delete 3
+    /// rows" does. Routes through ``AppMuting/setAppMuted(bundleID:muted:)``
+    /// rather than a direct `Archive` write to `apps.is_muted`, so the same
+    /// write that flips the column also invalidates the timeline's triage
+    /// cache — see ``AppMuting``'s own doc comment for why that is a seam of
+    /// its own rather than one more requirement on ``BackglanceCore/TriageEvaluating``.
+    /// Synchronous, like ``setPinned(ids:_:)`` and ``setRead(ids:_:)``:
+    /// `RulesEngine.setAppMuted(bundleID:muted:)` is an ordinary lock-guarded
+    /// write with no `await` on it.
+    func setAppMuted(bundleID: String, _ muted: Bool) throws
 
     /// Item 10 of the context menu ("Export Selection…") — see
     /// docs/features/ACTIONS.md#select-and-export. `ids` acts on the whole selection, like

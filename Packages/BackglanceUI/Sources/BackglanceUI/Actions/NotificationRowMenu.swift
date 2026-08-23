@@ -14,6 +14,8 @@ import Foundation
 /// `Button` or `Divider` and wires up the actual dispatch, which is
 /// deliberately the one thing this type does not know how to do.
 enum NotificationRowMenu {
+    // MARK: Internal
+
     /// One entry's identity. `.separator` is a layout slot, not an action —
     /// the caller draws a `Divider()` for it and never reads its `title` or
     /// `isEnabled`.
@@ -26,6 +28,8 @@ enum NotificationRowMenu {
         case unpin
         case markRead
         case markUnread
+        case mute
+        case unmute
         case notificationSettings
         case exportSelection
         case delete
@@ -62,7 +66,7 @@ enum NotificationRowMenu {
     ///     item-5 branch below for why that is not the same as
     ///     `item.isPinned`.
     ///   - appName: `apps.display_name` (or its bundle-id/placeholder
-    ///     fallback), for items 1 and 9's titles. Taken as its own parameter
+    ///     fallback), for items 1, 8 and 9's titles. Taken as its own parameter
     ///     rather than read off `item` so a caller with a fetched app record
     ///     but no `TimelineItem` (there is none today, but nothing here
     ///     should assume one) is never forced to build one just to get a
@@ -84,7 +88,7 @@ enum NotificationRowMenu {
     ///
     /// Multi-select semantics, from the paragraph under
     /// docs/features/ACTIONS.md's table: items 3–6, 10 and 11 are dispatched
-    /// with the *whole selection*'s ids; items 1, 2 and 9 always act on the
+    /// with the *whole selection*'s ids; items 1, 2, 8 and 9 always act on the
     /// right-clicked row's own app, never the selection — "open the app for
     /// 3 selected rows" has no single meaning, but "copy 3 rows" or "delete
     /// 3 rows" does. This function only decides what the items say; which ids
@@ -152,14 +156,13 @@ enum NotificationRowMenu {
 
         result.append(.separator)
 
-        // 8. "Mute ‹App› in Timeline" / "Unmute ‹App›" is deliberately absent
-        // here. It needs `RulesEngine.setAppMuted`, which Phase 4.2
-        // introduces — tracked as BACKGLANCE-239 — so there is nothing yet
-        // for it to toggle. No disabled placeholder either: an item that can
-        // never be tapped is its own kind of confusing ("why is this here if
-        // it never works?"), and the separators the table puts on either
-        // side of item 8 already give item 9 below the same visual grouping
-        // it would have had next to a present item 8.
+        // 8. Mute ‹App› in Timeline / Unmute ‹App› (BACKGLANCE-239) — see
+        // ``muteItem(appName:isAppMuted:)``'s own doc comment for the full
+        // reasoning behind its label and its hidden-when-no-bundle-id
+        // condition.
+        if item.bundleID != nil {
+            result.append(muteItem(appName: appName, isAppMuted: item.isAppMuted))
+        }
 
         // 9. Notification Settings for ‹App›… — acts on the right-clicked
         // row's app, like items 1 and 2, never the selection.
@@ -197,5 +200,30 @@ enum NotificationRowMenu {
             : Item(kind: .delete, title: String(localized: "Delete"), isEnabled: true))
 
         return result
+    }
+
+    // MARK: Private
+
+    /// Item 8's `.mute`/`.unmute` entry, split out of
+    /// ``items(for:appName:selectionCount:host:canActivateApp:showsOpenLink:)``
+    /// only to keep that function under SwiftLint's body-length limit — the
+    /// reasoning below is exactly as load-bearing as it would be inline.
+    ///
+    /// Acts on the right-clicked row's app, like items 1, 2 and 9, never the
+    /// selection. The caller only calls this when `item.bundleID != nil`:
+    /// item 8 is hidden entirely, the same treatment item 2 gets, when there
+    /// is no bundle id for `RulesEngine.setAppMuted` to act on.
+    ///
+    /// The label reads `isAppMuted` — the raw `apps.is_muted` flag carried
+    /// onto `TimelineItem` at build time — and deliberately not
+    /// `item.triage.muted`, which is `false` on a VIP-pinned row from a muted
+    /// app even though the app itself is still muted underneath (VIP beats
+    /// mute; see `TimelineItem.isAppMuted`'s own doc comment). Reading triage
+    /// here would flip this one row's label to "Mute" while every unmatched
+    /// sibling from the same app still correctly says "Unmute".
+    private static func muteItem(appName: String, isAppMuted: Bool) -> Item {
+        isAppMuted
+            ? Item(kind: .unmute, title: String(localized: "Unmute \(appName)"), isEnabled: true)
+            : Item(kind: .mute, title: String(localized: "Mute \(appName) in Timeline"), isEnabled: true)
     }
 }

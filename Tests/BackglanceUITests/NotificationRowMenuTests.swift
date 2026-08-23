@@ -311,32 +311,10 @@ final class NotificationRowMenuTests: XCTestCase {
         XCTAssertEqual(items.first { $0.kind == .delete }?.title, "Delete 3 Notifications")
     }
 
-    // MARK: - Item 8: Mute — deliberately absent
-
-    /// There is no `.mute`/`.unmute` case on `NotificationRowMenu.Kind` at
-    /// all — BACKGLANCE-239 adds it once `RulesEngine.setAppMuted` exists
-    /// (Phase 4.2). This sweeps every host/selection-count combination this
-    /// suite otherwise exercises and asserts none of them ever mentions
-    /// muting, in either the kind list or the rendered titles.
-    func testItem8MuteIsAbsentEverywhere() {
-        for host: TimelineStore.Host in [.popover, .window] {
-            for selectionCount in [0, 1, 3] {
-                let items = NotificationRowMenu.items(
-                    for: makeItem(),
-                    appName: "Fixture Chat",
-                    selectionCount: selectionCount,
-                    host: host,
-                    canActivateApp: true,
-                    showsOpenLink: true
-                )
-
-                XCTAssertFalse(
-                    items.contains { $0.title.localizedCaseInsensitiveContains("mute") },
-                    "host: \(host), selectionCount: \(selectionCount)"
-                )
-            }
-        }
-    }
+    // Item 8 ("Mute ‹App› in Timeline" / "Unmute ‹App›") has its own suite,
+    // `NotificationRowMenuMuteTests`, split out purely to keep this file
+    // under SwiftLint's file-length limit as the menu has grown to eleven
+    // items — see that file's own doc comment.
 
     // MARK: - Which ids a menu item acts on
 
@@ -397,7 +375,9 @@ final class NotificationRowMenuTests: XCTestCase {
     private func makeItem(
         isPinned: Bool = false,
         isRead: Bool = false,
-        triage: Triage = .none
+        triage: Triage = .none,
+        bundleID: String? = nil,
+        isAppMuted: Bool = false
     ) -> TimelineItem {
         let deliveredAt = UnixDate(Stubs.epoch)
         let notification = ArchivedNotification(
@@ -409,6 +389,13 @@ final class NotificationRowMenuTests: XCTestCase {
             isRead: isRead,
             isPinned: isPinned
         )
-        return TimelineItem(id: 1, notification: notification, appName: "Fixture Chat", triage: triage)
+        return TimelineItem(
+            id: 1,
+            notification: notification,
+            appName: "Fixture Chat",
+            bundleID: bundleID,
+            triage: triage,
+            isAppMuted: isAppMuted
+        )
     }
 }

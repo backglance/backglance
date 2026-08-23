@@ -104,4 +104,31 @@ enum TimelineKeyboard {
         }
         return !current(anchorNotification)
     }
+
+    /// ⇧⌘M: which app to mute or unmute, and which way — the row the keyboard
+    /// is actually focused on, per item 8's own scoping in
+    /// docs/features/ACTIONS.md#context-menu-specification ("act on the
+    /// right-clicked row's app, never the selection"), which this shortcut
+    /// mirrors with "focused" standing in for "right-clicked". `nil` when
+    /// there is no focused row, or the focused row's app has no bundle id to
+    /// mute — the same two conditions `NotificationRowMenu`'s item 8 hides
+    /// itself for (`items(for:appName:selectionCount:host:canActivateApp:showsOpenLink:)`),
+    /// so the keyboard and the menu can never disagree about which rows this
+    /// shortcut reaches.
+    ///
+    /// - Returns: the bundle id to pass to
+    ///   ``ActionDispatching/setAppMuted(bundleID:_:)`` and the value to pass
+    ///   with it — the opposite of ``TimelineItem/isAppMuted``, the *raw*
+    ///   `apps.is_muted` flag, never `triage.muted` (see
+    ///   ``TimelineItem/isAppMuted``'s own doc comment for why those two can
+    ///   disagree on a VIP-pinned row from a muted app).
+    static func muteTarget(focusedID: Int64?, items: [TimelineItem]) -> (bundleID: String, muted: Bool)? {
+        guard let focusedID,
+              let item = items.first(where: { $0.id == focusedID }),
+              let bundleID = item.bundleID
+        else {
+            return nil
+        }
+        return (bundleID, !item.isAppMuted)
+    }
 }
