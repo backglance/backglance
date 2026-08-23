@@ -5,16 +5,18 @@ import SwiftUI
 
 /// Settings, as far as this milestone has settings.
 ///
-/// Four tabs. General holds Search — semantic indexing is the first thing the app
+/// Five tabs. General holds Search — semantic indexing is the first thing the app
 /// does that needs the user's permission in the plain sense, since it reads every
 /// notification they have ever received and writes a vector for each one — and
 /// Digest, which owns the app's only permission prompt. Privacy holds everything
 /// that decides what Backglance keeps, assembled by `PrivacySettingsView`
-/// (docs/features/PRIVACY_CONTROLS.md#ui-components). Permissions reports what
-/// macOS has allowed, and is the one place that can reopen setup
-/// (docs/features/PERMISSIONS_PRIVACY.md#ui-components). Status answers the one
-/// question capture cannot answer for itself — is it working — because capture
-/// fails silently and the timeline simply stops growing
+/// (docs/features/PRIVACY_CONTROLS.md#ui-components). Rules holds the highlight,
+/// VIP, mute and (v1.x) regex rules that triage the timeline, assembled by
+/// `RulesSettingsView` (docs/features/RULES.md#ui-components, BACKGLANCE-209).
+/// Permissions reports what macOS has allowed, and is the one place that can
+/// reopen setup (docs/features/PERMISSIONS_PRIVACY.md#ui-components). Status
+/// answers the one question capture cannot answer for itself — is it working —
+/// because capture fails silently and the timeline simply stops growing
 /// (docs/operations/MONITORING_LOGGING.md#health-indicators-in-the-ui).
 ///
 /// The split is the one the docs called for once the Privacy pane existed. General
@@ -27,6 +29,8 @@ struct SettingsView: View {
     let digest: DigestSettingsModel
 
     let privacy: PrivacySettingsModel
+
+    let rules: RulesSettingsModel
 
     let permissions: PermissionsSettingsModel
 
@@ -41,6 +45,10 @@ struct SettingsView: View {
             PrivacySettingsView(model: privacy)
                 .tabItem { Label(String(localized: "Privacy"), systemImage: "hand.raised") }
                 .accessibilityIdentifier("settings.tab.privacy")
+
+            RulesSettingsView(model: rules)
+                .tabItem { Label(String(localized: "Rules"), systemImage: "wand.and.stars") }
+                .accessibilityIdentifier("settings.tab.rules")
 
             PermissionsSettingsView(model: permissions)
                 .tabItem { Label(String(localized: "Permissions"), systemImage: "lock.shield") }

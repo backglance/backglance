@@ -17,6 +17,7 @@ final class SettingsWindowController: NSWindowController {
         search: SearchService,
         digest: DigestSettingsModel,
         privacy: PrivacySettingsModel,
+        rules: RulesSettingsModel,
         permissions: PermissionsSettingsModel,
         status: StatusSettingsModel
     ) {
@@ -33,6 +34,7 @@ final class SettingsWindowController: NSWindowController {
                 search: search,
                 digest: digest,
                 privacy: privacy,
+                rules: rules,
                 permissions: permissions,
                 status: status
             )

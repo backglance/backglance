@@ -217,10 +217,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             wipe: wipe,
             resumeCapture: resume
         )
+        // `rulesEngine` is already built and observing by the time this runs —
+        // `applicationDidFinishLaunching(_:)` calls `startRules()` before `startInterface()`,
+        // which is the only caller of this method — so the Rules pane's export/import menu
+        // has a live engine from the moment the window can first be shown, the same as every
+        // other model built here.
+        let rules = RulesSettingsModel(archive: archive, engine: rulesEngine)
         return SettingsWindowController(
             search: search,
             digest: Self.digestSettings(),
             privacy: privacy,
+            rules: rules,
             permissions: makePermissionsModel(),
             status: makeStatusModel(archive: archive)
         )
