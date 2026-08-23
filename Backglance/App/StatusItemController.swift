@@ -104,17 +104,26 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     /// Read by the digest banner, which does not post about something already on screen.
     private(set) var lastOpenedAt: Date?
 
-    /// Shows the popover, or hides it if it is already up. Bound to the status
-    /// item's left click and to ⌃⌥N.
     /// Opens the popover showing the digest, for a banner tap. A no-op if it is already
     /// open — the digest is what it would be showing anyway.
     func openOnDigest() {
+        openPopover()
+    }
+
+    /// Shows the popover if it is not already up; a no-op otherwise. The half of
+    /// ``togglePopover()`` that anything driving the popover *open* from outside a click —
+    /// a digest banner tap, a `backglance://search`/`digest` route — needs: those callers
+    /// mean "make sure this is visible", and toggling would instead close a popover the
+    /// user already had open, which is not what any of them are asking for.
+    func openPopover() {
         guard !popover.isShown else {
             return
         }
         togglePopover()
     }
 
+    /// Shows the popover, or hides it if it is already up. Bound to the status
+    /// item's left click and to ⌃⌥N.
     func togglePopover() {
         if popover.isShown {
             popover.performClose(nil)

@@ -148,4 +148,9 @@ public enum Log {
 
     /// Sparkle checks, downloads and install outcomes.
     public static let updater = RedactingLogger(category: "updater")
+
+    /// `backglance://` route parsing and dispatch failures — the failure kind only, never
+    /// the query string or any other value a caller put in the URL
+    /// (docs/api/API_DOCUMENTATION.md#error-behavior).
+    public static let automation = RedactingLogger(category: "automation")
 }

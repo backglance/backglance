@@ -64,7 +64,7 @@ The AppleScript/JXA dictionary is deliberately not planned; the reasoning is in 
   ┌──────────────────────────────────────────────────────────────┐
   │  Backglance.app (LSUIElement, not sandboxed)                  │
   │                                                              │
-  │  NSAppleEventManager kAEGetURL ──▶ URLSchemeHandler.parse    │
+  │  NSAppleEventManager kAEGetURL ──▶ URLRoute.parse            │
   │                                     │ URLRoute               │
   │  Shortcuts ─────▶ App Intents ──┐   ▼                        │
   │  (v1.x)           NotificationEntity  AppCoordinator.perform │
@@ -85,6 +85,8 @@ No arrow leaves the machine.
 ## URL Scheme `backglance://`
 
 `Info.plist` registers `backglance` under `CFBundleURLTypes`; `AppDelegate` installs `URLSchemeHandler` for `kInternetEventClass` / `kAEGetURL`. If the app is not running, macOS launches it and delivers the URL after `applicationDidFinishLaunching`. The parser and route enum are shown in full in [EXPORT_AUTOMATION.md](../features/EXPORT_AUTOMATION.md#url-scheme); the table below is the contract.
+
+The work is split across two files, and the seam matters. `URLRoute` and `URLRouteError` — the route enum, the bounds, and `URLRoute.parse(_:)` — live in `BackglanceCore` (`Automation/URLRoute.swift`); `URLSchemeHandler` in `Backglance/App/` is only the `NSAppleEventManager` registration and the dispatch to AppKit surfaces. That is not tidiness: no test bundle in this project has a `TEST_HOST`, so app-target code cannot be unit-tested at all, and the security properties below are all *parser* properties. `URLRouteTests` in `BackglanceCoreTests` is what makes them assertions rather than assertions of intent.
 
 ### Routes
 

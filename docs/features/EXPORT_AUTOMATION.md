@@ -332,8 +332,15 @@ Notes:
 | `backglance://export?from=YYYY-MM-DD&to=YYYY-MM-DD&format=csv\|json` | **opens `ExportSheet` prefilled** — always a confirmation, never a silent write; default target `~/Downloads` | v1.x |
 
 ```swift
-// Backglance/App/URLSchemeHandler.swift
-import AppKit
+// Packages/BackglanceCore/Sources/BackglanceCore/Automation/URLRoute.swift
+//
+// The sketch below is the shape as first drafted, with `parse` hanging off
+// `URLSchemeHandler` in the app target. As shipped, the route enum, the errors and
+// `parse(_:)` are in `BackglanceCore` and only the `NSAppleEventManager` installation
+// stayed behind in `Backglance/App/URLSchemeHandler.swift` — app-target code has no
+// test host in this project, and the parser is where every bound in
+// API_DOCUMENTATION.md#security-properties actually lives.
+import Foundation
 
 enum URLRoute: Equatable {
     case search(query: String)
@@ -553,7 +560,7 @@ An AppleScript/JXA dictionary is **not planned**. The URL scheme covers scriptin
 - **CSV escaping:** table-driven tests for `CSVWriter.escape` — commas, quotes, CRLF, leading `=`/`+`/`-`/`@`, empty, emoji.
 - **Streaming:** export 100k rows to a temp file and assert peak RSS delta < 30 MB (measured with `task_info` in a performance test, marked `XCTSkip` on CI runners without the budget).
 - **Cancellation / disk full:** inject a `FileHandle` failure via a temporary read-only directory; assert `ExportError.io` and that no partial file remains.
-- **URL parsing:** `URLSchemeHandler.parse` table tests for every route, including `minutes=0`, `minutes=abc`, `id=not-a-uuid`, `from=2026-13-40`, missing `q`.
+- **URL parsing:** `URLRoute.parse` table tests (`URLRouteTests`, `BackglanceCoreTests`) for every route, including `minutes=0`, `minutes=abc`, `id=not-a-uuid`, `from=2026-13-40`, missing `q`, plus the refusals: a `file://` URL, another app's scheme, and any URL carrying a path.
 - **Intents:** call `perform()` directly on `SearchNotificationsIntent` with an injected in-memory archive; assert entity ids and dialog text; `PauseCaptureIntent` asserts `CaptureStatus.paused(until:)`.
 - **UI:** XCUITest for `ExportSheet` (preset → row estimate → save panel appears) on the `Backglance` scheme.
 

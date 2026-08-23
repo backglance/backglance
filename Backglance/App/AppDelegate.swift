@@ -62,6 +62,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     var hotKeys: HotKeyCenter?
     var window: TimelineWindowController?
 
+    /// Retained for the same reason as every other collaborator here: a local would
+    /// deallocate at the end of `startURLScheme()`, and whether `NSAppleEventManager`
+    /// itself would then still have somewhere live to deliver `kAEGetURL` to is not a
+    /// question worth risking — this is the one strong reference the app keeps on it
+    /// (docs/api/API_DOCUMENTATION.md#url-scheme-backglance).
+    var urlSchemeHandler: URLSchemeHandler?
+
     /// `rulesEngine`, or ``NoTriage`` when it has not been built — which only happens when
     /// `startCapture()` itself found no archive, the same state every `guard let archive`
     /// below already treats as "nothing to build". Every triage-consuming type default-
@@ -95,6 +102,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // about when a *pass* runs, not about when this method is called.
         startRetention()
         startInterface()
+        // After startInterface(): every surface a route can reach — the status item, the
+        // timeline window, the engine — has to exist before the first `kAEGetURL` can
+        // arrive, and macOS does not deliver a launch URL until this method returns anyway
+        // (docs/api/API_DOCUMENTATION.md#url-scheme-backglance).
+        startURLScheme()
         // Last, and after the interface: setup's last screen ends with "Backglance lives in
         // your menu bar", which wants a menu bar item already there to look at.
         startOnboardingIfNeeded()

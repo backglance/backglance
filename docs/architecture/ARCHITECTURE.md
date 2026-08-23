@@ -149,7 +149,7 @@ Responsibilities:
 - `StatusItemController.swift` — `NSStatusItem` with `NSPopover` hosting an `NSHostingController`; icon reflects `CaptureStatus` (running / paused / degraded).
 - `HotKeyCenter.swift` — Carbon `RegisterEventHotKey` wrapper, default ⌃⌥N.
 - `LaunchAtLogin.swift` — `SMAppService.mainApp`.
-- `URLSchemeHandler.swift` — `backglance://search`, `open`, `digest`, `pause`, `resume` (v1.0) and `export` (v1.x).
+- `URLSchemeHandler.swift` — installs the `kAEGetURL` handler and dispatches `backglance://search`, `open`, `digest`, `pause`, `resume` (v1.0) and `export` (v1.x) to the app's surfaces. The route enum and parser are `URLRoute` in `BackglanceCore`, where they can be unit-tested.
 - `SparkleUpdaterController.swift` — the only networked component; honours the "Check for updates automatically" toggle.
 
 ### Dependency Graph

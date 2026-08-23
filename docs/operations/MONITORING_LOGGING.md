@@ -73,6 +73,7 @@ All loggers share the subsystem `app.backglance.Backglance` and one of these cat
 | `rules` | `BackglanceCore` | Rules evaluated (count, matched rule IDs), regex compile errors |
 | `ui` | `Backglance` (app) | Popover open/close timings, window lifecycle, hotkey registration results |
 | `updater` | `Backglance` (app) | Sparkle appcast checks, download, install outcomes |
+| `automation` | `Backglance` (app) | `backglance://` route parse/dispatch failures, by failure kind only (docs/api/API_DOCUMENTATION.md#error-behavior) |
 
 The loggers are declared once, in `BackglanceCore/Logging/Log.swift`, and imported everywhere:
 
@@ -91,6 +92,7 @@ public enum Log {
     public static let rules   = Logger(subsystem: subsystem, category: "rules")
     public static let ui      = Logger(subsystem: subsystem, category: "ui")
     public static let updater = Logger(subsystem: subsystem, category: "updater")
+    public static let automation = Logger(subsystem: subsystem, category: "automation")
 }
 ```
 
@@ -279,6 +281,7 @@ public enum Log {
     public static let rules   = RedactingLogger(category: "rules")
     public static let ui      = RedactingLogger(category: "ui")
     public static let updater = RedactingLogger(category: "updater")
+    public static let automation = RedactingLogger(category: "automation")
 }
 ```
 
