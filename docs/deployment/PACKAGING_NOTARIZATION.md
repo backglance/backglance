@@ -816,7 +816,14 @@ The complete script. It is what both the manual path and `release.yml` run; the 
 #   NOTARY_APPLE_ID / NOTARY_TEAM_ID / NOTARY_PASSWORD
 #                     if all three are set they are used instead of the profile (CI path)
 #   DIST_DIR          default build/dist
+#
+# This is the one implementation of the signing order and the packaging layout: the manual
+# release path in docs/deployment/DEPLOYMENT_GUIDE.md and the `release` job in
+# .github/workflows/release.yml both run this script, and differ only in where the notary
+# credentials and the certificate come from.
 set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
@@ -841,7 +848,8 @@ BUILD_NUMBER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Conten
 IDENTITY="${SIGN_IDENTITY:-Developer ID Application: Backglance (TEAMID1234)}"
 DIST="${DIST_DIR:-build/dist}"
 WORK="build/notary"
-ENTITLEMENTS="Backglance/Backglance.entitlements"
+ENTITLEMENTS="$REPO_ROOT/Backglance/Backglance.entitlements"
+[[ -f "$ENTITLEMENTS" ]] || die "entitlements not found: $ENTITLEMENTS"
 mkdir -p "$DIST" "$WORK"
 
 log "Backglance $VERSION (build $BUILD_NUMBER) — $APP"
@@ -886,7 +894,13 @@ sign "$APP" --entitlements "$ENTITLEMENTS"
 
 log "Verifying signature"
 codesign --verify --deep --strict --verbose=2 "$APP"
-if codesign -d --entitlements - --xml "$APP" 2>/dev/null | grep -q 'get-task-allow'; then
+# The get-task-allow refusal. A Debug-signed build is a debuggable build, and shipping one
+# would hand anything on the user's Mac a debugger attach to a process that reads the
+# notification archive. The extraction has to succeed for the check to mean anything: if
+# codesign cannot print the entitlements, an empty grep would pass this silently.
+ENTS="$(codesign -d --entitlements - --xml "$APP" 2>/dev/null)" \
+  || die "could not read the entitlements back off $APP — refusing to ship an unverified build"
+if grep -q 'get-task-allow' <<<"$ENTS"; then
   die "get-task-allow entitlement present — this is a Debug-signed build; archive with -configuration Release"
 fi
 codesign -dvv "$APP" 2>&1 | grep -E '^Authority=Developer ID Application' >/dev/null \

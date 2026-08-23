@@ -92,7 +92,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: notarytool-logs
-          path: build/notary-*/notary-*-log.json
+          path: build/notary/notary-*-log.json
           retention-days: 30
           if-no-files-found: ignore
       - name: Verify the staple survived packaging
