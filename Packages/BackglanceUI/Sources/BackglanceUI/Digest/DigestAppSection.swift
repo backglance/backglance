@@ -57,7 +57,7 @@ public struct DigestAppSection: View {
         .padding(.vertical, 4)
         .padding(.horizontal, 10)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("\(section.appName), \(section.items.count) notifications"))
+        .accessibilityLabel(Text("\(section.appName), ^[\(section.items.count) notification](inflect: true)"))
         // A heading, so the VoiceOver rotor can jump app to app through a long digest
         // (docs/reference/ACCESSIBILITY.md#day-headers-and-grouping).
         .accessibilityAddTraits(.isHeader)

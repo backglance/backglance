@@ -29,13 +29,17 @@ extension RulesEngine {
             let raw = rule.pattern.trimmingCharacters(in: .whitespacesAndNewlines)
 
             guard !raw.isEmpty else {
-                problems.append(RuleCompileError(ruleID: id, message: "Pattern is empty.", kind: .emptyPattern))
+                problems.append(RuleCompileError(
+                    ruleID: id,
+                    message: String(localized: "Pattern is empty."),
+                    kind: .emptyPattern
+                ))
                 continue
             }
             guard raw.count <= RuleLimits.maxPatternLength else {
                 problems.append(RuleCompileError(
                     ruleID: id,
-                    message: "Pattern is over \(RuleLimits.maxPatternLength) characters.",
+                    message: String(localized: "Pattern is over \(RuleLimits.maxPatternLength) characters."),
                     kind: .patternTooLong
                 ))
                 continue
@@ -46,7 +50,7 @@ extension RulesEngine {
                 guard let resolved = rule.color.flatMap(HighlightColor.init(rawValue:)) else {
                     problems.append(RuleCompileError(
                         ruleID: id,
-                        message: "Unknown highlight colour.",
+                        message: String(localized: "Unknown highlight colour."),
                         kind: .unknownColorToken
                     ))
                     continue
@@ -90,7 +94,7 @@ extension RulesEngine {
             guard RuleLimits.regexRulesEnabled else {
                 problems.append(RuleCompileError(
                     ruleID: id,
-                    message: "Regex rules arrive in a later version.",
+                    message: String(localized: "Regex rules arrive in a later version."),
                     kind: .notAvailableInThisVersion
                 ))
                 return nil

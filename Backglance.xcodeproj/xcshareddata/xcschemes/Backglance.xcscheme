@@ -54,6 +54,20 @@
             ReferencedContainer = "container:Backglance.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <!-- Pseudo-localization, off by default: tick both in Edit Scheme ▸ Run ▸ Arguments
+           to run the pass in docs/reference/INTERNATIONALIZATION.md#pseudo-localization-testing.
+           Doubling every string exposes layouts that only fit English; the second one makes
+           any string that never reached the catalog SHOUT in capitals. -->
+      <CommandLineArguments>
+         <CommandLineArgument
+            argument = "-NSDoubleLocalizedStrings YES"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "-NSShowNonLocalizedStrings YES"
+            isEnabled = "NO">
+         </CommandLineArgument>
+      </CommandLineArguments>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"

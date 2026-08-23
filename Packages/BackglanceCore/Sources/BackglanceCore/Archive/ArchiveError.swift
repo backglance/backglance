@@ -101,34 +101,34 @@ public enum ArchiveError: Error, Sendable {
     public var userMessage: String {
         switch self {
         case .openFailed:
-            "Backglance couldn't open its archive."
+            String(localized: "Backglance couldn't open its archive.")
 
         case .migrationFailed:
-            "Backglance couldn't upgrade its archive. Your data is untouched."
+            String(localized: "Backglance couldn't upgrade its archive. Your data is untouched.")
 
         case .duplicate:
-            "Already archived."
+            String(localized: "Already archived.")
 
         case .insertFailed:
-            "A notification couldn't be saved."
+            String(localized: "A notification couldn't be saved.")
 
         case .writeFailed:
-            "Backglance couldn't save a change to its archive."
+            String(localized: "Backglance couldn't save a change to its archive.")
 
         case .insufficientDiskSpace:
-            "There isn't enough free disk space to compact the archive. Nothing was changed."
+            String(localized: "There isn't enough free disk space to compact the archive. Nothing was changed.")
 
         case .integrityCheckFailed:
-            "The archive failed an integrity check."
+            String(localized: "The archive failed an integrity check.")
 
         case .observationFailed:
-            "The timeline stopped updating. Reopen the window to retry."
+            String(localized: "The timeline stopped updating. Reopen the window to retry.")
 
         case .wipeIncomplete:
-            "Some files couldn't be removed. See the log for details."
+            String(localized: "Some files couldn't be removed. See the log for details.")
 
         case .unavailable:
-            "Backglance is busy, try again in a moment."
+            String(localized: "Backglance is busy, try again in a moment.")
         }
     }
 }

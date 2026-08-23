@@ -1,5 +1,1655 @@
 {
-  "sourceLanguage" : "en",
-  "strings" : { },
-  "version" : "1.0"
+  "sourceLanguage": "en",
+  "strings": {
+    "!": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "%@ (^[%lld record](inflect: true))": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "%@ · %@ · “%@”": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "%@ · %@ · “%@” · %@": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "%@ · ^[%lld notification](inflect: true)": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "%@, %@": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "%@, %lld codes redacted in the last 30 days": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "%@, ^[%lld notification](inflect: true)": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "%lld": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "%lld imported, %lld skipped": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "%lld more from muted apps": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "%lld notifications": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "(%lld)": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "(no text)": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "(no title)": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "24 hours": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "30 days": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "7 days": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "A notification couldn't be saved.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "A zip of versions, capture state and counts — no notification text, ever. Open it before you send it; it is plain JSON. App names are left out unless you turn them on above, because which apps notify you is itself personal.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "A zip of versions, capture state and counts. No notification text.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Adapter": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Add": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Add Rule": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Add Rule…": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Add app…": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "After 15 minutes away": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "After 5 minutes away": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Allowed": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Already archived.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Also forget per-app settings": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Also show a notification banner": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Always": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Amber": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Anywhere": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "App bundle id": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "App icons, through the standard NSWorkspace API.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "App not found": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Apps": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Archive": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Asleep or lid closed": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Back": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance Settings": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance can't read notifications yet.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance can’t request this permission for you; macOS only lets apps point you to the setting.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance could not read this digest.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance couldn't find the system's notification database.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance couldn't open its archive.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance couldn't read the system's notification database.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance couldn't save a change to its archive.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance couldn't upgrade its archive. Your data is untouched.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance couldn’t change this: %@": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance couldn’t import the older notifications. New ones are still being archived.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance is busy, try again in a moment.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance is importing what macOS still has — usually the last few days, since the system prunes older notifications. From now on every notification is archived as it arrives.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance is open source (GPL-3.0). You can read exactly what it opens, and watch it with fs_usage if you like.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance lives in your menu bar. Press Control-Option-N to open it.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance needs Full Disk Access to read new notifications.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance only archives notifications while it is running, so anything delivered before you open it is gone by the time it starts.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance only archives notifications while it is running, so anything delivered before you open it is gone by the time it starts. ⌃⌥N opens it from wherever you are.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance was wiped, but some files couldn’t be removed. See the log for details.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance will ask for Touch ID before deleting anything.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance — %@": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance — %lld unread": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance — capture stopped": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance — needs Full Disk Access": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance's own notifications": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance, %lld unread notifications": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance, 1 unread notification": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance, more than 99 unread notifications": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backglance, no unread notifications": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Backups made before now still contain the archive.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Banner for Focus sessions": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Banners are off in System Settings ▸ Notifications ▸ Backglance.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Best matches": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Blue": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Body": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Bundle identifier": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "CSV": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Cancel": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Capture": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Capture is paused until %@.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Capture is paused.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Capture isn't running.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Check again": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Check for Updates…": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Check for updates automatically": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Choosing \"Never store\" above also turns on \"Exclude this app\", in the same write. Turning \"Exclude this app\" off on its own does not change the retention policy — pick a window above if you want capture to resume under one.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Clear filters": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Clear search": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Click Open System Settings below.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Closes setup. You can grant Full Disk Access later from Settings.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Codes from this app will be stored in plain text": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Collapsed": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Colour": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Come back here — this screen updates by itself.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Confirmation": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Continue": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Copy": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Copy command": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Copy with App and Time": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Couldn't copy": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Couldn't open %@": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Couldn't open System Settings": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Couldn't open link": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Couldn't write the export file: %@": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Couldn’t read redaction activity.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Couldn’t read the archive.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Count time away when": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Degraded — %@": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Degraded — needs Full Disk Access": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Delete": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Delete %lld Notifications": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Delete embeddings": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Deleted %lld notifications": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Deleted 1 notification": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Diagnostics": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Digest": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Dismiss digest": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Dismiss until next launch": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Edit Rule": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Edit…": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Enabled": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Enter something to match.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Every notification Backglance has stored is deleted, along with its search index, digests, cached icons and away sessions. This can’t be undone.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Exclude this app": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Excluded apps": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Expanded": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Export %lld Notifications": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Export 1 Notification": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Export Diagnostics…": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Export Rules…": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Export Selection…": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Export cancelled.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Export failed: %@": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Export format": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Exports you already saved stay where you put them.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Export…": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Failed %@ — see the log": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Finds notifications by meaning as well as by wording — \"the message about the invoice\" rather than the exact words. Everything is computed on this Mac and stored in your archive, about 2 KB per notification. The model is English, so other languages fall back to full-text search.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Focus search": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "For 1 Hour": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "For 15 Minutes": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Forever": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Format": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Full Disk Access": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Full Disk Access isn’t sticking": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Full Disk Access needed to capture new notifications.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Future verification codes from this app will be archived exactly as they arrive. Codes that were already redacted stay redacted — Backglance never stored them.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "General": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Global shortcut": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Grant Full Disk Access": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Grant Full Disk Access…": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Granted": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Granted — macOS has no notification database yet": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Granted, but macOS has no notification database yet": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Granted, thanks!": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Green": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Group by app": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Hid %lld notification(s) past their retention window and permanently removed %lld from an earlier pass.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Highlight": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "How many codes were replaced, by app, over the last 30 days. Backglance cannot show the codes themselves — it never stored them.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Import Rules…": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Import notifications received while paused": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Imported ^[%lld notification](inflect: true).": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "In a Focus": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Include app names": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Indexing %@ of %@": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Inherit": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Integrity": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "JSON": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Keep notifications for": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Kind": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Last capture": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Learn why": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Locked": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Mail, Messages, Safari, Photos, Documents, the keychain, or any other app’s data. It makes no network connections except checking for updates, which you can turn off.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Mark All as Read": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Mark all read": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Mark as Read": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Mark as Unread": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Marked away by hand": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Match": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Mute": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Mute %@ in Timeline": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Muted": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Never": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Never store": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Never this launch": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "New notifications since you were away start here": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "No apps yet": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "No archived app with bundle id %@.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "No digests will be built or shown. Backglance still records when you were away, so searching for what you missed keeps working.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "No notifications match.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "None — capture isn’t reading": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Not allowed — the digest opens in the popover instead": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Not asked yet": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Not available in this preview.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Not checked this launch": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Not granted": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Not granted — capture is off": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Not in the archive": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Not read yet": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Not running": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Nothing has looked like a one-time code in the last 30 days.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Nothing here yet. New notifications will appear as they arrive.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Nothing in the last 50 notifications matches yet.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Nothing matched.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Nothing needed cleaning up.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Notification Center keeps whatever macOS keeps. That store isn’t Backglance’s.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Notification Settings for %@…": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Notification history lives in a system database macOS protects, and Full Disk Access is the only permission that can read it. Backglance can’t request it — macOS has no prompt for this one — so the button above opens the setting.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Notification history lives in a system database that macOS protects. There is no narrower permission and no API for it — Full Disk Access is the only way any app can read it. This is also why Backglance is not in the Mac App Store.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Notifications": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Notifications from these apps are never stored. Backglance cannot tell which apps are sensitive — add your bank, brokerage or health apps here.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Notifications older than their app's retention window are removed automatically, about every six hours. Pinned notifications are never removed by age.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Notifications that arrive while paused are not archived.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "OK": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "OK %@": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Off": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Off by default. The patterns are written for the way text messages and e-mail announce a code, so running them everywhere turns the occasional ticket or order number into “[code redacted]” too.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "On": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "One permission: Full Disk Access": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "One-time code redaction": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Only this app (optional)": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Only used for the optional missed-notifications banner, and only asked for when you turn that banner on. Backglance works fully without it.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Open Backglance": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Open Backglance at login": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Open Full Disk Access Settings": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Open Full Window": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Open Link": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Open Login Items Settings": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Open Notification Settings": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Open Notification Settings…": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Open System Settings": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Open at Login": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Open in %@": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Open timeline at this point": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Opens the notification timeline. Also available with Control-Option-N.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Partial — counted from when Backglance started": {
+      "comment": "Digest badge: the app launched into an already-away Mac",
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Password manager": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Pattern": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Pattern is empty.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Pattern is over %lld characters.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Pause": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Pause Capture": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Paused": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Paused until %@": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Permissions": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Pin": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Play a sound": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Presenting or screen sharing": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Press Return to open in %@.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Priority": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Privacy": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Purple": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Quit Backglance": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Ranges above %lld days are exported as multiple files.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Reconstructed — Backglance wasn't running for part of this time": {
+      "comment": "Digest badge: the session was rebuilt from store timestamps",
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Red": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Redact codes in all apps": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Redact one-time codes": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Redaction activity": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Redaction placeholders (like “[code redacted]”) export as-is — the original text was never stored.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Regex": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Regex rules arrive in a later version.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Remove": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Remove filter, %@": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Restore defaults": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Resume": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Resume Capture": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Retention": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Retry": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Reveal Archive in Finder": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Rule": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Rule %lld in the file: %@.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Rules": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Rules can’t be exported right now.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Rules can’t be imported right now.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Rules change how Backglance shows notifications. They do not change what macOS delivers.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Run Integrity Check": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Run cleanup now": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Running": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Save": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Saved": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Search": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Search failed. Try again in a moment.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Search is still preparing. Try again in a moment.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Search was cancelled.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Select an app": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Semantic search": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Sender": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Settings…": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Setup takes about a minute and needs one permission.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Show digest": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Show setup again": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Similar": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Skip for now": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Some files couldn't be removed. See the log for details.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Something went wrong — see log": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Startup": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Status": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Store fingerprint": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "The Notification Center database — copied read-only, never modified.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "The archive could not be read.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "The archive couldn’t be wiped. Nothing was deleted.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "The archive failed an integrity check.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "The embedding model returned %lld dimensions, expected %lld.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "The integrity check couldn’t run.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "The integrity check reads the whole file, so it isn’t run automatically — on a large archive it takes a moment.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "The notification history macOS never had.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "The on-device English sentence model isn't available on this Mac. Semantic search is off; full-text search still works.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "The start date must be before the end date.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "The timeline stopped updating. Reopen the window to retry.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "There isn't enough free disk space to compact the archive. Nothing was changed.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "This Mac has no Touch ID, so the typed word is the only confirmation.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "This build carries no update signing key, so it cannot check for updates. That is expected for a build you compiled yourself; released builds are signed.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "This file needs a newer version of Backglance to import (rules format v%lld).": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "This file will contain notification text in plain text.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "This file's format is \"%@\", not a rules file Backglance recognizes.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "This is everything the system still had.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "This looks like a sentence. Semantic search is off, so only exact words were tried.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "This version of macOS stores notifications in a format Backglance doesn't recognize yet.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Thread": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Timeline options": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Title": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Today": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Touch ID didn’t succeed. Nothing was deleted.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Troubleshooting": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Try %@, %@, %@, or a sentence like %@ with Semantic search on.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Try Again": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Turn on Semantic Search": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Turn on the switch next to Backglance. If it isn’t listed, click + and choose it from Applications.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Two Focus files, to know when you were in a Focus.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Type “wipe” to confirm": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Type “wipe” to confirm.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Unavailable": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Undo": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Unknown app": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Unknown highlight colour.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Unmute %@": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Unpin": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Until I Resume": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Until Tomorrow": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Updates": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "VIP": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Verification codes are replaced with “[code redacted]” before they are stored. The original digits are never written to your archive, the search index or an export. Turning redaction off cannot restore codes that were already redacted.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Version": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "View mode": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Waiting for approval in System Settings": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Waiting for approval in System Settings ▸ General ▸ Login Items.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Waiting for permission…": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Welcome to Backglance": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "What Backglance never reads": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "What Backglance reads": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "What did I miss": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "What this doesn’t reach": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "When off, notifications that arrive during a pause are never archived, even though macOS still has them. Turning it on makes a pause a delay instead of a gap.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "When this is off, Backglance makes no network connections at all. Updates are the only thing it ever fetches — there is no telemetry and no crash reporting.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "When you come back, Backglance shows one summary of what arrived while you were away — once, and never again after you dismiss it.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Whole word only": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Wipe Archive": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Wipe Archive…": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Wipe the Backglance archive": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Wipe the archive?": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Wiping deletes every notification Backglance has stored and starts over. It can’t be undone, and it can’t reach macOS’s own notification store or your backups.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Wiping…": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Would have matched": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Yesterday": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "You missed %lld notifications from %lld apps": {
+      "comment": "Digest headline. Both counts are pluralized by the string catalog.",
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "You missed ^[%lld notification](inflect: true) from ^[%lld app](inflect: true) %@": {
+      "comment": "Digest banner body. Both counts are pluralized by the string catalog.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "You missed ^[%1$lld notification](inflect: true) from ^[%2$lld app](inflect: true) %3$@"
+          }
+        }
+      }
+    },
+    "Your existing archive still works. Backglance can only guide you to the setting — macOS has no prompt for this permission.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Your settings are kept. They aren’t notification content.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "You’re set.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "and %lld more…": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "anywhere": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "app": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "body": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "capture degraded": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "capture paused": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "capture paused until %@": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "capture stopped": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "code redacted": {
+      "comment": "VoiceOver: the OTP digits were redacted before this notification was ever archived",
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "ended %@": {
+      "comment": "Digest subheadline: when the away session ended",
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "macOS deletes notifications the moment you dismiss them. Backglance keeps a private, local archive so you can search what you missed — nothing leaves your Mac.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "macOS hasn’t created a notification database on this Mac yet.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "macOS may hold local snapshots for up to 24 hours.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "macOS sometimes keeps an old decision for an app that has been rebuilt or replaced. This makes it forget Backglance’s, so the switch can be set again from scratch. Backglance won’t run it for you.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "macOS sometimes needs the app to restart after granting. Your setup progress is saved.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "needs Full Disk Access": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "new since you were away": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "pinned": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "read": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "redacted": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "sender": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "the pattern is empty": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "the pattern is over %lld characters": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "the regex pattern does not compile": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "title": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "unknown": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "unread": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "while asleep": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "while away": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "while in a Focus": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "while locked": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "while presenting": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "⌃⌥N is unavailable — another app may already be using it.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "⌃⌥N opens Backglance from anywhere.": {
+      "extractionState": "manual",
+      "localizations": {}
+    }
+  },
+  "version": "1.0"
 }

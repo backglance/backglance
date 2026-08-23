@@ -28,7 +28,10 @@ struct DigestBannerPoster {
     /// ``post(digest:appCount:reason:sessionEndedAt:popoverLastOpenedAt:policy:center:)``.
     static func body(itemCount: Int, appCount: Int, reason: AwayReason) -> String {
         String(
-            localized: "You missed \(itemCount) notifications from \(appCount) apps \(reason.whileLabel)",
+            localized: """
+            You missed ^[\(itemCount) notification](inflect: true) from \
+            ^[\(appCount) app](inflect: true) \(reason.whileLabel)
+            """,
             comment: "Digest banner body. Both counts are pluralized by the string catalog."
         )
     }

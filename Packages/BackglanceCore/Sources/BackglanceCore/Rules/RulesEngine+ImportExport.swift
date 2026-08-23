@@ -95,17 +95,8 @@ extension RulesEngine {
             var entry = entry
             entry.pattern = entry.pattern.trimmingCharacters(in: .whitespacesAndNewlines)
 
-            guard !entry.pattern.isEmpty else {
-                throw RulesError.invalidEntry(index: index, reason: "the pattern is empty")
-            }
-            guard entry.pattern.count <= RuleLimits.maxPatternLength else {
-                throw RulesError.invalidEntry(
-                    index: index,
-                    reason: "the pattern is over \(RuleLimits.maxPatternLength) characters"
-                )
-            }
-            if entry.kind == .regex, (try? NSRegularExpression(pattern: entry.pattern)) == nil {
-                throw RulesError.invalidEntry(index: index, reason: "the regex pattern does not compile")
+            if let reason = Self.invalidReason(for: entry) {
+                throw RulesError.invalidEntry(index: index, reason: reason)
             }
 
             validated.append(entry)
@@ -137,6 +128,23 @@ extension RulesEngine {
     }
 
     // MARK: Private
+
+    /// The reason `entry` fails `importRules(from:)`'s pre-write validation, or `nil` if
+    /// it passes — pulled out of that method purely to keep the entry's `pattern` already
+    /// trimmed and its three checks off the top-level function's line count; the checks
+    /// themselves, and the "never echo the pattern back" rule they follow, are unchanged.
+    private static func invalidReason(for entry: RulesDocument.Entry) -> String? {
+        if entry.pattern.isEmpty {
+            return String(localized: "the pattern is empty")
+        }
+        if entry.pattern.count > RuleLimits.maxPatternLength {
+            return String(localized: "the pattern is over \(RuleLimits.maxPatternLength) characters")
+        }
+        if entry.kind == .regex, (try? NSRegularExpression(pattern: entry.pattern)) == nil {
+            return String(localized: "the regex pattern does not compile")
+        }
+        return nil
+    }
 
     /// What `importRules(from:)` treats as "this is the same rule" on both sides of the
     /// comparison — an already-archived row and a file entry alike. Deliberately just the

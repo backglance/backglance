@@ -142,25 +142,12 @@ final class CaptureEngineImportTests: XCTestCase {
         }
     }
 
-    // MARK: - The sentence onboarding shows
-
-    /// It ends where it ends on purpose: a number smaller than the user expected is the
-    /// system's pruning, not Backglance's failure.
-    func testTheSummarySentenceExplainsWhyTheNumberIsSmall() {
-        let now = Date(timeIntervalSinceReferenceDate: 774_000_000)
-        let summary = ImportSummary(archived: 1_187, oldest: now.addingTimeInterval(-6 * 86_400))
-
-        let sentence = summary.userSentence(now: now)
-
-        XCTAssertTrue(sentence.contains("from the last 6 days"), sentence)
-        XCTAssertTrue(sentence.hasSuffix("this is all the system still had."), sentence)
-    }
-
-    func testTheSummarySentenceOmitsTheSpanWhenNothingWasImported() {
-        let sentence = ImportSummary(archived: 0).userSentence()
-
-        XCTAssertEqual(sentence, "Imported 0 notifications — this is all the system still had.")
-    }
+    // The two `userSentence` tests that used to sit here went with the method they were
+    // the only callers of (BACKGLANCE-216). They are not worth reconstructing against
+    // `ImportProgressView.countSentence` from this bundle: asserting the exact English of
+    // a `String(localized:)` result cannot work here, because no test bundle in this
+    // project has a `TEST_HOST` (BACKGLANCE-238), so `Bundle.main` is the xctest runner
+    // rather than Backglance.app and the string catalog is never consulted.
 
     // MARK: Private
 

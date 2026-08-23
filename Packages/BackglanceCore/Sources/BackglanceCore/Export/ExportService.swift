@@ -66,16 +66,16 @@ public enum ExportError: Error, LocalizedError, Equatable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .invalidRange:
-            "The start date must be before the end date."
+            String(localized: "The start date must be before the end date.")
 
         case let .rangeTooLarge(days):
-            "Ranges above \(days) days are exported as multiple files."
+            String(localized: "Ranges above \(days) days are exported as multiple files.")
 
         case .cancelled:
-            "Export cancelled."
+            String(localized: "Export cancelled.")
 
         case let .io(msg):
-            "Couldn't write the export file: \(msg)"
+            String(localized: "Couldn't write the export file: \(msg)")
         }
     }
 }

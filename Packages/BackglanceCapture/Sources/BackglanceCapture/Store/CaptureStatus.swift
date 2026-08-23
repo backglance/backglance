@@ -117,16 +117,18 @@ public enum DegradedReason: Sendable, Equatable {
     public var userMessage: String {
         switch self {
         case .noFullDiskAccess:
-            "Backglance needs Full Disk Access to read new notifications."
+            String(localized: "Backglance needs Full Disk Access to read new notifications.")
 
         case .storeNotFound:
-            "Backglance couldn't find the system's notification database."
+            String(localized: "Backglance couldn't find the system's notification database.")
 
         case .unknownSchema:
-            "This version of macOS stores notifications in a format Backglance doesn't recognize yet."
+            String(
+                localized: "This version of macOS stores notifications in a format Backglance doesn't recognize yet."
+            )
 
         case .readError:
-            "Backglance couldn't read the system's notification database."
+            String(localized: "Backglance couldn't read the system's notification database.")
         }
     }
 }

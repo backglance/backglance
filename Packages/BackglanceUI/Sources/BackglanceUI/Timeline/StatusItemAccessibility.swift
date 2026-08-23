@@ -41,6 +41,19 @@ public enum StatusItemAccessibility {
 
     // MARK: Private
 
+    /// The `1` and default branches look like they should collapse into one
+    /// `^[\(count) unread notification](inflect: true)` call — the same markup
+    /// ``StatusSettingsView`` and ``ImportProgressView`` already use. They stay apart:
+    /// this package's tests have no host bundle for a catalog entry to resolve
+    /// against (the same trade ``UndoToastView/message(count:)`` and
+    /// ``ExportSheet/title(count:)`` document), and here that is not a silent
+    /// no-op — verified by actually making the swap and running
+    /// ``StatusItemAccessibilityTests``: `inflect: true` resolves in that
+    /// environment, but always to the *singular* noun, so "7 unread notifications"
+    /// becomes "7 unread notification" for every count, not the literal markup and
+    /// not the correct plural. That regresses VoiceOver's actual output, so the
+    /// hand-written branch stays until the dedicated localization pass gives this
+    /// package a catalog to resolve against.
     private static func unreadPhrase(count: Int) -> String {
         switch count {
         case ..<1:

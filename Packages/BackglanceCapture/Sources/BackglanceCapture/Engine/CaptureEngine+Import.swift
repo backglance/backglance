@@ -63,17 +63,15 @@ public struct ImportSummary: Sendable, Equatable {
     /// The oldest notification the store still had.
     public var oldest: Date?
 
-    /// The one sentence onboarding shows when the import finishes.
-    ///
-    /// It ends where it ends on purpose: macOS prunes its own store after about a week,
-    /// so "this is all the system still had" is the honest explanation for a number
-    /// smaller than the user expected. No apology, no upsell, nothing to enable.
-    public func userSentence(now: Date = Date()) -> String {
-        let days = oldest.map { max(1, Int(now.timeIntervalSince($0) / 86_400)) }
-        let span = days.map { " from the last \($0) day\($0 == 1 ? "" : "s")" } ?? ""
-        let plural = archived == 1 ? "" : "s"
-        return "Imported \(archived.formatted()) notification\(plural)\(span) — this is all the system still had."
-    }
+    // There is deliberately no `userSentence` here any more. It claimed in its own doc
+    // comment to be "the one sentence onboarding shows", and it was not: onboarding builds
+    // its text from the raw counts in `ImportProgressView.countSentence`, and a repository-
+    // wide search found no other caller either — only the two tests that existed to test
+    // it. A method kept alive solely by its own tests, while describing UI it is not, is
+    // worse than no method, so it went (BACKGLANCE-216). If a caller ever wants the fuller
+    // "this is all the system still had" line, it belongs next to the view that shows it,
+    // where the string catalog's plural inflection actually resolves — see the note on
+    // `ImportProgressView.countSentence`.
 }
 
 // MARK: - CaptureEngine + import

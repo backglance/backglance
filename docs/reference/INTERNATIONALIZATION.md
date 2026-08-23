@@ -44,7 +44,7 @@ Note the asymmetry: even with an English UI, Backglance runs on Macs set to Turk
 
 ### Authoring strings
 
-All user-facing strings live in `Backglance/Resources/Localizable.xcstrings` (Xcode String Catalog; Xcode extracts entries automatically from `String(localized:)` and SwiftUI string literals at build time).
+All user-facing strings live in `Backglance/Resources/Localizable.xcstrings` (Xcode String Catalog). Xcode extracts entries from `String(localized:)` and SwiftUI string literals at build time — but only for the target that *owns* the catalog, which in a repository with four local packages is not enough on its own; see [The one catalog and four packages](#the-one-catalog-and-four-packages) below.
 
 ```swift
 // SwiftUI: string literals in Text/Button are auto-extracted as localization keys.
@@ -69,6 +69,30 @@ Rules:
 - No user-visible string is assembled by concatenation; use format specifiers so word order can change per language: `String(localized: "\(count) notifications from \(appName)")`.
 - Every non-obvious key gets a `comment:` — translators see the comment, not the UI.
 - Log messages, `os.Logger` output, SQL, bundle IDs, URL scheme parts, and rule patterns are **not** localized and never go through the catalog.
+
+### The one catalog and four packages
+
+The design above — one catalog, every string in it — is right at *runtime*: `String(localized:)` and SwiftUI's `Text("literal")` resolve against `Bundle.main`, which is `Backglance.app`, and no call site in this repository passes a `bundle:` argument. It does not happen on its own at *build* time, and the gap is quiet enough to have gone unnoticed for four milestones:
+
+| Target | Extracted by an app build? | Why |
+|---|---|---|
+| `Backglance` (app) | Yes, ~27 keys | It owns the catalog |
+| `BackglanceUI` | Into its own bundle, which nothing reads | A package is a separate target; its `defaultLocalization` sends strings to a generated `en.lproj` |
+| `BackglanceCore`, `BackglanceCapture`, `BackglanceSearch` | No | They had no `defaultLocalization`, so nothing extracted them anywhere |
+
+Because a missing key falls back to the key itself, all of it rendered correct English regardless, which is exactly why the catalog sat empty while 400+ call sites were written against it. The same fallback is why `^[…](inflect: true)` silently produced the singular noun for every count: automatic grammar agreement needs the key to be *in* the catalog, and the fallback path strips the markup and keeps the literal.
+
+The fix is two parts, and both are in the repository:
+
+1. Every package declares `defaultLocalization: "en"`. This gives the package no catalog of its own and changes no lookup — it only makes `xcodebuild -exportLocalizations` walk the target at all.
+2. `Scripts/sync_string_catalog.sh` runs that export, which is the one tool that walks every target, and merges the union of what it finds into the single catalog. Translations already in the catalog are never overwritten; a key that leaves the source but carries translations is marked `stale` rather than deleted.
+
+```bash
+Scripts/sync_string_catalog.sh            # after adding or changing any user-facing string
+Scripts/sync_string_catalog.sh --check    # what CI runs; fails when the catalog has drifted
+```
+
+> ⚠️ **Warning:** No test bundle in this project has a `TEST_HOST` (BACKGLANCE-238), so in a unit test `Bundle.main` is the xctest runner rather than `Backglance.app` and the catalog is never consulted. A test that asserts the exact English of a `String(localized:)` result is therefore asserting the fallback, not the catalog — and a plural written with `inflect: true` will come back singular. Assert on the model's counts, not on the rendered sentence.
 
 ### Plural rules
 
@@ -293,7 +317,8 @@ New-language keyword contributions are welcome — as code PRs against `OTPRedac
 
 Before v2.0 translation begins, and periodically in v1.x, the UI is smoke-tested with pseudo-localization to catch clipped labels, truncation, and hard-coded strings:
 
-- Run with `-NSDoubleLocalizedStrings YES` (doubles every localized string — catches truncation) and `-NSShowNonLocalizedStrings YES` (SHOUTS non-localized strings — catches strings that bypassed the catalog). Both can be set in the Xcode scheme's Arguments Passed On Launch.
+- Run with `-NSDoubleLocalizedStrings YES` (doubles every localized string — catches truncation) and `-NSShowNonLocalizedStrings YES` (SHOUTS non-localized strings — catches strings that bypassed the catalog). Both are already in the shared scheme, unticked: Edit Scheme ▸ Run ▸ Arguments, tick the two, run, untick. They are shipped off because doubling every string on an ordinary debug run is noise, and shipped at all so the pass is two clicks rather than a thing to look up.
+- Run `Scripts/sync_string_catalog.sh` first. `-NSShowNonLocalizedStrings` reports anything missing from the catalog, and until the sync has run that is *every* string in the four packages — which drowns the real finding.
 - Xcode's scheme App Language settings also offer "Double-Length Pseudolanguage" and "Right-to-Left Pseudolanguage"; the latter verifies the [RTL](#right-to-left) non-breakage promise.
 - German is a natural double-length test on its own ("Bestätigungscode" vs "code"); popover layouts are checked at German lengths even in v1.0.
 

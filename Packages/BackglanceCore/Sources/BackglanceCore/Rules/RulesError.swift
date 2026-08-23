@@ -43,16 +43,16 @@ extension RulesError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case let .unknownApp(bundleID):
-            "No archived app with bundle id \(bundleID)."
+            String(localized: "No archived app with bundle id \(bundleID).")
 
         case let .invalidEntry(index, reason):
-            "Rule \(index + 1) in the file: \(reason)."
+            String(localized: "Rule \(index + 1) in the file: \(reason).")
 
         case let .importFormatMismatch(format):
-            "This file's format is \"\(format)\", not a rules file Backglance recognizes."
+            String(localized: "This file's format is \"\(format)\", not a rules file Backglance recognizes.")
 
         case let .importVersionUnsupported(version):
-            "This file needs a newer version of Backglance to import (rules format v\(version))."
+            String(localized: "This file needs a newer version of Backglance to import (rules format v\(version)).")
         }
     }
 }
