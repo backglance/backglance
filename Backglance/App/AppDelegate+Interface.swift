@@ -42,10 +42,18 @@ extension AppDelegate {
         // (BACKGLANCE-242).
         let actionHandler = NotificationActionHandler(archive: archive, triage: triage)
         self.actionHandler = actionHandler
-        let window = TimelineWindowController(store: store, banners: banners, actions: actionHandler)
+        // No window is built here. It gets its own `host: .window` store, and building
+        // both eagerly would open a second timeline subscription and a second page cache
+        // at launch for a window most launches never show — see `showTimelineWindow()`.
+        //
         // Search owns the semantic model and the background indexer, both of
         // which stay asleep until the user turns the setting on.
-        let search = SearchService(archive: archive)
+        //
+        // `triage` is the same `RulesEngine` the timeline evaluates through, threaded in
+        // so `is:vip` and pinned-first ordering in search agree with what the timeline
+        // draws. Without it `HybridSearch` fell back to `NoTriage()` and every VIP rule
+        // was invisible to search (BACKGLANCE-241).
+        let search = SearchService(archive: archive, triage: triage)
         search.start()
         let settings = settingsWindow(search: search, archive: archive, retention: retention)
         // The field's own state: what was typed, what came back, what is still
@@ -60,7 +68,7 @@ extension AppDelegate {
         // the popover is about to open, so an app that never comes back from an away
         // session never asks the question.
         let digests = DigestPresenter(archive: archive)
-        digests.onOpenTimeline = { _ in window.show() }
+        digests.onOpenTimeline = { [weak self] _ in self?.showTimelineWindow() }
         let statusItem = StatusItemController(
             store: store,
             search: searchModel,
@@ -68,7 +76,7 @@ extension AppDelegate {
             digests: digests,
             banners: banners,
             actions: actionHandler,
-            menuActions: menuActions(window: window, settings: settings)
+            menuActions: menuActions(settings: settings)
         )
         // Registration fails when another app already owns ⌃⌥N. That is a note
         // in Settings, not a failure to launch: the status item still works.
@@ -80,22 +88,56 @@ extension AppDelegate {
         self.searchModel = searchModel
         self.digests = digests
         self.settings = settings
-        self.window = window
         self.statusItem = statusItem
         self.hotKeys = hotKeys
-        mirrorCaptureStatus(into: store)
+        mirrorCaptureStatus()
+    }
+
+    /// Brings the full timeline window up, building it and its store the first time.
+    ///
+    /// The window's store is its own `TimelineStore(host: .window)`, not the popover's.
+    /// `Host` is fixed at init and is not decoration: `TimelineStore+Selection` refuses
+    /// every multi-select mutator unless `host == .window`, `NotificationRowMenu` hides
+    /// "Export Selection…" outside it, and each host reads its view mode and grouping
+    /// from its own defaults key. Handing the window the popover's store — which is what
+    /// this did until BACKGLANCE-243 — silently disabled ⌘A, ⇧-click, ⌘E and the export
+    /// menu item in the one surface they were written for, and collapsed both hosts onto
+    /// the popover's remembered layout.
+    ///
+    /// Built here rather than in ``startInterface()`` because the second store is not
+    /// free: it opens its own `timelineSnapshots` subscription and keeps its own page
+    /// cache of up to `TimelineStore.maxRows` rows. A launch that never opens the window
+    /// should not pay for either, and most launches never do — the popover is the whole
+    /// point of a menu bar app.
+    ///
+    /// The new store is seeded from ``AppDelegate/lastCaptureState`` before anything can
+    /// draw it. The status mirror only pushes on the engine's *next* value, so a store
+    /// born after capture went degraded would otherwise show a running banner over a
+    /// timeline that had stopped growing.
+    func showTimelineWindow() {
+        if let window {
+            window.show()
+            return
+        }
+        guard let archive else {
+            return
+        }
+        let store = TimelineStore(archive: archive, triage: triage, host: .window)
+        store.captureState = lastCaptureState
+        windowStore = store
+        let window = TimelineWindowController(store: store, banners: banners, actions: actionHandler)
+        self.window = window
+        window.show()
     }
 
     /// The four verbs the status item's menu needs, built apart from ``startInterface()``
     /// only because composing them inline pushes that function past SwiftLint's
-    /// body-length limit. Two parameters, not the whole interface: everything else these
-    /// closures touch, they reach through `self`.
-    private func menuActions(
-        window: TimelineWindowController,
-        settings: SettingsWindowController
-    ) -> StatusItemController.MenuActions {
+    /// body-length limit. One parameter, not the whole interface: everything else these
+    /// closures touch, they reach through `self` — including the window, which does not
+    /// exist yet when this is called (``showTimelineWindow()``).
+    private func menuActions(settings: SettingsWindowController) -> StatusItemController.MenuActions {
         StatusItemController.MenuActions(
-            openWindow: { window.show() },
+            openWindow: { [weak self] in self?.showTimelineWindow() },
             pause: { [weak self] choice in
                 guard let engine = self?.engine else {
                     return

@@ -46,7 +46,7 @@ extension AppDelegate: URLRoutePerforming {
     ///   lands, this opens the window, which is real progress toward the doc's contract,
     ///   but does not scroll to or select the row, and never shows the "not found" case.
     func performOpen(uuid _: UUID) {
-        window?.show()
+        showTimelineWindow()
     }
 
     /// `backglance://digest` — opens the popover; `DigestPresenter` (refreshed as part of

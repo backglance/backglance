@@ -7,11 +7,19 @@ import Observation
 /// The timeline's state: the rows in memory, the sections built from them, and
 /// the live subscription that keeps both current.
 ///
-/// One instance serves both hosts. The popover and the window render the same
-/// ``sections``; only their chrome differs. Every write the UI triggers — mark
-/// read, pin, delete — goes to the archive and comes back through the
-/// subscription, so no view ever mutates its own copy of a row and the two hosts
-/// cannot drift apart.
+/// One instance per host, not one for both. The popover and the window render the
+/// same ``sections`` and differ mostly in chrome, which is what made sharing look
+/// free — but ``Host`` is fixed at init and decides behaviour, not just
+/// appearance: `TimelineStore+Selection` refuses every multi-select mutator
+/// unless `host == .window`, and each host reads its view mode and grouping from
+/// its own defaults key. A shared `host: .popover` store therefore disabled the
+/// window's entire selection model (BACKGLANCE-243). Two stores cost a second
+/// subscription and a second page cache, which is why the app builds the
+/// window's only when the window is first opened.
+///
+/// They still cannot drift apart: every write the UI triggers — mark read, pin,
+/// delete — goes to the archive and comes back through each store's own
+/// subscription, so no view ever mutates its own copy of a row.
 ///
 /// The subscription itself lives in `BackglanceCore`
 /// (``BackglanceCore/Archive/timelineSnapshots(unreadSince:pageSize:)``): this

@@ -54,6 +54,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     /// The interface, retained for the same reason: a status item whose
     /// controller is deallocated stays in the menu bar and stops responding.
     var store: TimelineStore?
+
+    /// The full window's own store.
+    ///
+    /// Separate from ``store`` because ``BackglanceUI/TimelineStore/Host`` is fixed at
+    /// init and decides real behaviour, not just chrome: `TimelineStore+Selection` gates
+    /// every multi-select mutator on `host == .window`, `NotificationRowMenu` hides
+    /// "Export Selection…" outside it, and the two hosts file their view mode and
+    /// grouping under different defaults keys. One shared `host: .popover` store meant
+    /// the window silently lost all of it (BACKGLANCE-243).
+    ///
+    /// `nil` until the window is first opened — see `showTimelineWindow()` for why the
+    /// second subscription and page cache are not paid for at launch.
+    var windowStore: TimelineStore?
+
+    /// What the engine last said, so a store built after that status arrived does not
+    /// start out claiming capture is running when it is not. ``windowStore`` is created
+    /// on first open, long after the mirror's first value.
+    var lastCaptureState: TimelineCaptureState = .running
+
     var digests: DigestPresenter?
     var search: SearchService?
     var searchModel: SearchViewModel?

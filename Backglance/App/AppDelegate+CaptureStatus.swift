@@ -26,7 +26,8 @@ extension AppDelegate {
         )
     }
 
-    /// Pushes the engine's status into the store as the UI's own value type.
+    /// Pushes the engine's status into every live timeline store as the UI's own value
+    /// type.
     ///
     /// The UI never imports `BackglanceCapture`
     /// (docs/getting-started/DEVELOPMENT_GUIDE.md#dependency-direction), so the
@@ -34,15 +35,29 @@ extension AppDelegate {
     /// sides. It is a small enum-to-enum map rather than a shared type because
     /// the views need far less than the engine publishes: enough to pick an
     /// icon, an empty state and one sentence.
-    func mirrorCaptureStatus(into store: TimelineStore) {
+    ///
+    /// Takes no store, and reads `store`/`windowStore` off `self` on each value instead,
+    /// because the two surfaces no longer share one store and the window's is built only
+    /// when it is first opened (BACKGLANCE-243). A parameter would have to be either the
+    /// popover's — leaving the window's banner frozen at whatever it was born with — or a
+    /// second call, and this method cancels the previous mirror task, so a second call
+    /// would silently unhook the first store rather than add to it. `lastCaptureState` is
+    /// what the late-built store is seeded from; see `showTimelineWindow()`.
+    func mirrorCaptureStatus() {
         guard let engine else {
             return
         }
         statusMirror?.cancel()
         let stream = engine.statusStream
-        statusMirror = Task { @MainActor in
+        statusMirror = Task { @MainActor [weak self] in
             for await status in stream {
-                store.captureState = Self.timelineState(for: status)
+                guard let self else {
+                    return
+                }
+                let state = Self.timelineState(for: status)
+                lastCaptureState = state
+                store?.captureState = state
+                windowStore?.captureState = state
             }
         }
     }
