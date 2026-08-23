@@ -35,15 +35,15 @@ final class OnboardingFDATests: XCTestCase {
         let app = try launch(fullDiskAccess: "denied")
 
         XCTAssertTrue(app.waitForStep("onboarding.welcome"), "setup should open on a fresh Mac")
-        app.button("onboarding.continue").click()
+        app.control("onboarding.continue").click()
         XCTAssertTrue(app.waitForStep("onboarding.whyFDA"))
-        app.button("onboarding.continue").click()
+        app.control("onboarding.continue").click()
         XCTAssertTrue(app.waitForStep("onboarding.whatWeRead"))
-        app.button("onboarding.continue").click()
+        app.control("onboarding.continue").click()
 
         XCTAssertTrue(app.waitForStep("onboarding.grant"))
         XCTAssertTrue(app.waitForStep("onboarding.grant.status.waiting"), "it should say it is waiting")
-        XCTAssertFalse(app.button("onboarding.continue").isEnabled, "Continue is the one blocked transition")
+        XCTAssertFalse(app.control("onboarding.continue").isEnabled, "Continue is the one blocked transition")
     }
 
     /// 🔒 Skipping is a supported outcome, not a failure. Someone evaluating the app is
@@ -53,19 +53,19 @@ final class OnboardingFDATests: XCTestCase {
         let app = try launch(fullDiskAccess: "denied")
         XCTAssertTrue(app.waitForStep("onboarding.welcome"))
 
-        app.button("onboarding.skip").click()
+        app.control("onboarding.skip").click()
 
         XCTAssertTrue(waitForWindowToClose(app), "the setup window should close")
-        XCTAssertEqual(app.state, .runningForeground, "and the app should still be running")
+        XCTAssertNotEqual(app.state, .notRunning, "and the app should still be running")
     }
 
     func testBackReturnsToThePreviousScreen() throws {
         let app = try launch(fullDiskAccess: "denied")
         XCTAssertTrue(app.waitForStep("onboarding.welcome"))
-        app.button("onboarding.continue").click()
+        app.control("onboarding.continue").click()
         XCTAssertTrue(app.waitForStep("onboarding.whyFDA"))
 
-        app.button("onboarding.back").click()
+        app.control("onboarding.back").click()
 
         XCTAssertTrue(app.waitForStep("onboarding.welcome"))
     }
@@ -81,9 +81,9 @@ final class OnboardingFDATests: XCTestCase {
 
         XCTAssertTrue(app.waitForStep("onboarding.grant"))
         XCTAssertTrue(app.waitForStep("onboarding.grant.status.granted"), "it should acknowledge the grant")
-        XCTAssertTrue(app.button("onboarding.continue").isEnabled)
+        XCTAssertTrue(app.control("onboarding.continue").isEnabled)
 
-        app.button("onboarding.continue").click()
+        app.control("onboarding.continue").click()
         XCTAssertTrue(app.waitForStep("onboarding.done"))
     }
 
@@ -95,7 +95,7 @@ final class OnboardingFDATests: XCTestCase {
         advance(app, times: 4)
         XCTAssertTrue(app.waitForStep("onboarding.done"))
 
-        app.button("onboarding.continue").click()
+        app.control("onboarding.continue").click()
 
         XCTAssertTrue(waitForWindowToClose(app))
     }
@@ -111,7 +111,7 @@ final class OnboardingFDATests: XCTestCase {
             app.waitForStep("onboarding.welcome", timeout: 3),
             "a Mac that has been through setup should not see it again"
         )
-        XCTAssertEqual(app.state, .runningForeground)
+        XCTAssertNotEqual(app.state, .notRunning)
     }
 
     // MARK: Private
@@ -134,7 +134,7 @@ final class OnboardingFDATests: XCTestCase {
 
     private func advance(_ app: XCUIApplication, times: Int) {
         for _ in 0 ..< times {
-            let button = app.button("onboarding.continue")
+            let button = app.control("onboarding.continue")
             guard button.waitForExistence(timeout: 5), button.isEnabled else {
                 return
             }

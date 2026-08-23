@@ -295,9 +295,12 @@ Stable `accessibilityIdentifier` strings power XCUITest (see [TESTING.md](../tes
 | `digest.banner` | Digest banner |
 | `digest.list` | Digest list |
 | `settings.privacy.panicWipe` | Panic wipe button |
-| `onboarding.fda.openSettings` | FDA "Open System Settings" button |
+| `onboarding.grant.openSettings` | FDA "Open System Settings" button |
+| `onboarding.window` | Setup window |
 
 Identifiers are namespaced `scene.element` and are not localized (they are not user-facing).
+
+An identifier on a **container** needs `.accessibilityElement(children: .contain)` next to it. Without it SwiftUI applies the identifier to every element inside the container and the outermost application wins, so each child reports the container's identifier and none of its own — the controls are still on screen, and every `descendants(matching:)[…]` query for them returns nothing. `OnboardingView`, `ExportSheet` and `FDABanner` all pair the two.
 
 ## Testing
 

@@ -33,6 +33,13 @@ public struct OnboardingView: View {
             footer
         }
         .frame(width: Self.windowSize.width, height: Self.windowSize.height)
+        // `children: .contain` is load-bearing, not decoration. Without it an identifier on
+        // a container is applied to everything inside it, and the outermost application
+        // wins: the step group, Back, Skip and Continue all came back as
+        // "onboarding.window", which is every identifier `OnboardingFDATests` drives the
+        // flow by. Same pairing as `ExportSheet` and `FDABanner`
+        // (docs/reference/ACCESSIBILITY.md#identifiers-for-ui-tests).
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("onboarding.window")
     }
 

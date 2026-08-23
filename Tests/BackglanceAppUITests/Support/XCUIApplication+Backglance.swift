@@ -59,7 +59,13 @@ extension XCUIApplication {
         descendants(matching: .any)[identifier].waitForExistence(timeout: timeout)
     }
 
-    func button(_ identifier: String) -> XCUIElement {
-        descendants(matching: .button)[identifier]
+    /// A control by identifier, whatever AppKit decided it was.
+    ///
+    /// Matching on `.any` rather than `.button` because "Skip for now" is
+    /// `.buttonStyle(.link)`, which macOS exposes with the link role — a `buttons[…]` query
+    /// misses it and reports "does not exist", which reads like a missing button rather than
+    /// a role mismatch. `isEnabled` and `click()` work the same on either role.
+    func control(_ identifier: String) -> XCUIElement {
+        descendants(matching: .any)[identifier].firstMatch
     }
 }

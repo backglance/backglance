@@ -1003,6 +1003,10 @@ private func launch(fullDiskAccess: String, hasCompletedOnboarding: Bool = false
 
 Assertions are by accessibility identifier, never by copy: these tests are about the flow, and a
 reworded headline should not fail them ([ACCESSIBILITY.md](../reference/ACCESSIBILITY.md#identifiers-for-ui-tests)).
+They also query on `.any` rather than on a role — `XCUIApplication.control(_:)`, not `buttons[…]`.
+"Skip for now" is `.buttonStyle(.link)`, which macOS exposes with the link role, so a `buttons[…]`
+query reports it as non-existent and the failure reads like a missing button rather than a role
+mismatch.
 
 What the suite covers: the three explanation screens in order and Continue blocked at Grant
 without the permission; the grant acknowledged and setup finishing with it; Back; "Skip for now"
