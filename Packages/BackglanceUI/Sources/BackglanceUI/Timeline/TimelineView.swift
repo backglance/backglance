@@ -159,9 +159,11 @@ public struct TimelineView: View {
     /// swipe/click-outside dismissal, not just `onCancel`) clears it back to
     /// `nil` through this same `Binding` rather than leaving it stale.
     private var isExportSheetPresented: Binding<Bool> {
-        Binding(get: { exportIDs != nil }, set: { if !$0 {
-            exportIDs = nil
-        } })
+        Binding(get: { exportIDs != nil }, set: {
+            if !$0 {
+                exportIDs = nil
+            }
+        })
     }
 
     private var timeline: some View {
@@ -292,27 +294,25 @@ private struct TimelineSectionSlots: View {
     let onActionError: (ActionError) -> Void
 
     var body: some View {
-        Group {
-            ForEach(section.slots) { slot in
-                switch slot {
-                case .divider:
-                    UnreadDivider()
+        ForEach(section.slots) { slot in
+            switch slot {
+            case .divider:
+                UnreadDivider()
 
-                case let .appHeader(group):
-                    // `AppGroupHeader` itself only fires `onToggle` for the
-                    // muted group, so handing it the same closure for every
-                    // header here is safe: a plain by-app header stays inert.
-                    AppGroupHeader(group: group, isExpanded: isMutedExpanded, onToggle: onToggleMuted)
+            case let .appHeader(group):
+                // `AppGroupHeader` itself only fires `onToggle` for the
+                // muted group, so handing it the same closure for every
+                // header here is safe: a plain by-app header stays inert.
+                AppGroupHeader(group: group, isExpanded: isMutedExpanded, onToggle: onToggleMuted)
 
-                case let .row(item):
-                    row(for: item)
-                }
+            case let .row(item):
+                row(for: item)
             }
+        }
 
-            if isMutedExpanded {
-                ForEach(section.mutedItems) { item in
-                    row(for: item)
-                }
+        if isMutedExpanded {
+            ForEach(section.mutedItems) { item in
+                row(for: item)
             }
         }
     }
