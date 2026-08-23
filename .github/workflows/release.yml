@@ -132,6 +132,18 @@ jobs:
           ' CHANGELOG.md > "$DIST/RELEASE_NOTES.md"
           test -s "$DIST/RELEASE_NOTES.md" \
             || { echo "::error::no ## [$v] section in CHANGELOG.md"; exit 1; }
+          # The section is written while the milestone is still open, and carries a note
+          # saying so. release.yml ships this text verbatim as the GitHub Release body and as
+          # what Sparkle shows in the update dialog, so an unedited section would announce a
+          # release by explaining that it has not happened. The header is the tell: at release
+          # time it carries a date, not "unreleased".
+          header="$(grep -m1 "^## \[$v\]" CHANGELOG.md || true)"
+          case "$header" in
+            *unreleased*)
+              echo "::error title=CHANGELOG not released::$header — give the section its date and drop the pre-release note before tagging (docs/deployment/DEPLOYMENT_GUIDE.md Step 1)"
+              exit 1
+              ;;
+          esac
           gh release create "v$v" \
             --title "Backglance $v" \
             --notes-file "$DIST/RELEASE_NOTES.md" \

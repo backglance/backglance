@@ -146,6 +146,12 @@ agvtool what-marketing-version -terse1       # 1.0.0
 agvtool what-version -terse                  # 20
 
 # 3. Move the CHANGELOG section (do this by hand: [Unreleased] -> [1.0.0] - 2026-08-17)
+#    Two edits, not one: give the section its date, and delete the "> The tag is not cut"
+#    note the section carries while the milestone is open. release.yml ships this section
+#    verbatim as the GitHub Release body and as what Sparkle shows, so shipping it unedited
+#    announces the release by explaining that it has not happened. The workflow refuses to
+#    publish a section whose header still says "unreleased", which catches the first of the
+#    two edits but cannot catch the second.
 "${EDITOR:-vim}" CHANGELOG.md
 
 # 4. Commit and tag. The tag is annotated so `git describe` and GitHub both show it.

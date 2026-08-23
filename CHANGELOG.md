@@ -1,6 +1,6 @@
 # Changelog
 
-Last Updated: 2026-08-22
+Last Updated: 2026-08-23
 
 All notable changes to Backglance are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html): breaking changes (including any archive migration that is not forward-transparent) bump MAJOR, features bump MINOR, fixes bump PATCH. Pre-1.0 releases (`0.x`) make no compatibility promises, and the archive may be reset between them.
 
@@ -18,10 +18,26 @@ Work in progress toward v1.0 — the nine MVP feature groups (see [docs/referenc
 Project scaffolding is complete: a fresh clone runs `Scripts/bootstrap.sh`, opens in Xcode, builds,
 tests and lints clean.
 
-Continuous integration is deliberately not running yet. The four workflow files are authored and
-their gates reproduce green locally, but they stay untracked until M4 so that nothing is verified by
-a pipeline that no one is watching; `docs/deployment/CI_CD.md` remains the canonical copy. Until
-then, the build, test and lint gates are local commands.
+Continuous integration is tracked but has not run yet. The workflow files were held out of the
+repository until M4 so that nothing was verified by a pipeline no one was watching; that hold is
+released, and all five — `ci.yml`, `fixtures.yml`, `perf.yml`, `release.yml`, `cask-bump.yml` — are
+committed. Every `ci.yml` job that can be reproduced off GitHub has been, verbatim and on the Xcode
+the workflow pins: build, test, the string-catalog check and all three lint steps are green locally.
+What no local run can answer — the runner image, the actions, the aggregate check — waits for the
+first pull request.
+
+Six of the nine are written up in the milestone entries below, which are complete but not yet
+tagged — capture and the archive in `0.2.0`, the timeline and search in `0.3.0`, the digest, the
+privacy controls and onboarding in `0.4.0`. The remaining three belong to this entry:
+
+- Actions: open source app or deep link, copy text, delete with undo, select-and-export to CSV/JSON
+- Rules: keyword highlights, VIP pinning, per-app muting — visual triage only
+- Foundation: zero telemetry, local-only archive, global hotkey ⌃⌥N, launch at login, Sparkle updater
+  (user-disableable and provably off), `backglance://` URL scheme, one string catalog for every
+  user-facing string
+
+What is left before `1.0.0` is not a feature: the release pipeline — signing, notarization, the
+signed appcast, the Homebrew cask — and the verification pass that a release deserves.
 
 ### Added
 
@@ -44,15 +60,6 @@ then, the build, test and lint gates are local commands.
   and `Backglance.xctestplan` with its `Fast` and `Full` configurations
 - `Scripts/bootstrap.sh`, `build.sh`, `grant_fda_hint.sh`, `ExportOptions.plist`, and the
   `pre-commit` / `commit-msg` git hooks
-- Continuous capture: store watcher, fingerprinting, `StoreAdapterV14`/`V15`/`V26`, first-launch import, degraded mode (in progress)
-- Timeline: menu bar popover and full window, day/app grouping, compact and detailed rows, unread badge (in progress)
-- Instant search: FTS5 full-text search with filters, fuzzy matching, optional on-device semantic search (in progress)
-- "What did I miss" digest: away-session tracking (lock, sleep, Focus, presenting) and a once-per-return, dismissible digest (in progress)
-- Privacy controls: per-app retention, exclusion list with defaults, OTP redaction on by default for Messages and Mail, pause capture, panic wipe (in progress)
-- Actions: open source app or deep link, copy text, delete, select-and-export to CSV/JSON (in progress)
-- Rules: keyword highlights, VIP pinning, per-app muting — visual triage only (in progress)
-- Onboarding: Full Disk Access flow with plain explanations and a graceful degraded mode (in progress)
-- Foundation: zero telemetry, local-only archive, global hotkey ⌃⌥N, launch at login, Sparkle updater (user-disableable), `backglance://` URL scheme (in progress)
 
 Planned pre-release tags on the way to 1.0.0, one per milestone (targets, not promises):
 
@@ -67,14 +74,16 @@ M3 — the digest, the privacy controls, and onboarding. The milestone where Bac
 being a thing that records and starts being a thing you can tell what *not* to record.
 
 > The tag is not cut, and cannot be until `v0.2.0` and `v0.3.0` are: tags follow the
-> milestones in order. Two of this milestone's own gates are also open, and both need a
-> machine permission rather than more code. `OnboardingFDATests` is written and its bundle
-> builds, but XCUITest needs Accessibility permission for whatever launches it, and without
-> that the runner times out before any test code runs. And none of this milestone's UI has
-> been screenshot-verified: `screencapture` needs Screen Recording permission, and System
-> Events exposes nothing inside an `NSHostingController`, so no automated substitute exists.
-> Everything below builds, passes its unit tests, and lints clean; what is missing is a
-> human's eyes on the pixels.
+> milestones in order, and `v0.2.0` is still waiting on live capture verified against a real
+> store on macOS 14, 15 and 26. This milestone's own exit criteria are met. The two that were
+> open both turned on a machine permission rather than on more code, and both are closed now:
+> `OnboardingFDATests` drives the built app through setup with Full Disk Access denied and
+> granted, six tests, and its first real run earned its keep by failing — an accessibility
+> identifier on the setup window's container was being applied to every control inside it, so
+> the buttons all reported the container's name and none of their own. And the screens have
+> been seen: `screencapture` cannot photograph anything on a Mac whose terminal lacks Screen
+> Recording permission, but XCUITest's own screenshots do not go through it, which is how the
+> status item's pause submenu and every onboarding screen were finally looked at.
 
 ### Added
 
