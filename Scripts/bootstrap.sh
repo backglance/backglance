@@ -124,7 +124,7 @@ else
 fi
 
 # 5. Optional tooling report ----------------------------------------------------
-for tool in xcbeautify swiftlint swiftformat create-dmg gh; do
+for tool in xcbeautify swiftlint swiftformat create-dmg gh pandoc; do
   if command -v "$tool" >/dev/null 2>&1; then
     info "found $tool"
   else

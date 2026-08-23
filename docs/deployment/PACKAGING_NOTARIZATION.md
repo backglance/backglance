@@ -1077,10 +1077,13 @@ else
   rm -f "$WORK/appcast.xml"
 fi
 
-# 3. Previous release zips, for delta updates (newest first, up to MAX_DELTAS)
+# 3. Previous release zips, for delta updates (newest first, up to MAX_DELTAS).
+# The greps are allowed to come up empty: on the very first release there is no
+# previous tag at all, and `grep` exiting 1 on no matches must not kill the
+# script under pipefail.
 gh release list --repo "$REPO" --exclude-drafts --exclude-pre-releases --limit 20 \
     --json tagName --jq '.[].tagName' \
-  | grep -v "^v$VERSION\$" | head -n "$MAX_DELTAS" \
+  | { grep -v "^v$VERSION\$" || true; } | head -n "$MAX_DELTAS" \
   | while IFS= read -r tag; do
       prev="${tag#v}"
       if gh release download "$tag" --repo "$REPO" --pattern "Backglance-$prev.zip" --dir "$WORK" 2>/dev/null; then
