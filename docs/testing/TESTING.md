@@ -50,7 +50,7 @@ This document is the test strategy for Backglance: what kinds of tests exist, wh
 |---|---|---|---|
 | Unit | `BackglanceCoreTests`, `BackglanceCaptureTests`, `BackglanceSearchTests` | one type at a time; `Archive(inMemory: true)` when a database is needed; parser fuzz; redaction rules; query parser; rules engine; digest engine with injected clock | every PR, all three runners |
 | Integration | `Integration/` folders in the same bundles | fixture store → `StoreSnapshot` → adapter → `RecordParser` → `OTPRedactor` → `Archive` end-to-end; hybrid search over a populated archive; retention job over a populated archive; migrations from archived databases | every PR, all three runners |
-| UI | `BackglanceAppUITests` | XCUITest for onboarding (FDA denied / granted / skip), popover open, timeline scroll and search field | every PR, `macos-26` only |
+| UI | `BackglanceAppUITests` | XCUITest for onboarding (FDA denied / granted / skip), the status item's right-click menu and pause submenu, and the settings window's tabs and panes | every PR, `macos-26` only |
 | Performance | `*PerformanceTests`, `SearchLatencyTests` | `XCTMetric` measurements against checked-in baselines | nightly, `macos-26` |
 
 The pyramid is deliberately bottom-heavy. A UI test that fails tells you something is wrong; a unit test that fails tells you what. Anything that would need FDA on the CI runner is not a test — it is a manual step in [SETUP_GUIDE.md](../getting-started/SETUP_GUIDE.md).
@@ -74,7 +74,7 @@ Tests/
 │   └── Performance/     SearchLatencyTests
 ├── BackglanceUITests/            unit tests for the BackglanceUI package (models, copy, formatting)
 ├── BackglanceAppUITests/        XCUITest, driving the built app
-│   ├── OnboardingFDATests.swift, PopoverTests.swift, TimelineWindowTests.swift
+│   ├── OnboardingFDATests.swift, StatusItemMenuTests.swift, SettingsWindowTests.swift
 │   └── Support/         XCUIApplication+Backglance.swift
 └── Fixtures/
     ├── SystemStore/macOS14|macOS15|macOS26/   store.db, manifest.json, expected.json   (SYNTHETIC)
@@ -1030,7 +1030,17 @@ the menu is a different menu. And pause lives in `UserDefaults` so that it survi
 passes `-capture.pausedUntil 0` in the argument domain. Without it a pause left by an earlier run —
 or by the developer's own Backglance — decides what the menu offers.
 
-`PopoverTests` (hotkey-free: the test clicks the status item via `XCUIApplication(bundleIdentifier: "com.apple.systemuiserver")` fallback or the `--uitest-open-popover` argument) and `TimelineWindowTests` (open window, scroll 200 rows, type in search field, expect filtered rows) live next to it. UI tests run only on `macos-26` in CI because the XCUITest runner is the slowest part of the matrix and the app's UI does not vary by OS.
+`SettingsWindowTests` lives next to it: the settings window's tabs, asserted to all be visible
+(not folded into the toolbar's `»` overflow, which is how BACKGLANCE-249 shipped) and to each
+switch to the pane they name, opened by the route a user has — the status item's menu.
+
+Two suites are **planned, not written**: `PopoverTests` (open the popover from the status item,
+assert the timeline paints) and `TimelineWindowTests` (open the window, scroll 200 rows, type in
+the search field, expect filtered rows). When they are written they should reach the status item
+the way `StatusItemMenuTests` does — through the app's own accessibility tree; there is no
+popover-opening launch argument in the app today, and adding one would test a code path users
+never take. UI tests run only on `macos-26` in CI because the XCUITest runner is the slowest part
+of the matrix and the app's UI does not vary by OS.
 
 ### Reproducing the runner's time zone
 
