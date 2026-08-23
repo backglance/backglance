@@ -49,7 +49,7 @@ public struct UndoToastView: View {
     public let onUndo: () -> Void
 
     public var body: some View {
-        HStack(spacing: 8) {
+        ToastPresentation(accessibilityIdentifier: "timeline.undoToast") {
             Text(Self.message(count: count))
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
@@ -66,23 +66,6 @@ public struct UndoToastView: View {
                 .keyboardShortcut("z", modifiers: .command)
                 .accessibilityIdentifier("timeline.undoToast.undo")
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(.separator)
-        )
-        .padding(.horizontal, 12)
-        .padding(.bottom, 10)
-        .frame(maxWidth: .infinity, alignment: .bottom)
-        // A move-in reads as the toast arriving *from* the delete that just happened,
-        // which is the point of a toast at all; Reduce Motion collapses that to a
-        // plain appear/disappear, per docs/reference/ACCESSIBILITY.md#reduced-motion —
-        // the same trade `AppGroupHeader`'s chevron makes for its rotation.
-        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("timeline.undoToast")
     }
 
     // MARK: Internal
@@ -113,11 +96,6 @@ public struct UndoToastView: View {
             String(localized: "Deleted \(count) notifications")
         }
     }
-
-    // MARK: Private
-
-    @Environment(\.accessibilityReduceMotion)
-    private var reduceMotion
 }
 
 // MARK: - Previews

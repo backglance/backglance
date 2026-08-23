@@ -184,4 +184,27 @@ public extension Archive {
             throw ArchiveError.observationFailed(ArchiveError.detail(from: error))
         }
     }
+
+    /// The archived row for `uuid`, or `nil` when it was never captured, or was
+    /// soft-deleted since.
+    ///
+    /// The same lookup ``insertOrUpdate(_:redaction:)`` already runs internally to
+    /// detect a thread update (`Archive+Upsert.swift`), exposed here for
+    /// `backglance://open?id=` (docs/api/API_DOCUMENTATION.md#url-scheme-backglance),
+    /// the one other caller that needs to resolve a uuid without paging through
+    /// the timeline to find it. A soft-deleted row counts as "not here": it is not
+    /// in the timeline either, and revealing one would show a row `TimelineStore`
+    /// has already filtered out everywhere else.
+    func notification(uuid: String) throws -> ArchivedNotification? {
+        do {
+            return try pool.read { db in
+                try ArchivedNotification
+                    .filter(Column("uuid") == uuid)
+                    .filter(Column("is_deleted") == false)
+                    .fetchOne(db)
+            }
+        } catch {
+            throw ArchiveError.observationFailed(ArchiveError.detail(from: error))
+        }
+    }
 }

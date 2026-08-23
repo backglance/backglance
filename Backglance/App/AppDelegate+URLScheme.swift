@@ -1,5 +1,6 @@
 import AppKit
 import BackglanceCore
+import BackglanceUI
 import Foundation
 
 // MARK: - AppDelegate + URL scheme
@@ -33,20 +34,48 @@ extension AppDelegate: URLRoutePerforming {
         statusItem?.openPopover()
     }
 
-    /// `backglance://open?id=` — opens the timeline window.
+    /// `backglance://open?id=` — opens the timeline window, resolves `uuid` against the
+    /// archive, and either reveals the row or reports it missing
+    /// (docs/api/API_DOCUMENTATION.md#error-behavior).
     ///
-    /// - Note: BACKGLANCE-244 reveals `uuid` in the timeline and shows the "Not in the
-    ///   archive" toast when it is not there (docs/api/API_DOCUMENTATION.md#error-behavior).
-    ///   Two surfaces that needs do not exist yet, and this deliberately does not invent
-    ///   either to close the gap early: `Archive` has no public uuid → row lookup (only
-    ///   the private `ArchivedNotification.filter(Column("uuid") == …)` GRDB uses
-    ///   internally for upsert), and `BackglanceUI` has no generic toast surface —
-    ///   `UndoToastView` renders one specific message for one specific action, not an
-    ///   arbitrary string a caller outside the undo flow could hand it. Until that task
-    ///   lands, this opens the window, which is real progress toward the doc's contract,
-    ///   but does not scroll to or select the row, and never shows the "not found" case.
-    func performOpen(uuid _: UUID) {
+    /// `showTimelineWindow()` runs first and synchronously: it either shows the window
+    /// already built or builds one (and `windowStore` with it) before returning, so
+    /// `windowStore` below is never `nil` for a reason this method needs to handle —
+    /// only ``AppDelegate/archive`` being `nil` (no archive, no interface at all) can
+    /// make that guard fail, the same precondition every other route in this file
+    /// already assumes.
+    ///
+    /// The archive read and ``BackglanceUI/TimelineStore/reveal(_:)`` both run off this
+    /// call's synchronous path — the former because a uuid lookup is one indexed row,
+    /// the latter because it is `async` by nature (it may have to page older rows in
+    /// first) — so this hands off to a `Task` rather than blocking the Apple Event
+    /// dispatch thread on either.
+    func performOpen(uuid: UUID) {
         showTimelineWindow()
+        guard let archive, let windowStore else {
+            return
+        }
+        Task {
+            do {
+                guard let notification = try archive.notification(uuid: uuid.uuidString) else {
+                    // The literal failure kind only — never the uuid itself, per
+                    // `Log.automation`'s own doc comment and CLAUDE.md's logging rule.
+                    Log.automation.error("open: uuid not found")
+                    windowStore.showMessage(String(localized: "Not in the archive"))
+                    return
+                }
+                if await windowStore.reveal(notification) == .unreachable {
+                    windowStore.showMessage(String(localized: "Not in the archive"))
+                }
+            } catch {
+                // A failed read, not a missing row — `ArchiveError.userMessage` already
+                // says something more useful than "Not in the archive" for this case
+                // (docs/api/API_DOCUMENTATION.md#error-behavior's "Archive being wiped
+                // or migrated" row).
+                let detail = (error as? ArchiveError)?.userMessage ?? String(localized: "Not in the archive")
+                windowStore.showMessage(detail)
+            }
+        }
     }
 
     /// `backglance://digest` — opens the popover; `DigestPresenter` (refreshed as part of

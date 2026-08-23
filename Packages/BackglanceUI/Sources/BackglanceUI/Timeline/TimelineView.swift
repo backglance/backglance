@@ -70,6 +70,21 @@ public struct TimelineView: View {
             }
             actionError = nil
         }
+        // Same idiom as `actionError` just above, keyed on `TimelineMessage.id` rather
+        // than the message itself: two different `backglance://open?id=` links that
+        // both land on "Not in the archive" are still two separate tasks, each
+        // restarting its own four-second clock rather than the second toast inheriting
+        // whatever was left of the first's.
+        .task(id: store.message?.id) {
+            guard store.message != nil else {
+                return
+            }
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else {
+                return
+            }
+            store.clearMessage()
+        }
         .sheet(isPresented: isExportSheetPresented) {
             if let ids = exportIDs {
                 exportSheet(for: ids)
@@ -93,6 +108,9 @@ public struct TimelineView: View {
                             actionError = $0
                         }
                     }
+                }
+                if let message = store.message {
+                    MessageToastView(message: message.text)
                 }
             }
         }
@@ -183,6 +201,16 @@ public struct TimelineView: View {
             .onChange(of: store.selectedID) { _, id in
                 if let id {
                     proxy.scrollTo(id)
+                }
+            }
+            // `reveal(_:)`'s own scroll signal — see `ScrollRequest`'s doc comment for
+            // why this cannot just piggyback on the `selectedID` case above: revealing
+            // a row that was already selected changes nothing `onChange` there would
+            // see, and a second `backglance://open?id=` for the same notification
+            // would silently fail to re-scroll to it.
+            .onChange(of: store.scrollRequest) { _, request in
+                if let request {
+                    proxy.scrollTo(request.rowID)
                 }
             }
         }

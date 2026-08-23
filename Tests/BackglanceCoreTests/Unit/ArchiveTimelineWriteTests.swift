@@ -110,6 +110,44 @@ final class ArchiveTimelineWriteTests: XCTestCase {
         XCTAssertEqual(count, Archive.unreadBadgeCap)
     }
 
+    // MARK: - Resolving a uuid (backglance://open?id=)
+
+    func testANotificationIsFoundByItsUUID() throws {
+        let archive = try XCTUnwrap(archive)
+        let ids = try TimelineSeed.fill(archive, count: 3)
+        let target = try XCTUnwrap(ids.first)
+        let expected = try XCTUnwrap(archive.timelinePage().first { $0.id == target })
+
+        let found = try archive.notification(uuid: expected.uuid)
+
+        XCTAssertEqual(found?.id, target)
+    }
+
+    /// The whole point of `backglance://open?id=`'s error path
+    /// (docs/api/API_DOCUMENTATION.md#error-behavior): a uuid the archive has never
+    /// seen resolves to `nil`, not a thrown error.
+    func testAnUnknownUUIDResolvesToNil() throws {
+        let archive = try XCTUnwrap(archive)
+        try TimelineSeed.fill(archive, count: 2)
+
+        XCTAssertNil(try archive.notification(uuid: UUID().uuidString))
+    }
+
+    /// A soft-deleted row is not in the timeline anywhere else either — the lookup
+    /// agrees, so `backglance://open?id=` for a since-deleted notification reports
+    /// "Not in the archive" rather than resolving a row `TimelineStore` could never
+    /// show.
+    func testASoftDeletedNotificationIsNotFoundByUUID() throws {
+        let archive = try XCTUnwrap(archive)
+        try TimelineSeed.fill(archive, count: 3, deleted: [1])
+        let deletedUUID = try archive.pool.read { db in
+            try String.fetchOne(db, sql: "SELECT uuid FROM notifications WHERE is_deleted = 1")
+        }
+        let uuid = try XCTUnwrap(deletedUUID)
+
+        XCTAssertNil(try archive.notification(uuid: uuid))
+    }
+
     // MARK: - The away-session half of the anchor
 
     func testTheLatestFinishedAwaySessionEndIsTheAnchorCandidate() throws {

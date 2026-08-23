@@ -89,6 +89,28 @@ public final class TimelineStore {
         }
     }
 
+    /// A request to scroll to one row, published by ``reveal(_:)``.
+    ///
+    /// Carries its own identity (a fresh `UUID` per request) rather than being just an
+    /// `Int64`, so that revealing the same row twice in a row is still two distinct
+    /// values `TimelineView`'s `.onChange` can react to — equal row ids alone would look
+    /// like no change at all.
+    public struct ScrollRequest: Equatable, Sendable {
+        // MARK: Lifecycle
+
+        public init(rowID: Int64) {
+            self.rowID = rowID
+        }
+
+        // MARK: Public
+
+        public let rowID: Int64
+
+        // MARK: Private
+
+        private let nonce = UUID()
+    }
+
     /// The bundle identifier the preferences are filed under.
     ///
     /// Kept as documentation rather than used as a suite name: `.standard`
@@ -114,6 +136,22 @@ public final class TimelineStore {
     /// A one-sentence, content-free explanation of a failed read, for the banner.
     /// `nil` when the timeline is healthy.
     public internal(set) var loadError: String?
+
+    /// A short message worth surfacing outside any one row — today, only
+    /// ``reveal(_:)``'s "Not in the archive" for `backglance://open?id=` naming a uuid
+    /// the archive has never seen or can no longer reach
+    /// (docs/api/API_DOCUMENTATION.md#error-behavior). `nil` most of the time;
+    /// `TimelineView` clears it a few seconds after it last changed, the same idiom it
+    /// already uses for its own `actionError`.
+    public internal(set) var message: TimelineMessage?
+
+    /// The last row ``reveal(_:)`` asked to be scrolled to.
+    ///
+    /// Not the same signal as ``selectedID``: revealing a row that is already the
+    /// keyboard selection would leave `selectedID` unchanged, and `TimelineView`'s
+    /// `.onChange` needs a change to fire in order to re-scroll to it. Each request
+    /// carries its own identity for exactly that reason — see ``ScrollRequest``.
+    public internal(set) var scrollRequest: ScrollRequest?
 
     /// Whether ``loadNextPage()`` has anything left to fetch.
     public internal(set) var hasMorePages = true
