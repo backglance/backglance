@@ -1,0 +1,135 @@
+name: perf
+
+# The wall-clock budgets from docs/deployment/PERFORMANCE_GUIDE.md, and the only
+# place they run.
+#
+# Every suite behind `PerfGate` is skipped unless `BACKGLANCE_PERF` is set, and the
+# only thing that sets it is the test plan's `Performance` configuration, which
+# `ci.yml` and `fixtures.yml` explicitly skip. That split is deliberate: a pull
+# request runs on whatever shared runner it is given, and that runner's variance is
+# larger than a 50 ms budget. A performance test that goes red because the machine
+# was busy teaches everyone to ignore performance tests.
+#
+# So the budgets run here — nightly, one job, nothing else competing — and a
+# regression opens an issue rather than blocking a merge.
+
+on:
+  # Nightly, after fixtures.yml has had the runners for a while.
+  schedule:
+    - cron: '41 5 * * *'
+
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: Why this run (shows up in the run title)
+        required: false
+        default: manual check
+
+  # A change to the gate, the budgets, or this workflow gets one PR run: the point
+  # is to prove the gate still turns on, not to police the numbers.
+  pull_request:
+    paths:
+      - 'Backglance.xctestplan'
+      - 'Tests/BackglanceTestSupport/Sources/BackglanceTestSupport/PerfGate.swift'
+      - '.github/workflows/perf.yml'
+
+concurrency:
+  group: perf-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  XCODE_APP: /Applications/Xcode_26.2.app
+
+jobs:
+  budgets:
+    name: budgets
+    runs-on: macos-26
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      # Only the nightly run files anything; a PR run stays read-only.
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode and install tools
+        run: |
+          sudo xcode-select -s "$XCODE_APP"
+          xcodebuild -version && sw_vers
+          brew install --quiet xcbeautify jq
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: build/SourcePackages
+          key: spm-macos26-${{ hashFiles('Backglance.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/*/Package.resolved') }}
+          restore-keys: spm-macos26-
+      - name: Resolve packages
+        run: |
+          xcodebuild -resolvePackageDependencies -project Backglance.xcodeproj \
+            -scheme Backglance -clonedSourcePackagesDirPath build/SourcePackages
+      # `-only-test-configuration Performance` is what sets BACKGLANCE_PERF=1, and
+      # so what turns `PerfGate.isEnabled` on. Without it every assertion below is
+      # an `XCTSkip` and the job is green for no reason.
+      - name: Measure
+        id: measure
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -scheme Backglance \
+            -testPlan Backglance \
+            -configuration Debug \
+            -only-test-configuration Performance \
+            -destination 'platform=macOS,arch=arm64' \
+            -clonedSourcePackagesDirPath build/SourcePackages \
+            -resultBundlePath build/perf.xcresult \
+            -only-testing:BackglanceSearchTests/SearchLatencyTests \
+            -only-testing:BackglanceUITests/PopoverLaunchTests \
+            -only-testing:BackglanceUITests/MemoryFootprintTests \
+            -only-testing:BackglanceCoreTests/RetentionIntegrationTests \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --renderer github-actions
+      # A skipped suite is the failure this workflow was written after: the gate
+      # was unsettable for two milestones, so every budget passed by not running.
+      - name: Prove the gate was actually on
+        if: always() && steps.measure.outcome != 'skipped'
+        run: |
+          skipped=$(xcrun xcresulttool get test-results tests --path build/perf.xcresult --format json \
+            | jq '[.. | objects | select(.result? == "Skipped")] | length')
+          echo "skipped tests: $skipped"
+          if [ "$skipped" -gt 0 ]; then
+            echo "::error::$skipped performance test(s) were skipped — BACKGLANCE_PERF did not reach the test host"
+            exit 1
+          fi
+      - name: Upload xcresult
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-xcresult
+          path: build/perf.xcresult
+          retention-days: 14
+          if-no-files-found: warn
+      # Nightly only. A red PR run is already visible on the PR; a red nightly run
+      # is visible to nobody unless it files something.
+      - name: File a regression issue
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="A performance budget regressed"
+          # Dedupe by exact title so a nightly cron does not file this every night.
+          if gh issue list --repo "$GITHUB_REPOSITORY" --state open --label perf \
+               --search "in:title \"$title\"" --json title --jq '.[].title' | grep -Fxq "$title"; then
+            echo "issue already open: $title"
+            exit 0
+          fi
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "$title" \
+            --label perf \
+            --body "The nightly \`perf\` workflow failed. Budgets and the policy behind them: docs/deployment/PERFORMANCE_GUIDE.md#regression-budgets-and-ci-policy
+          - **A real regression** is the likely reading: download the \`perf-xcresult\` artifact, where each assertion prints what it measured next to its budget.
+          - **A busy runner** is the other one. Budgets fail at 1.5x target so ordinary variance does not trip them, but re-run before opening a code investigation.
+          - **A broken gate** is neither: if the tests were *skipped* rather than failed, \`BACKGLANCE_PERF\` is not reaching the test host and nothing was measured. See \`PerfGate\` and the test plan's Performance configuration.
+          - Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          echo "opened: $title"

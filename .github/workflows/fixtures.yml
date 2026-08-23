@@ -1,0 +1,182 @@
+name: fixtures
+
+on:
+  # Nightly, offset off the hour so it does not queue behind everyone else's cron.
+  schedule:
+    - cron: '17 4 * * *'
+
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: Why this run (shows up in the run title)
+        required: false
+        default: manual check
+
+  pull_request:
+    paths:
+      - 'Packages/BackglanceCapture/**'
+      - 'Tests/Fixtures/**'
+      - 'Tests/BackglanceCaptureTests/**'
+      - 'Scripts/make_fixture.sh'
+      - 'Scripts/verify_fixture.sh'
+      - '.github/workflows/fixtures.yml'
+
+concurrency:
+  group: fixtures-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  fixtures:
+    name: fixtures (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      # One red OS must not hide the state of the other two.
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            xcode: /Applications/Xcode_16.2.app
+            os_major: '14'
+          - os: macos-15
+            xcode: /Applications/Xcode_16.2.app
+            os_major: '15'
+          - os: macos-26
+            xcode: /Applications/Xcode_26.2.app
+            os_major: '26'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode and install tools
+        run: |
+          sudo xcode-select -s "${{ matrix.xcode }}"
+          xcodebuild -version && sw_vers
+          brew install --quiet xcbeautify jq
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: build/SourcePackages
+          key: spm-${{ matrix.os }}-${{ hashFiles('Backglance.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/*/Package.resolved') }}
+          restore-keys: spm-${{ matrix.os }}-
+      - name: Resolve packages
+        run: |
+          xcodebuild -resolvePackageDependencies -project Backglance.xcodeproj \
+            -scheme Backglance -clonedSourcePackagesDirPath build/SourcePackages
+      # Hygiene + manifest checks for this OS's fixture, then the Swift suite.
+      - name: Fixture suite
+        run: |
+          set -o pipefail
+          Scripts/verify_fixture.sh --os ${{ matrix.os_major }} --hygiene-only
+          xcodebuild test -scheme Backglance -testPlan Backglance -configuration Debug \
+            -skip-test-configuration Performance \
+            -destination 'platform=macOS' \
+            -clonedSourcePackagesDirPath build/SourcePackages \
+            -only-testing:BackglanceCaptureTests/FixtureStoreTests \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --renderer github-actions
+      # ------------------------------------------------------------------
+      # Live probe smoke test.
+      #
+      # Scripts/verify_fixture.sh --live writes ONE json object to stdout:
+      #   {"status":"ok|permissionDenied|storeNotFound|unknownSchema|missingTables|readError",
+      #    "schemaHash":"<64 hex or null>","dbinfoVersion":"<string or null>",
+      #    "osVersion":"26.5.0","runner":"macos-26"}
+      # and always exits 0. A non-zero exit means the probe itself broke, which is
+      # a real failure — degrading is the contract, crashing is not.
+      # ------------------------------------------------------------------
+      - name: Live probe smoke test
+        id: probe
+        env:
+          # The script cannot know which matrix leg it is; the reporting job reads this
+          # back out of the artifact to name the issue it opens.
+          BACKGLANCE_PROBE_RUNNER: ${{ matrix.os }}
+        run: |
+          set -uo pipefail
+          mkdir -p build/probe
+          out="build/probe/live-probe-${{ matrix.os }}.json"
+          if ! Scripts/verify_fixture.sh --live > "$out"; then
+            echo "::error title=Live probe crashed::verify_fixture.sh --live exited non-zero on ${{ matrix.os }}. The probe must degrade, never fail."
+            cat "$out" || true
+            exit 1
+          fi
+          jq -e . "$out" > /dev/null || { echo "::error::live probe did not emit valid JSON"; cat "$out"; exit 1; }
+          jq -c . "$out"
+          status="$(jq -r .status "$out")"
+          case "$status" in
+            # Readable: print the fingerprint hash so a drift is visible in the log.
+            ok) echo "::notice title=Store readable on ${{ matrix.os }}::schemaHash $(jq -r .schemaHash "$out")" ;;
+            # Expected on a hosted runner: no Full Disk Access, or no store at all.
+            permissionDenied|storeNotFound) echo "::notice title=Probe degraded::$status — expected, not a failure" ;;
+            # Not a leg failure; report-unknown-fingerprint turns this into an issue.
+            unknownSchema|missingTables) echo "::warning title=Unknown store schema::$status — see the follow-up job" ;;
+            *) echo "::error::'$status' is not a ProbeResult case this workflow knows about"; exit 1 ;;
+          esac
+      - name: Upload live probe result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-probe-${{ matrix.os }}
+          path: build/probe/live-probe-${{ matrix.os }}.json
+          retention-days: 30
+          if-no-files-found: warn
+
+  # Collect every leg's probe result and open one issue per unknown fingerprint.
+  # PR runs are excluded: a fork PR has no business opening issues, and a
+  # contributor should not be paged for a runner-image change.
+  report-unknown-fingerprint:
+    name: Report unknown fingerprints
+    needs: fixtures
+    if: always() && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: live-probe-*
+          path: build/probe
+          merge-multiple: true
+      - name: Open a capture-degraded issue for anything we do not recognise
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KNOWN: Packages/BackglanceCapture/Sources/BackglanceCapture/Resources/KnownFingerprints.json
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(build/probe/live-probe-*.json)
+          [[ ${#files[@]} -gt 0 ]] || { echo "no probe results to inspect"; exit 0; }
+          for f in "${files[@]}"; do
+            status="$(jq -r .status "$f")"
+            runner="$(jq -r .runner "$f")"
+            hash="$(jq -r '.schemaHash // ""' "$f")"
+            osver="$(jq -r '.osVersion // "unknown"' "$f")"
+            # permissionDenied / storeNotFound are the normal hosted-runner outcome.
+            case "$status" in
+              permissionDenied|storeNotFound) echo "$runner: $status (expected)"; continue ;;
+            esac
+            # A readable store whose hash is already in KnownFingerprints.json is fine.
+            # `.adapters[]?[]?`, not `.[]?[]?`: the file is {version, adapters:{id:[hash]}},
+            # so the shorter path yields the arrays rather than the hashes and never matches
+            # — which would have filed an "unknown fingerprint" issue for every known one.
+            if [[ "$status" == "ok" ]] && jq -e --arg h "$hash" 'any(.adapters[]?[]?; . == $h)' "$KNOWN" > /dev/null; then
+              echo "$runner: ok, known fingerprint ${hash:0:12}"; continue
+            fi
+            title="Unknown store fingerprint on $runner (macOS $osver)"
+            # Dedupe by exact title so a nightly cron does not file this 30 times a month.
+            if gh issue list --repo "$GITHUB_REPOSITORY" --state open --label capture-degraded \
+                 --search "in:title \"$title\"" --json title --jq '.[].title' | grep -Fxq "$title"; then
+              echo "issue already open: $title"; continue
+            fi
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$title" \
+              --label capture-degraded \
+              --body "The nightly \`fixtures.yml\` live probe on **$runner** (macOS $osver) reported \`$status\`. Either a runner image changed the system store, or \`StoreFingerprint\` changed how it normalises DDL. Next steps: docs/architecture/OS_COMPATIBILITY_PLAYBOOK.md
+          - \`schemaHash\`: \`${hash:-none}\`
+          - Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "opened: $title"
+          done

@@ -1,0 +1,187 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# One in-flight run per ref: a force-push cancels the previous build
+# instead of stacking macOS minutes behind it.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Nothing in ci.yml writes anything. Jobs that need more say so themselves.
+permissions:
+  contents: read
+
+env:
+  XCODE_APP: /Applications/Xcode_26.2.app
+
+jobs:
+  # Cheap Linux job so a docs-only PR spends no macOS minutes. Deliberately not a
+  # workflow-level paths-ignore: a skipped workflow never reports its required
+  # checks, which leaves the PR permanently un-mergeable.
+  changes:
+    name: changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          # 'every' = a file counts only if it matches ALL patterns, i.e. it is
+          # neither under docs/ nor a markdown file. With the default 'some', a
+          # root-level README.md would satisfy '!docs/**' and defeat the filter.
+          predicate-quantifier: 'every'
+          filters: |
+            code:
+              - '!docs/**'
+              - '!**/*.md'
+
+  build-test:
+    name: build-test
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 26.2
+        run: |
+          # A pinned Xcode that the runner image has dropped is the single most likely way
+          # this workflow breaks, and `xcode-select` alone fails with nothing useful. Say
+          # what is actually installed so the fix is a one-line pin bump, not an investigation.
+          if [[ ! -d "$XCODE_APP" ]]; then
+            echo "::error title=Pinned Xcode missing::$XCODE_APP is not on this runner."
+            echo "Installed Xcodes:"; ls -d /Applications/Xcode*.app
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE_APP"
+          xcodebuild -version && swift --version
+      # Resolved SPM checkouts: GRDB 7.x, Sparkle 2.x and Sparkle's binary artifact.
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: build/SourcePackages
+          key: spm-macos26-${{ hashFiles('Backglance.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/*/Package.resolved') }}
+          restore-keys: spm-macos26-
+      - name: Resolve packages and install xcbeautify
+        run: |
+          xcodebuild -resolvePackageDependencies -project Backglance.xcodeproj \
+            -scheme Backglance -clonedSourcePackagesDirPath build/SourcePackages
+          brew install --quiet xcbeautify
+      # `xcodebuild test` builds every target in the scheme first, so this one step
+      # is both the build gate and the unit-test gate.
+      #
+      # `-skip-test-configuration Performance` leaves the wall-clock budgets to
+      # perf.yml. A pull request runs on whatever runner it is given, and a shared
+      # runner's variance is larger than the budgets themselves — see
+      # docs/deployment/PERFORMANCE_GUIDE.md#regression-budgets-and-ci-policy.
+      - name: Build and test
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -scheme Backglance \
+            -testPlan Backglance \
+            -configuration Debug \
+            -skip-test-configuration Performance \
+            -destination 'platform=macOS,arch=arm64' \
+            -clonedSourcePackagesDirPath build/SourcePackages \
+            -resultBundlePath build/ci.xcresult \
+            -enableCodeCoverage YES \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --renderer github-actions
+      # Here rather than in the lint job, which selects no Xcode and resolves no packages:
+      # --check runs `xcodebuild -exportLocalizations`, so it needs both. Xcode extracts
+      # strings only into the catalog of the target that owns it, which means a new string
+      # in any of the four packages reaches Localizable.xcstrings only when someone runs
+      # the sync script — this fails the PR when they forgot
+      # (docs/reference/INTERNATIONALIZATION.md#the-one-catalog-and-four-packages).
+      - name: String catalog is in sync
+        run: Scripts/sync_string_catalog.sh --check
+      # The only thing worth keeping from a red run: failures, attachments, coverage.
+      - name: Upload xcresult
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-xcresult
+          path: build/ci.xcresult
+          retention-days: 7
+          if-no-files-found: warn
+
+  lint:
+    name: lint
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install linters
+        run: brew install --quiet swiftformat swiftlint
+      # --lint never rewrites; it exits non-zero on any file it would have changed.
+      - name: SwiftFormat
+        run: swiftformat --lint --reporter github-actions-log .
+      # --strict promotes every warning to an error, including no_content_in_logs.
+      - name: SwiftLint
+        run: swiftlint lint --strict --reporter github-actions-logging
+      # A custom rule that matches nothing passes forever, so prove the privacy rules bite.
+      - name: Privacy lint rules are live
+        run: Scripts/verify_lint_rules.sh
+
+  adapter-guard:
+    name: Adapter changes carry fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            adapter:
+              - 'Packages/BackglanceCapture/Sources/**/Adapters/**'
+              - 'Packages/BackglanceCapture/Sources/**/RecordParser*'
+              - 'Packages/BackglanceCapture/Sources/**/StoreFingerprint*'
+            fixtures:
+              - 'Tests/Fixtures/SystemStore/**'
+      - name: Fail if adapter changed without fixture coverage
+        if: steps.changes.outputs.adapter == 'true' && steps.changes.outputs.fixtures == 'false'
+        run: |
+          echo "::error title=Adapter change without fixtures::Adapters/, RecordParser* or StoreFingerprint* changed, but nothing under Tests/Fixtures/SystemStore/ did."
+          cat <<'MSG'
+          The adapters read Apple's undocumented system store; the synthetic fixtures
+          are the only proof they still work. Fix:
+            1. Scripts/make_fixture.sh                 (on a Mac running the target macOS)
+            2. Scripts/verify_fixture.sh --os <major>
+            3. Commit store.db + manifest.json + expected.json + KnownFingerprints.json
+          Rule and reasoning:
+            docs/contributing/CONTRIBUTING.md#adapter-and-parser-changes-require-fixtures
+          MSG
+          exit 1
+
+  # The single required status check. It runs even when build-test and lint were
+  # skipped, so branch protection never waits on a check that will not report.
+  ci-complete:
+    name: ci-complete
+    if: always()
+    needs: [changes, build-test, lint, adapter-guard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any required job did not succeed
+        run: |
+          results='${{ join(needs.*.result, " ") }}'
+          echo "job results: $results"
+          for r in $results; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "::error::a required job reported '$r'"; exit 1 ;;
+            esac
+          done
+          echo "all required jobs green"

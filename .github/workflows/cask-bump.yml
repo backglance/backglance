@@ -1,0 +1,80 @@
+name: cask-bump
+
+on:
+  repository_dispatch:
+    types: [release-published]
+
+permissions:
+  contents: read      # nothing in THIS repository is written; the tap uses its own token
+
+jobs:
+  bump:
+    name: Bump backglance cask
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERSION: ${{ github.event.client_payload.version }}
+      SOURCE_REPO: ${{ github.repository }}
+      TAP_REPO: backglance/homebrew-tap
+      GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+    steps:
+      # client_payload is attacker-controllable in principle (anyone who can
+      # dispatch), and it ends up in a shell string and a branch name. Validate first.
+      - name: Validate the payload
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+            || { echo "::error::client_payload.version '$VERSION' is not MAJOR.MINOR.PATCH"; exit 1; }
+          echo "bumping to $VERSION"
+      - name: Check out the tap
+        uses: actions/checkout@v4
+        with:
+          repository: backglance/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+      # Download the published asset and check it against the release's own
+      # SHA256SUMS.txt. If those disagree, something is wrong with the release,
+      # and a cask pinning the wrong hash breaks `brew install` for everyone.
+      - name: Download the release zip and verify its checksum
+        id: sha
+        run: |
+          set -euo pipefail
+          zip="Backglance-$VERSION.zip"
+          base="https://github.com/$SOURCE_REPO/releases/download/v$VERSION"
+          mkdir -p work
+          curl -fsSL -o "work/$zip" "$base/$zip"
+          curl -fsSL -o work/SHA256SUMS.txt "$base/SHA256SUMS.txt"
+          sum="$(sha256sum "work/$zip" | awk '{print $1}')"
+          grep -Fq "$sum  $zip" work/SHA256SUMS.txt \
+            || { echo "::error::sha256 $sum does not match SHA256SUMS.txt — refusing to bump"; exit 1; }
+          echo "sha256=$sum" >> "$GITHUB_OUTPUT"
+          echo "sha256 $sum verified against SHA256SUMS.txt"
+      - name: Rewrite version and sha256 in Casks/backglance.rb
+        working-directory: tap
+        run: |
+          set -euo pipefail
+          cask=Casks/backglance.rb
+          [[ -f "$cask" ]] || { echo "::error::$cask not found in $TAP_REPO"; exit 1; }
+          sed -e "s/^  version \".*\"/  version \"$VERSION\"/" \
+              -e "s/^  sha256 \".*\"/  sha256 \"${{ steps.sha.outputs.sha256 }}\"/" \
+              "$cask" > "$cask.tmp"
+          mv "$cask.tmp" "$cask"
+          git diff --quiet -- "$cask" \
+            && { echo "::error::cask already at $VERSION with this sha256"; exit 1; }
+          git --no-pager diff -- "$cask"
+      - name: Open the pull request
+        working-directory: tap
+        run: |
+          set -euo pipefail
+          branch="bump-backglance-$VERSION"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git commit -am "backglance $VERSION"
+          git push -u origin "$branch"
+          gh pr create --repo "$TAP_REPO" --base main --head "$branch" \
+            --title "backglance $VERSION" \
+            --body "Bump to \`$VERSION\`. Opened automatically by \`cask-bump.yml\`; two lines changed, read the diff and merge.
+          - url: https://github.com/$SOURCE_REPO/releases/download/v$VERSION/Backglance-$VERSION.zip
+          - sha256: \`${{ steps.sha.outputs.sha256 }}\` (matches SHA256SUMS.txt on the release)
+          - Release notes: https://github.com/$SOURCE_REPO/releases/tag/v$VERSION"

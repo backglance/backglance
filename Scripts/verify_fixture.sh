@@ -54,26 +54,86 @@ schema_hash() {
 }
 
 # ---- --live: what this Mac's own store looks like, without reading a single row. ----
+#
+# 🤖 stdout is ONE json object and nothing else, because `.github/workflows/fixtures.yml`
+# pipes it straight into `jq`. The friendly lines a human wants go to stderr, so both
+# readers are served by the same run. The contract, which that workflow's own comment
+# block also states:
+#
+#   {"status":"ok|permissionDenied|storeNotFound|unknownSchema|readError",
+#    "schemaHash":"<64 hex or null>","dbinfoVersion":"<string or null>",
+#    "osVersion":"26.5.0","runner":"macos-26"}
+#
+# `--live` always exits 0. Degrading is the contract — a hosted runner has no Full Disk
+# Access and usually no store at all, and that is a normal answer, not a failure. A
+# non-zero exit therefore means the probe itself broke, which is the one thing CI should
+# treat as red.
+#
+# `runner` comes from BACKGLANCE_PROBE_RUNNER so the matrix leg can label its own artifact;
+# on a laptop it is just "local".
 if [[ "$LIVE" -eq 1 ]]; then
   LIVE_STORE="$HOME/Library/Group Containers/group.com.apple.usernoted/db2/db"
-  if [[ ! -r "$LIVE_STORE" ]]; then
-    echo "live      no store readable at that path — grant Full Disk Access to your terminal"
+  LIVE_OS="$(sw_vers -productVersion)"
+  LIVE_RUNNER="${BACKGLANCE_PROBE_RUNNER:-local}"
+
+  # Emits the object and stops. `jq -n` rather than hand-rolled string building: a hash
+  # that came back empty has to serialise as null, not as "".
+  live_report() {
+    local status="$1" hash="${2:-}" dbinfo="${3:-}"
+    jq -n \
+      --arg status "$status" \
+      --arg hash "$hash" \
+      --arg dbinfo "$dbinfo" \
+      --arg osVersion "$LIVE_OS" \
+      --arg runner "$LIVE_RUNNER" \
+      '{status: $status,
+        schemaHash: (if $hash == "" then null else $hash end),
+        dbinfoVersion: (if $dbinfo == "" then null else $dbinfo end),
+        osVersion: $osVersion,
+        runner: $runner}'
     exit 0
+  }
+
+  command -v jq > /dev/null 2>&1 || { echo "error: --live needs jq" >&2; exit 1; }
+
+  # storeNotFound and permissionDenied are different answers and the reporting job treats
+  # them the same, but a human debugging their own Mac needs to know which one it was.
+  if [[ ! -e "$LIVE_STORE" ]]; then
+    echo "live      no store at that path — macOS has not created one yet" >&2
+    live_report storeNotFound
   fi
+  if [[ ! -r "$LIVE_STORE" ]]; then
+    echo "live      store not readable — grant Full Disk Access to your terminal" >&2
+    live_report permissionDenied
+  fi
+
   # Copied first, exactly as capture does: Apple's live database is never opened.
   SNAPSHOT_DIR="$(mktemp -d)"
   trap 'rm -rf "$SNAPSHOT_DIR"' EXIT
   cp "$LIVE_STORE" "$SNAPSHOT_DIR/db"
   [[ -f "${LIVE_STORE}-wal" ]] && cp "${LIVE_STORE}-wal" "$SNAPSHOT_DIR/db-wal"
-  HASH="$(schema_hash "$SNAPSHOT_DIR/db")"
-  KNOWN="$REPO_ROOT/Packages/BackglanceCapture/Sources/BackglanceCapture/Resources/KnownFingerprints.json"
-  echo "live      macOS $(sw_vers -productVersion) schema ${HASH:0:12}"
-  if command -v jq > /dev/null 2>&1 && jq -e --arg h "$HASH" 'any(.adapters[]?[]?; . == $h)' "$KNOWN" > /dev/null; then
-    echo "live      known fingerprint"
-  else
-    echo "live      UNKNOWN fingerprint — regenerate the fixture for this macOS (Scripts/make_fixture.sh)"
+
+  # `<hash> <dbinfoVersion>`, the two fields FixtureGenerator --print-fingerprint prints.
+  LIVE_FIELDS="$(
+    swift run --package-path "$REPO_ROOT/Packages/BackglanceCapture" FixtureGenerator \
+      --print-fingerprint --db "$SNAPSHOT_DIR/db" 2> /dev/null
+  )"
+  HASH="$(echo "$LIVE_FIELDS" | cut -d" " -f1)"
+  DBINFO="$(echo "$LIVE_FIELDS" | cut -d" " -f2)"
+
+  if [[ -z "$HASH" ]]; then
+    echo "live      could not fingerprint the store" >&2
+    live_report readError
   fi
-  exit 0
+
+  KNOWN="$REPO_ROOT/Packages/BackglanceCapture/Sources/BackglanceCapture/Resources/KnownFingerprints.json"
+  echo "live      macOS $LIVE_OS schema ${HASH:0:12}" >&2
+  if jq -e --arg h "$HASH" 'any(.adapters[]?[]?; . == $h)' "$KNOWN" > /dev/null; then
+    echo "live      known fingerprint" >&2
+    live_report ok "$HASH" "$DBINFO"
+  fi
+  echo "live      UNKNOWN fingerprint — regenerate the fixture for this macOS (Scripts/make_fixture.sh)" >&2
+  live_report unknownSchema "$HASH" "$DBINFO"
 fi
 
 # ---- --update-known-fingerprints: the bundled hash list, rebuilt from the manifests. ----
