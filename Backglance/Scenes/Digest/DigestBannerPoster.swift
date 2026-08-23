@@ -29,8 +29,8 @@ struct DigestBannerPoster {
     static func body(itemCount: Int, appCount: Int, reason: AwayReason) -> String {
         String(
             localized: """
-            You missed ^[\(itemCount) notification](inflect: true) from \
-            ^[\(appCount) app](inflect: true) \(reason.whileLabel)
+            You missed \(itemCount) notifications from \
+            \(appCount) apps \(reason.whileLabel)
             """,
             comment: "Digest banner body. Both counts are pluralized by the string catalog."
         )

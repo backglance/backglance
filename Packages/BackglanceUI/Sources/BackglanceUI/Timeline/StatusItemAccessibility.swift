@@ -42,18 +42,21 @@ public enum StatusItemAccessibility {
     // MARK: Private
 
     /// The `1` and default branches look like they should collapse into one
-    /// `^[\(count) unread notification](inflect: true)` call — the same markup
-    /// ``StatusSettingsView`` and ``ImportProgressView`` already use. They stay apart:
-    /// this package's tests have no host bundle for a catalog entry to resolve
-    /// against (the same trade ``UndoToastView/message(count:)`` and
-    /// ``ExportSheet/title(count:)`` document), and here that is not a silent
-    /// no-op — verified by actually making the swap and running
-    /// ``StatusItemAccessibilityTests``: `inflect: true` resolves in that
-    /// environment, but always to the *singular* noun, so "7 unread notifications"
-    /// becomes "7 unread notification" for every count, not the literal markup and
-    /// not the correct plural. That regresses VoiceOver's actual output, so the
-    /// hand-written branch stays until the dedicated localization pass gives this
-    /// package a catalog to resolve against.
+    /// interpolated call with the plural in the catalog entry — which is what
+    /// ``StatusSettingsView`` and ``ImportProgressView`` now do, and what
+    /// docs/reference/INTERNATIONALIZATION.md#plural-rules asks for. They stay apart for
+    /// now because nothing in this package can prove the result: these tests have no host
+    /// bundle, so `Bundle.main` is the xctest runner and every lookup falls back to the
+    /// key (the same trade ``UndoToastView/message(count:)`` and ``ExportSheet/title(count:)``
+    /// document). What was verified, by making the swap and running
+    /// ``StatusItemAccessibilityTests``, is that the fallback answers with whichever
+    /// literal the key holds — so a test here would be asserting the key, not the plural.
+    ///
+    /// The mechanism itself does work in the built app: BACKGLANCE-248 proved catalog
+    /// plurals render correctly for both branches, `^[…](inflect: true)` does not, and
+    /// `OnboardingFDATests` now checks one of them against the running app. Converting
+    /// these three sites is a follow-up, and it needs a UI test to come with it — an
+    /// unverified conversion is how the singular got shipped to VoiceOver the first time.
     private static func unreadPhrase(count: Int) -> String {
         switch count {
         case ..<1:

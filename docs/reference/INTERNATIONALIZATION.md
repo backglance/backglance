@@ -80,7 +80,7 @@ The design above — one catalog, every string in it — is right at *runtime*: 
 | `BackglanceUI` | Into its own bundle, which nothing reads | A package is a separate target; its `defaultLocalization` sends strings to a generated `en.lproj` |
 | `BackglanceCore`, `BackglanceCapture`, `BackglanceSearch` | No | They had no `defaultLocalization`, so nothing extracted them anywhere |
 
-Because a missing key falls back to the key itself, all of it rendered correct English regardless, which is exactly why the catalog sat empty while 400+ call sites were written against it. The same fallback is why `^[…](inflect: true)` silently produced the singular noun for every count: automatic grammar agreement needs the key to be *in* the catalog, and the fallback path strips the markup and keeps the literal.
+Because a missing key falls back to the key itself, all of it rendered correct English regardless, which is exactly why the catalog sat empty while 400+ call sites were written against it. Counts were the exception, and they were worse than they looked: a key written as `^[…](inflect: true)` fell back to *itself*, markup and all, and `Imported ^[0 notification](inflect: true).` was on the last screen of onboarding for a release (BACKGLANCE-248).
 
 The fix is two parts, and both are in the repository:
 
@@ -92,18 +92,30 @@ Scripts/sync_string_catalog.sh            # after adding or changing any user-fa
 Scripts/sync_string_catalog.sh --check    # what CI runs; fails when the catalog has drifted
 ```
 
-> ⚠️ **Warning:** No test bundle in this project has a `TEST_HOST` (BACKGLANCE-238), so in a unit test `Bundle.main` is the xctest runner rather than `Backglance.app` and the catalog is never consulted. A test that asserts the exact English of a `String(localized:)` result is therefore asserting the fallback, not the catalog — and a plural written with `inflect: true` will come back singular. Assert on the model's counts, not on the rendered sentence.
+> ⚠️ **Warning:** No test bundle in this project has a `TEST_HOST` (BACKGLANCE-238), so in a unit test `Bundle.main` is the xctest runner rather than `Backglance.app` and the catalog is never consulted. A test that asserts the exact English of a `String(localized:)` result is therefore asserting the fallback, not the catalog — a plural asserted there proves nothing about the plural. Assert on the model's counts, not on the rendered sentence. The one bundle that sees real catalog output is `BackglanceAppUITests`, because it drives the built app; `OnboardingFDATests.testTheImportLineIsPluralisedByTheCatalog` is the plural that is actually checked.
 
 ### Plural rules
 
-String Catalogs handle plural variation per language (Turkish has no plural distinction in this position; German and English do). Author with an interpolated count and define variants in the catalog editor:
+String Catalogs handle plural variation per language (Turkish has no plural distinction in this position; German and English do). Interpolate the count plainly and put the variants in the catalog entry:
 
 ```swift
-// One key, per-language plural variants defined in Localizable.xcstrings.
-Text("^[\(digest.itemCount) notification](inflect: true) while you were away")
+// Key: "%lld notifications while you were away", with one/other variations in Localizable.xcstrings.
+Text("\(digest.itemCount) notifications while you were away")
 ```
 
-For counts in `String(localized:)` contexts, use the same catalog plural support rather than `count == 1 ? ... : ...` — the ternary hardcodes English grammar.
+```jsonc
+// Localizable.xcstrings, the entry that key resolves to.
+"localizations": { "en": { "variations": { "plural": {
+  "one":   { "stringUnit": { "state": "translated", "value": "%lld notification while you were away" } },
+  "other": { "stringUnit": { "state": "translated", "value": "%lld notifications while you were away" } }
+}}}}
+```
+
+A sentence with **two** counts needs a substitution per count — `"You missed %lld notifications from %lld apps %@"` is authored with `substitutions` (`argNum`, `formatSpecifier`, and `%arg` inside each variation) and a `stringUnit` value of `"You missed %1$#@notifications@ from %2$#@apps@ %3$@"`. Both shapes compile into `en.lproj/Localizable.stringsdict`; if that file is missing from the built app, no plural in the catalog is doing anything.
+
+> ❌ **Don't** write `^[\(count) notification](inflect: true)`. Automatic grammar agreement is not compiled in this project — Xcode emits no inflection rule for such an entry, `String(localized:)` hands back the value with the markup still in it, and the markup is what the user reads. Removing the last of it is BACKGLANCE-248; the plural belongs in the catalog entry, not in the key.
+
+For counts in `String(localized:)` contexts, use the same catalog plural support rather than `count == 1 ? ... : ...` — the ternary hardcodes English grammar. Three sites still do (`ExportSheet`, `UndoToastView`, `StatusItemAccessibility`); they were written that way when no plural mechanism here was known to work, and converting them is tracked separately.
 
 ### Export and import
 

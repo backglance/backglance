@@ -111,9 +111,13 @@ public struct ImportProgressView: View {
 
     /// "Imported 143 notifications." Pluralised through the string catalog rather than by
     /// hand, because "1 notifications" is the kind of thing that survives review and then
-    /// ships (docs/reference/INTERNATIONALIZATION.md#string-catalogs).
+    /// ships (docs/reference/INTERNATIONALIZATION.md#plural-rules).
+    ///
+    /// The count is interpolated plainly and the plural lives in the catalog entry's
+    /// variations. It was written as `^[…](inflect: true)` until BACKGLANCE-248: automatic
+    /// grammar agreement compiles to nothing here, so the markup reached the screen.
     private func countSentence(archived: Int) -> String {
-        String(localized: "Imported ^[\(archived) notification](inflect: true).")
+        String(localized: "Imported \(archived) notifications.")
     }
 }
 

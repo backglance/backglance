@@ -100,6 +100,36 @@ final class OnboardingFDATests: XCTestCase {
         XCTAssertTrue(waitForWindowToClose(app))
     }
 
+    /// The one rendered plural a test can reach, and the reason it can: the app resolves
+    /// `Localizable.xcstrings` against `Bundle.main`, which is `Backglance.app` here and the
+    /// xctest runner in every other bundle (BACKGLANCE-238).
+    ///
+    /// It shipped for one release as the literal string `Imported ^[0 notification](inflect:
+    /// true).` — automatic grammar agreement compiles to nothing in this project, so the
+    /// markup went to the screen (BACKGLANCE-248). Nothing below asserts the count itself;
+    /// what it asserts is that a *catalog* answered, because the fallback for a missing key
+    /// is the key, and the key still has the markup in it.
+    func testTheImportLineIsPluralisedByTheCatalog() throws {
+        let app = try launch(fullDiskAccess: "granted", storePath: BackglanceLaunch.fixtureStorePath)
+        XCTAssertTrue(app.waitForStep("onboarding.welcome"))
+        advance(app, times: 4)
+        XCTAssertTrue(app.waitForStep("onboarding.done"))
+
+        // `onboarding.import.finished` *is* the sentence — the running state shows the same
+        // one with a climbing count, so waiting for the finished element is both the wait for
+        // the import and the way to read what it reported.
+        let line = app.control("onboarding.import.finished")
+        XCTAssertTrue(
+            line.waitForExistence(timeout: 60),
+            "the first-launch import should finish against a 250-record fixture"
+        )
+        let sentence = (line.value as? String) ?? line.label
+        XCTAssertFalse(sentence.contains("^["), "markup on screen means the catalog was not consulted: \(sentence)")
+        XCTAssertFalse(sentence.contains("inflect"), "markup on screen: \(sentence)")
+        // The macOS 26 fixture holds 250 records, and importing it is what this screen reports.
+        XCTAssertEqual(sentence, "Imported 250 notifications.")
+    }
+
     // MARK: - Not on every launch
 
     /// Setup is a first-run thing. Someone who has been through it — or skipped it — gets the
@@ -125,8 +155,16 @@ final class OnboardingFDATests: XCTestCase {
         return url
     }
 
-    private func launch(fullDiskAccess: String, hasCompletedOnboarding: Bool = false) throws -> XCUIApplication {
-        let launch = BackglanceLaunch(fullDiskAccess: fullDiskAccess, hasCompletedOnboarding: hasCompletedOnboarding)
+    private func launch(
+        fullDiskAccess: String,
+        hasCompletedOnboarding: Bool = false,
+        storePath: String? = nil
+    ) throws -> XCUIApplication {
+        let launch = BackglanceLaunch(
+            fullDiskAccess: fullDiskAccess,
+            hasCompletedOnboarding: hasCompletedOnboarding,
+            storePath: storePath
+        )
         let app = try launch.app(archiveDirectory: XCTUnwrap(archiveDirectory))
         app.launch()
         return app

@@ -5,9 +5,28 @@
       "extractionState": "manual",
       "localizations": {}
     },
-    "%@ (^[%lld record](inflect: true))": {
+    "%@ (%lld records)": {
       "extractionState": "manual",
-      "localizations": {}
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%@ (%lld record)"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%@ (%lld records)"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "%@ · %@ · “%@”": {
       "extractionState": "manual",
@@ -17,9 +36,28 @@
       "extractionState": "manual",
       "localizations": {}
     },
-    "%@ · ^[%lld notification](inflect: true)": {
+    "%@ · %lld notifications": {
       "extractionState": "manual",
-      "localizations": {}
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%@ · %lld notification"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%@ · %lld notifications"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "%@, %@": {
       "extractionState": "manual",
@@ -29,9 +67,28 @@
       "extractionState": "manual",
       "localizations": {}
     },
-    "%@, ^[%lld notification](inflect: true)": {
+    "%@, %lld notifications": {
       "extractionState": "manual",
-      "localizations": {}
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%@, %lld notification"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%@, %lld notifications"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "%lld": {
       "extractionState": "manual",
@@ -661,9 +718,28 @@
       "extractionState": "manual",
       "localizations": {}
     },
-    "Imported ^[%lld notification](inflect: true).": {
+    "Imported %lld notifications.": {
       "extractionState": "manual",
-      "localizations": {}
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Imported %lld notification."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Imported %lld notifications."
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "In a Focus": {
       "extractionState": "manual",
@@ -1488,14 +1564,56 @@
       "extractionState": "manual",
       "localizations": {}
     },
-    "You missed ^[%lld notification](inflect: true) from ^[%lld app](inflect: true) %@": {
+    "You missed %lld notifications from %lld apps %@": {
       "comment": "Digest banner body. Both counts are pluralized by the string catalog.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
-            "state": "new",
-            "value": "You missed ^[%1$lld notification](inflect: true) from ^[%2$lld app](inflect: true) %3$@"
+            "state": "translated",
+            "value": "You missed %1$#@notifications@ from %2$#@apps@ %3$@"
+          },
+          "substitutions": {
+            "apps": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg app"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg apps"
+                    }
+                  }
+                }
+              }
+            },
+            "notifications": {
+              "argNum": 1,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg notification"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg notifications"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }

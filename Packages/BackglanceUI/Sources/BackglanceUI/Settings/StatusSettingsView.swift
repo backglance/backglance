@@ -62,7 +62,7 @@ public struct StatusSettingsView: View {
             return String(localized: "Never this launch")
         }
         let when = lastTickAt.formatted(.relative(presentation: .named))
-        return String(localized: "\(when) (^[\(model.health.lastTickRecords) record](inflect: true))")
+        return String(localized: "\(when) (\(model.health.lastTickRecords) records)")
     }
 
     private var fdaDescription: String {
@@ -76,7 +76,7 @@ public struct StatusSettingsView: View {
     private var archiveDescription: String {
         let size = Measurement(value: Double(model.summary.byteCount), unit: UnitInformationStorage.bytes)
             .formatted(.byteCount(style: .file))
-        return String(localized: "\(size) · ^[\(model.summary.notificationCount) notification](inflect: true)")
+        return String(localized: "\(size) · \(model.summary.notificationCount) notifications")
     }
 
     /// "Not checked yet" is a different answer from "checked and fine", and a pane that showed

@@ -94,6 +94,9 @@ NO_COMMENT = "No comment provided by engineer."
 # Merging it into Localizable.xcstrings would create keys nothing ever looks up there.
 SKIP_FILES = ("InfoPlist.xcstrings",)
 
+# What Xcode puts between a key and the variant of it a trans-unit carries.
+VARIANT_SEPARATOR = "|==|"
+
 tree = ET.parse(xliff_path)
 extracted: dict[str, str | None] = {}
 for file_node in tree.getroot().findall(".//x:file", NS):
@@ -104,6 +107,12 @@ for file_node in tree.getroot().findall(".//x:file", NS):
         key = unit.get("id")
         if not key:
             continue
+        # A catalog entry with plural variations exports one trans-unit per variant, keyed
+        # `<key>|==|plural.one`, `<key>|==|plural.other`, and for a two-count sentence
+        # `<key>|==|substitutions.apps.plural.one`. Those ids are not keys — taking them
+        # literally invents entries no call site ever looks up, and the variations already
+        # live in the catalog this script is merging into. Fold each one back to its key.
+        key = key.split(VARIANT_SEPARATOR, 1)[0]
         note = unit.findtext("x:note", default="", namespaces=NS).strip()
         comment = None if note in ("", NO_COMMENT) else note
         # First writer wins only for the comment: the same key can legitimately appear in

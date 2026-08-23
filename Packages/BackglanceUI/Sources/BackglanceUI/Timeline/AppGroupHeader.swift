@@ -47,7 +47,7 @@ public struct AppGroupHeader: View {
     private var reduceMotion
 
     private var accessibilityLabel: String {
-        String(localized: "\(group.name), ^[\(group.count) notification](inflect: true)")
+        String(localized: "\(group.name), \(group.count) notifications")
     }
 
     private var expandedStateText: String {
