@@ -138,6 +138,11 @@ jobs:
       - name: Install pinned linters
         run: |
           cd "$RUNNER_TEMP"
+          # `unzip -d` creates the final directory but not missing parents, and
+          # RUNNER_TEMP is fresh every run — without this both extractions die with
+          # "cannot create extraction directory", which reads like a lint failure and
+          # silently skips all three gates below (BACKGLANCE-259).
+          mkdir -p lint-tools/swiftformat lint-tools/swiftlint
           curl -sSL --retry 3 -o swiftformat.zip \
             "https://github.com/nicklockwood/SwiftFormat/releases/download/${SWIFTFORMAT_VERSION}/swiftformat.zip"
           echo "${SWIFTFORMAT_SHA256}  swiftformat.zip" | shasum -a 256 -c -
