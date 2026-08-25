@@ -231,6 +231,14 @@ struct TimelineList: View {
 }
 ```
 
+**Two details in that sketch are load-bearing, and both were learned the hard way (BACKGLANCE-253).**
+
+*`.onKeyPress` goes **after** `.focusable()`, never before it.* A key press is dispatched from the focused view outward through its ancestors, so a handler attached *inside* the focus anchor — on the view `.focusable()` wraps, rather than on the focusable view itself — never sees the key. Both orderings compile, both read the same at a glance, and the wrong one fails silently: `TimelineView` shipped with its whole shortcut modifier one level too deep, and every shortcut in it was dead in both the popover and the window until the line moved below `.focusable()`.
+
+*`KeyEquivalent.delete` does not match the physical ⌫.* The Delete key delivers **U+007F**, which `.delete` is not; a view that registers only `.onKeyPress(.delete)` ignores every Backspace. `TimelineView+Keyboard.swift` therefore registers both spellings, and `TimelineKeyboardTests` asserts the two still differ so the extra registration can be dropped the day that stops being true.
+
+Neither fault is reachable from a test on this project's own terms — an `LSUIElement` app under XCUITest receives no synthesized keystrokes at all (see [Identifiers for UI tests](#identifiers-for-ui-tests) and the note in `PluralRenderingTests`), so a keyboard regression here is caught by reading this section, not by CI.
+
 `NSPopover` focus handling: the popover is created with `behavior = .transient` and `becomesKeyOnlyIfNeeded = false`, and `StatusItemController` calls `popover.contentViewController?.view.window?.makeKey()` on show so keyboard events reach SwiftUI immediately — without this, the first keystroke after opening is lost. Esc closes via the popover's standard cancel path, mirrored by the `.onKeyPress(.escape)` handler when search has focus. ⌘C is a `Copy` menu-command (`CommandGroup`) so it also works from the full timeline window.
 
 ## Contrast

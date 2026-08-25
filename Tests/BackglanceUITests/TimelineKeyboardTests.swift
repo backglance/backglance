@@ -2,6 +2,7 @@ import BackglanceCore
 import BackglanceTestSupport
 @testable import BackglanceUI
 import Foundation
+import SwiftUI
 import XCTest
 
 /// Unit coverage for `TimelineKeyboard` — the pure, SwiftUI-free decisions
@@ -192,6 +193,25 @@ final class TimelineKeyboardTests: XCTestCase {
         XCTAssertEqual(
             TimelineKeyboard.escapeOutcome(hasSelection: false, canDismiss: false),
             .ignored
+        )
+    }
+
+    // MARK: - ⌫: the two spellings TimelineView+Keyboard registers
+
+    /// `KeyEquivalent.delete` is not the character the physical ⌫ delivers.
+    ///
+    /// This is the platform fact behind the second `.onKeyPress` registration
+    /// in `TimelineView+Keyboard.swift` (BACKGLANCE-253). Measured off real
+    /// keypresses in the running app: ⌫ arrives as U+007F, and with only the
+    /// `.delete` registration attached it deleted nothing at all. The
+    /// assertion is written as a *difference* on purpose — the day a Swift
+    /// release makes `.delete` carry U+007F, this test fails, and the extra
+    /// registration can be deleted rather than living on as cargo.
+    func testDeleteKeyEquivalentDoesNotCarryTheCharacterBackspaceSends() {
+        XCTAssertNotEqual(
+            KeyEquivalent.delete.character,
+            "\u{7F}",
+            "if these are equal, TimelineKeyboardShortcuts' second ⌫ registration is now redundant"
         )
     }
 

@@ -46,9 +46,16 @@ public struct TimelineView: View {
         // doc comment (`TimelineView+Keyboard.swift`) for why this is a
         // `ViewModifier` in its own file rather than a longer `.onKeyPress`
         // chain here.
-        .modifier(TimelineKeyboardShortcuts(exportIDs: $exportIDs, actionError: $actionError))
         .focusable()
         .focusEffectDisabled()
+        // Attached *outside* `.focusable()`, deliberately. A key press is
+        // dispatched from the focused view outward through its ancestors, so
+        // an `.onKeyPress` attached *inside* the focus anchor — on the view
+        // `.focusable()` wraps rather than on the focusable view itself —
+        // never sees the key at all. That one level of nesting is what left
+        // the whole keyboard map silently dead (BACKGLANCE-253), and it is
+        // why this line sits below `.focusable()` and not above it.
+        .modifier(TimelineKeyboardShortcuts(exportIDs: $exportIDs, actionError: $actionError))
         .task(id: store.sections.count) {
             // The popover opens straight into the list with the first unread
             // row selected, so ↓ moves rather than merely starting.

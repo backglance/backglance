@@ -92,6 +92,14 @@ struct TimelineKeyboardShortcuts: ViewModifier {
                 handleCopy(press, includeAppAndTimestamp: true)
             }
             .onKeyPress(.delete, phases: .down, action: handleDelete)
+            // The physical ⌫ arrives as U+007F, which `KeyEquivalent.delete`
+            // does not match — measured twice off real keypresses in the
+            // running app (BACKGLANCE-253): with this line removed, ⌫ deletes
+            // nothing; with it, the selected row goes. `.delete` stays
+            // registered on the same both-spellings insurance the ⇧⌘P pair
+            // below documents, and the two cannot double-fire because the
+            // first to match returns `.handled`.
+            .onKeyPress(KeyEquivalent("\u{7F}"), phases: .down, action: handleDelete)
             .onKeyPress(.deleteForward, phases: .down, action: handleDelete)
             .onKeyPress(KeyEquivalent("z"), phases: .down, action: handleUndo)
             // Registered twice each, lowercase and uppercase. Both shortcuts
