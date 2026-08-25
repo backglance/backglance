@@ -83,7 +83,10 @@ final class MemoryFootprintTests: XCTestCase {
     // MARK: Private
 
     /// 150 MB, the documented ceiling with the window open at 100k.
-    private static let windowBudget = UInt64(PerfGate.threshold(150)) * 1_024 * 1_024
+    ///
+    /// `memoryThreshold`, not `threshold`: the wall-clock allowance was widened to
+    /// 3× for runner noise (BACKGLANCE-258), and RSS does not vary that way.
+    private static let windowBudget = UInt64(PerfGate.memoryThreshold(150)) * 1_024 * 1_024
 
     private var store: TimelineStore?
 

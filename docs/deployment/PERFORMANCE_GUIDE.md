@@ -710,19 +710,20 @@ final class SearchLatencyTests: XCTestCase {
 
 | Metric | Budget | Failure threshold in CI | Test |
 |---|---|---|---|
-| FTS common-term p95 | 50 ms | > 75 ms (baseline + 50 %) | `SearchLatencyTests.testFTSCommonTermUnder50msP95` |
-| Hybrid p95 | 250 ms | > 375 ms | `SearchLatencyTests.testHybridUnder250msP95` |
-| Import 10k | 10 s | > 15 s | `ImportPerformanceTests.testImport10k` |
-| Popover first paint | 100 ms | > 150 ms | `PopoverLaunchTests.testFirstPaint` |
-| Idle RSS | 60 MB | > 70 MB | `MemoryFootprintTests.testIdle` |
-| Window open RSS at 100k | 150 MB | > 170 MB | `MemoryFootprintTests.testWindowAt100k` |
+| FTS common-term p95 | 50 ms | > 150 ms (3×) | `SearchLatencyTests.testFTSCommonTermUnder50msP95` |
+| Hybrid p95 | 250 ms | > 750 ms (3×) | `SearchLatencyTests.testHybridUnder250msP95` |
+| Import 10k | 10 s | > 30 s (3×) | `ImportPerformanceTests.testImport10k` |
+| Popover first paint | 100 ms | > 300 ms (3×) | `PopoverLaunchTests.testFirstPaint` |
+| Idle RSS | 60 MB | > 90 MB (1.5×) | `MemoryFootprintTests.testIdle` |
+| Window open RSS at 100k | 150 MB | > 225 MB (1.5×) | `MemoryFootprintTests.testWindowAt100k` |
 | Archive bytes/notification | 1.5 KB | > 2 KB | `ArchiveSizeTests.testBytesPerNotification` |
 | Wakeups/s idle | < 1 | manual, Energy Log per release | release checklist |
 
 Policy:
 
 - **Pull requests** run the functional test plan only: `ci.yml` and `fixtures.yml` pass `-skip-test-configuration Performance`, so `BACKGLANCE_PERF` is unset and every budget skips. GitHub-hosted runner variance is larger than the budgets, and a perf test that fails because the machine was busy teaches everyone to ignore perf tests.
-- **Nightly** (`.github/workflows/perf.yml`, `macos-26`) runs `-only-test-configuration Performance`, which is the only thing that sets `BACKGLANCE_PERF=1`, with the +50 % failure thresholds above. A failure opens an issue labelled `perf`; it does not block merges but does block the next release until triaged.
+- **Nightly** (`.github/workflows/perf.yml`, `macos-26`) runs `-only-test-configuration Performance`, which is the only thing that sets `BACKGLANCE_PERF=1`, with the failure thresholds above. A failure opens an issue labelled `perf`; it does not block merges but does block the next release until triaged.
+- **The thresholds are the instrument's tolerance, not the bar.** The budget column is what the code is written to and what a release is measured against on real hardware; the threshold column is where a *nightly* turns red. Wall-clock thresholds sit at 3× because that is what GitHub's shared runners actually demand: the same commit (`dd08883`) passed on 24 August and failed on 25 August, and one assertion moved 80.0 ms → 109.4 ms across identical code, while the whole suite runs in 7.5 s locally against the runner's 32 s (BACKGLANCE-258). At the old 1.5× the gate was reporting the weather. The trade is sensitivity — a 2× slowdown now passes the nightly — and it is accepted because the regressions this catches (an accidental O(n²), a dropped index) are far larger than 3×, while a gate that cries wolf catches nothing. Memory thresholds stay at 1.5×: resident size does not grow because a machine is busy.
 - **The gate is checked, not assumed.** `perf.yml` fails if any test in that run was *skipped* rather than executed. A budget that is never measured passes forever, which is exactly how these budgets went unmeasured through two milestones (BACKGLANCE-194) — so "the suite was green" now means "the suite ran".
 - **Release** builds run the full perf suite locally on the developer's Mac (release checklist in [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)) and the Energy Log check.
 - Any PR that changes a hot path (`StoreWatcher`, `Archive+Timeline`, `FTSIndex`, `HybridSearch`, `SemanticIndex`, `TimelineView`) must paste `EXPLAIN QUERY PLAN` output for changed queries and a before/after number from a local `-only-test-configuration Performance` run in its description.

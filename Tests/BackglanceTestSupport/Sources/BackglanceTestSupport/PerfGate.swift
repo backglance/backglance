@@ -39,12 +39,40 @@ public enum PerfGate {
         }
     }
 
-    /// The budget's failure threshold: 50% above target.
+    /// A memory budget's failure threshold: 50% above target.
+    ///
+    /// Deliberately *not* ``threshold(_:)``'s allowance. Resident size does not
+    /// move with how busy the runner is — a loaded machine makes the same code
+    /// take longer, not allocate more — so the wall-clock slack below would be
+    /// meaningless here, and at 3× a 150 MB ceiling would only fail at 450 MB.
+    public static func memoryThreshold(_ budget: Double) -> Double {
+        budget * 1.5
+    }
+
+    /// A wall-clock budget's failure threshold: 3× target.
     ///
     /// The budget is what the code is written to; this is where a regression
     /// becomes a failure. The gap is the runner's variance, spelled out in the
     /// policy table rather than left to whoever reads a red test.
+    ///
+    /// It was 1.5× until BACKGLANCE-258 measured what the variance actually is.
+    /// The nightly went green then red on the *same commit* (dd08883, 24 and 25
+    /// August), and one assertion moved 80.0 ms → 109.4 ms across identical code:
+    /// 2.2× the 50 ms budget, from nothing but a busier runner. The same suite
+    /// passes locally in 7.5 s against the runner's 32 s. At 1.5× the gate was
+    /// reporting the weather.
+    ///
+    /// 3× is chosen over the ~2.2× observed worst case so ordinary noise has
+    /// headroom rather than sitting just under the line. It costs sensitivity —
+    /// a 2× slowdown now passes — and that is the deliberate trade: the
+    /// regressions this exists to catch (an accidental O(n²), a dropped index)
+    /// are far larger than 3×, while a gate that cries wolf catches nothing at
+    /// all, which is the failure this workflow's own header warns about.
+    ///
+    /// The budgets themselves are untouched and are still verified on real
+    /// hardware — see docs/deployment/PERFORMANCE_GUIDE.md. This number is the
+    /// instrument's tolerance, not the product's promise.
     public static func threshold(_ budget: Double) -> Double {
-        budget * 1.5
+        budget * 3.0
     }
 }
