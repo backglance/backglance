@@ -66,7 +66,15 @@ if [[ "$CAPTURE_SCHEMA" -eq 1 ]]; then
   fi
   # `.schema` emits DDL. Belt and braces: refuse anything that is not a CREATE, a comment,
   # or the punctuation those span — a row would be someone's notification.
-  if grep -Ev '^(CREATE|--|$|[[:space:]]|\)|;)' "$SCHEMA_SQL.tmp" | grep -q .; then
+  #
+  # `BEGIN` and `END;` are allowed because sqlite writes a trigger's body between them, at
+  # column 0, and every real store has at least one trigger (`app_deleted`). Without them
+  # this guard refused every real macOS store, which is why the fixtures had to be
+  # hand-reconstructed and drifted from the real schema (BACKGLANCE-260, BACKGLANCE-257).
+  # They are anchored whole-line, so `.dump`'s output — whose giveaways are
+  # `BEGIN TRANSACTION;` and `INSERT INTO …` — is still refused, which is the case this
+  # guard actually exists for. A trigger's body statements are indented and already pass.
+  if grep -Ev '^(CREATE|--|$|[[:space:]]|\)|;|BEGIN$|END;$)' "$SCHEMA_SQL.tmp" | grep -q .; then
     echo "error: captured schema contains non-DDL lines; refusing to write it" >&2
     rm -f "$SCHEMA_SQL.tmp"
     exit 1

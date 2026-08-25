@@ -74,7 +74,8 @@ Watch items: 15.4 shipped a `dbinfo` value bump without a DDL change; the fixtur
 
 ⚠️ Observed layout (fixture `Tests/Fixtures/SystemStore/macOS26/`), primary development target:
 
-- Same layout as 14/15 as observed in dev testing; re-verified by fixture at every macOS 26 point release (currently 26.5). No new columns needed by Backglance were introduced; a few additional columns exist on `record` that the adapter ignores.
+- Same layout as 14/15, and since 2026-08-25 this is **observed rather than inferred**: the fixture's DDL is now captured from a real macOS 26.5.2 (25F84) store with `make_fixture.sh --capture-schema`, not hand-reconstructed from this document (BACKGLANCE-257). Re-verified by fixture at every macOS 26 point release.
+- What a real store actually holds: tables `app`, `categories`, `dbinfo`, `delivered`, `displayed`, `record`, `requests`, `snoozed`, plus a `app_deleted` trigger; `record` has exactly `rec_id, app_id, uuid, data, request_date, request_last_date, delivered_date, presented, style, snooze_fire_date`; `delivered` and `requests` are both `(app_id, list)`; `dbinfo`'s version value is `17`, **not** the OS major. Earlier revisions of this section claimed "a few additional columns exist on `record`" — that came from the reconstructed fixture, and no such columns exist. `StoreAdapterV26Tests`' `extraRecordColumns: ["focus_disposition", "delivery_channel"]` is a robustness case for columns Apple might add, not a record of columns that are there.
 - The bplist inside `record.data` carries the same top-level keys Backglance reads (`app`, `date`, `req` → `titl`, `subt`, `body`, `iden`, `cate`, `thre`, `atta`, `usda`). `RecordParser` is tolerant of missing keys and treats everything except bundle id and delivered date as optional.
 - macOS 26 is the last macOS that runs on Intel; capture is exercised there best-effort (see [Intel and Apple Silicon Notes](#intel-and-apple-silicon-notes)).
 
