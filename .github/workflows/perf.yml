@@ -118,6 +118,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           title="A performance budget regressed"
+          # Both `gh issue list --label` and `gh issue create --label` fail hard on a
+          # label that does not exist, which is how a real regression went unreported and
+          # showed up only as a red step (BACKGLANCE-256). `--force` is idempotent.
+          gh label create perf --repo "$GITHUB_REPOSITORY" \
+            --color FBCA04 \
+            --description "A performance budget regressed in the nightly perf run" \
+            --force > /dev/null
           # Dedupe by exact title so a nightly cron does not file this every night.
           if gh issue list --repo "$GITHUB_REPOSITORY" --state open --label perf \
                --search "in:title \"$title\"" --json title --jq '.[].title' | grep -Fxq "$title"; then

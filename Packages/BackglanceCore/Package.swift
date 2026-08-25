@@ -33,11 +33,9 @@ let package = Package(
             name: "BackglanceCoreTests",
             dependencies: ["BackglanceCore", "BackglanceTestSupport"],
             path: "Tests/BackglanceCoreTests",
-            // The fixtures are read from the working copy through
-            // BackglanceTestSupport's `Fixtures`, not copied into the test bundle: the
-            // same sources are compiled by the Xcode test target, which gets no
-            // `Bundle.module`. The symlink is excluded so SwiftPM does not warn about it.
-            exclude: ["SharedFixtures"],
+            // No `exclude:` and no fixture resources — see the matching note in
+            // Packages/BackglanceCapture/Package.swift for why the `SharedFixtures`
+            // symlink that used to be excluded here is gone (BACKGLANCE-255).
             swiftSettings: [
                 .swiftLanguageMode(.v5),
             ]

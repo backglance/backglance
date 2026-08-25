@@ -386,9 +386,13 @@ Each package under `Packages/` is a standalone SPM package so it can be built an
 > The fixtures are *not* bundled as resources. Every test bundle is built twice — once by SwiftPM and
 > once by the Xcode test target the test plan runs — and `Bundle.module` exists only in the SwiftPM
 > build, so a resource lookup would not compile in Xcode. Tests reach `Tests/Fixtures/` through
-> `BackglanceTestSupport.Fixtures`, which derives the path from its own `#filePath`; the
-> `SharedFixtures` symlink inside each test target is `exclude`d from the manifest so SwiftPM does not
-> warn about it. See [TESTING.md](../testing/TESTING.md).
+> `BackglanceTestSupport.Fixtures`, which derives the path from its own `#filePath`. Each test target
+> used to hold a `SharedFixtures` symlink to `Tests/Fixtures/`, excluded from the SwiftPM manifest;
+> it is gone (BACKGLANCE-255). Xcode's synchronized folders followed it regardless of what the
+> manifest said and copied all three per-macOS fixture directories into one flat `Resources/`, where
+> `expected.json`, `manifest.json`, `store.db` and `README.md` collided — a hard build error under
+> Xcode 16.2, which is what `fixtures.yml` pins for its macOS 14 and 15 legs. Nothing read those
+> copies, so nothing replaced them. See [TESTING.md](../testing/TESTING.md).
 
 `Packages/BackglanceCore/Package.swift`:
 

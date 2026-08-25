@@ -150,6 +150,15 @@ jobs:
           shopt -s nullglob
           files=(build/probe/live-probe-*.json)
           [[ ${#files[@]} -gt 0 ]] || { echo "no probe results to inspect"; exit 0; }
+          # `gh issue create --label` and `gh issue list --label` both treat a missing
+          # label as a hard error, so a label nobody had created yet failed this job for a
+          # reason that had nothing to do with what the probe found — and a red reporting
+          # step looks exactly like the condition it exists to report (BACKGLANCE-256).
+          # `--force` makes this idempotent, so a fork or a deleted label self-heals.
+          gh label create capture-degraded --repo "$GITHUB_REPOSITORY" \
+            --color B60205 \
+            --description "Capture may be degraded: the live store fingerprint was not recognised" \
+            --force > /dev/null
           for f in "${files[@]}"; do
             status="$(jq -r .status "$f")"
             runner="$(jq -r .runner "$f")"
