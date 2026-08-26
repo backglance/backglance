@@ -80,7 +80,7 @@ public protocol StoreAdapter: Sendable {
     ///
     /// This is where live capture begins on a fresh archive: everything already in the
     /// store predates the install, so it belongs to the explicit import step, not to the
-    /// live stream (docs/features/CAPTURE.md#first-launch-import). It is also how
+    /// live stream (docs/features/CAPTURE.md#the-system-store-import). It is also how
     /// ``CaptureEngine`` skips past what arrived during a pause.
     ///
     /// > 🔒 Positions the cursor without reading `record.data`, so neither of those uses

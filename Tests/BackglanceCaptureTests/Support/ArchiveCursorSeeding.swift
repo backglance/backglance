@@ -8,7 +8,7 @@ extension Archive {
     /// Production does the opposite. A fresh archive starts live capture at the *tail*,
     /// because everything already in the store predates the install and backfilling it is
     /// `importExisting()`'s job — an explicit step the user consents to, recorded with
-    /// `source = 'import'` (docs/features/CAPTURE.md#first-launch-import).
+    /// `source = 'import'` (docs/features/CAPTURE.md#the-system-store-import).
     ///
     /// That makes "put rows in a store, then start the engine, then assert they were
     /// archived" a no-op in production semantics, which is exactly what most of these

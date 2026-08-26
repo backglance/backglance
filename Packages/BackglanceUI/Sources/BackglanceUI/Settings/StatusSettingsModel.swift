@@ -91,19 +91,35 @@ public final class StatusSettingsModel {
     ///   - saveDiagnostics: shows a save panel and writes the bundle. Returns where it landed,
     ///     or `nil` if the user cancelled. The app shell's, because a save panel is AppKit and
     ///     because the user must choose the destination before anything is written.
+    ///   - runImport: reads whatever the system store still holds, from the beginning. The app
+    ///     shell's, for the same reason the rest of this is: this module cannot see
+    ///     `CaptureEngine`. Defaults to a runner that reports failure, which is the truth for
+    ///     a preview or a launch with no engine.
     public init(
         archive: Archive?,
         readCaptureHealth: @escaping @Sendable () async -> CaptureHealth = { CaptureHealth() },
         readFullDiskAccess: @escaping @Sendable () -> FullDiskAccessDisplayState = { .denied },
-        saveDiagnostics: @escaping @Sendable (DiagnosticsExport.Options) async -> URL? = { _ in nil }
+        saveDiagnostics: @escaping @Sendable (DiagnosticsExport.Options) async -> URL? = { _ in nil },
+        runImport: @escaping ImportRunner = { _ in .failed }
     ) {
         self.archive = archive
         self.readCaptureHealth = readCaptureHealth
         self.readFullDiskAccess = readFullDiskAccess
         self.saveDiagnostics = saveDiagnostics
+        self.runImport = runImport
     }
 
     // MARK: Public
+
+    /// Runs an import, reporting progress as it goes, and answers with the final state.
+    ///
+    /// Written in ``ImportState`` rather than in `CaptureEngine`'s own `ImportProgress` and
+    /// `ImportSummary` because `BackglanceUI` cannot see `BackglanceCapture`
+    /// (docs/getting-started/DEVELOPMENT_GUIDE.md#dependency-direction). The app shell maps
+    /// one to the other, exactly as `OnboardingWindowController` already does.
+    public typealias ImportRunner = @Sendable (
+        @escaping @MainActor @Sendable (ImportState) -> Void
+    ) async -> ImportState
 
     public private(set) var health = CaptureHealth()
     public private(set) var summary = ArchiveSummary()
@@ -118,12 +134,34 @@ public final class StatusSettingsModel {
     /// Where the last export landed, so the pane can offer to reveal it.
     public private(set) var lastExport: URL?
 
+    /// How the on-demand import is going, or ``ImportState/idle`` when none has run this
+    /// launch. The same value the onboarding screen draws, drawn by the same view.
+    public private(set) var importState: ImportState = .idle
+
+    /// When an import last finished, or `nil` if one never has.
+    ///
+    /// Shown next to the button because "have I already done this?" is otherwise
+    /// unanswerable: an import that recovered nothing and an import that never ran look
+    /// identical from the timeline.
+    public private(set) var lastImportAt: Date?
+
     /// Whether the export names apps. Off by default — see
     /// ``BackglanceCore/DiagnosticsExport``.
     public var includeAppIdentifiers = false
 
     public var canRunChecks: Bool {
         archive != nil && !isBusy
+    }
+
+    /// Whether the import can be offered right now.
+    ///
+    /// Only while capture is actually running. Paused means the user asked Backglance to stop
+    /// reading their notifications, and a backfill is the largest read there is; degraded
+    /// means there is no adapter to read *with*, and the engine would only throw. `.stopped`
+    /// covers the launch that has no engine at all, because that is the health this pane is
+    /// handed then.
+    public var canImportFromStore: Bool {
+        archive != nil && !isBusy && !importState.isRunning && health.status == .running
     }
 
     /// Reads everything cheap. The integrity check is *not* here: it is a full scan of the
@@ -140,6 +178,7 @@ public final class StatusSettingsModel {
             let count = try await archive.pool.read { database in try ArchivedNotification.fetchCount(database) }
             summary.byteCount = space.byteCount
             summary.notificationCount = count
+            lastImportAt = try archive.lastImportDate()
             failure = nil
         } catch {
             failure = (error as? ArchiveError)?.userMessage ?? String(localized: "Couldn’t read the archive.")
@@ -164,6 +203,35 @@ public final class StatusSettingsModel {
         }
     }
 
+    /// Archives whatever the system store still holds, from the beginning.
+    ///
+    /// The one place outside onboarding this can be asked for, and it has to be *asked* for:
+    /// a fresh archive starts at the tail precisely so that Backglance never silently keeps a
+    /// backlog nobody chose to keep (see `CaptureEngine.bootstrap`). Pressing the button is
+    /// the consent, which is also why there is no second confirmation sheet in front of it.
+    ///
+    /// Safe to run again. Every row it re-reads is already archived — matched on the store's
+    /// own record id, or on the notification's uuid after a store reset — so a second run
+    /// writes nothing new. What it is *for* is the user who skipped the import during setup,
+    /// or granted Full Disk Access days later: everything older than the live cursor is still
+    /// sitting in Apple's store, and nothing else in the app will ever reach back for it.
+    public func importFromStore() async {
+        guard canImportFromStore else {
+            return
+        }
+        isBusy = true
+        importState = .running(archived: 0, expectedTotal: nil)
+        // The other buttons stay disabled until this settles: a full `PRAGMA integrity_check`
+        // over an archive that is being written to is a long wait for an answer about a
+        // moving target.
+        importState = await runImport { [weak self] state in
+            self?.importState = state
+        }
+        isBusy = false
+        // Everything on the pane just moved — the count, the file size, `last_import_at`.
+        await load()
+    }
+
     /// Builds the diagnostics bundle and asks the shell to save it.
     public func exportDiagnostics() async {
         guard !isBusy else {
@@ -180,4 +248,5 @@ public final class StatusSettingsModel {
     private let readCaptureHealth: @Sendable () async -> CaptureHealth
     private let readFullDiskAccess: @Sendable () -> FullDiskAccessDisplayState
     private let saveDiagnostics: @Sendable (DiagnosticsExport.Options) async -> URL?
+    private let runImport: ImportRunner
 }

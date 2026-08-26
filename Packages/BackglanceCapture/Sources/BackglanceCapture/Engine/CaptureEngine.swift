@@ -413,7 +413,7 @@ public actor CaptureEngine {
             // — an explicit step the user consents to, recorded with `source = 'import'`
             // and `last_import_at`. Starting at `.start` here would archive that whole
             // backlog as if it had just arrived, unasked, and leave the import with
-            // nothing left to do (docs/features/CAPTURE.md#first-launch-import).
+            // nothing left to do (docs/features/CAPTURE.md#the-system-store-import).
             //
             // Persisted immediately so the position survives a crash before the first
             // batch. Note the distinction ``Archive/clearCursor()`` documents: a *saved*

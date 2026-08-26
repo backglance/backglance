@@ -151,7 +151,9 @@ By default: password managers (1Password, Bitwarden, Dashlane, LastPass), Apple 
 
 ### Can it recover notifications from before I installed it?
 
-Only what Apple's store still has. When Backglance first launches with FDA, it imports every record still present in the system store. macOS prunes that store when you clear notifications and on its own schedule (roughly a week, though this is not documented and varies). So a first import typically recovers the last few days, not months. From that point on, Backglance archives continuously.
+Only what Apple's store still has. Setup offers to import every record still present in the system store, and **Settings ▸ Status ▸ Import from the System Store Now** runs the same import again whenever you ask — for anyone who skipped it during setup, or who granted Full Disk Access days later. macOS prunes that store when you clear notifications and on its own schedule (roughly a week, though this is not documented and varies). So an import typically recovers the last few days, not months. From that point on, Backglance archives continuously.
+
+Running the import twice is safe: anything already archived is recognised and skipped, so a second run adds nothing rather than duplicating what is there. Nothing is ever imported without you asking — a fresh archive starts from now, because keeping a backlog you did not choose to keep is not something an app should decide for you.
 
 Imported items are marked with `source = 'import'` in the archive and appear in the timeline like anything else.
 

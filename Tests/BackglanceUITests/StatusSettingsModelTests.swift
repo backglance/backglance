@@ -24,7 +24,7 @@ final class StatusSettingsModelTests: XCTestCase {
 
     func testLoadReadsCaptureHealthAndTheArchive() async throws {
         let archive = try XCTUnwrap(archive)
-        try seed(archive, count: 4)
+        try Self.seed(archive, count: 4)
         let health = CaptureHealth(
             status: .running,
             adapterID: "StoreAdapterV26",
@@ -55,7 +55,7 @@ final class StatusSettingsModelTests: XCTestCase {
 
     func testTheIntegrityCheckRunsWhenAsked() async throws {
         let archive = try XCTUnwrap(archive)
-        try seed(archive)
+        try Self.seed(archive)
         let model = makeModel()
 
         await model.runIntegrityCheck()
@@ -93,6 +93,108 @@ final class StatusSettingsModelTests: XCTestCase {
         XCTAssertFalse(model.canRunChecks)
         XCTAssertNil(model.summary.integrityOK)
         XCTAssertEqual(model.summary.notificationCount, 0)
+    }
+
+    // MARK: - The system-store import
+
+    /// The pane draws the count as it arrives and then the final one, and it cannot be asked
+    /// for a second import while the first is still reading.
+    func testTheImportReportsProgressAndThenTheFinalCount() async throws {
+        let probe = ImportProbe()
+        let model = makeModel(health: CaptureHealth(status: .running)) { report in
+            await MainActor.run {
+                probe.canImportMidFlight = probe.model?.canImportFromStore
+                report(.running(archived: 2, expectedTotal: 4))
+                probe.midFlight = probe.model?.importState
+            }
+            return .finished(archived: 4)
+        }
+        probe.model = model
+        await model.load()
+
+        await model.importFromStore()
+
+        XCTAssertEqual(probe.midFlight, .running(archived: 2, expectedTotal: 4))
+        let canImportMidFlight = try XCTUnwrap(probe.canImportMidFlight)
+        XCTAssertFalse(canImportMidFlight, "a second import must not be startable mid-flight")
+        XCTAssertEqual(model.importState, .finished(archived: 4))
+        XCTAssertTrue(model.canImportFromStore, "and offerable again once it finishes")
+    }
+
+    /// 🔒 The import reads every notification the system still holds. Paused means the user
+    /// asked Backglance to stop doing exactly that, and degraded means there is no adapter to
+    /// read with — in neither case is the button real.
+    func testTheImportIsOfferedOnlyWhileCaptureIsRunning() async {
+        let unavailable: [TimelineCaptureState] = [
+            .paused(until: nil),
+            .paused(until: Date()),
+            .noFullDiskAccess,
+            .degraded(message: "the store’s schema changed"),
+            .stopped,
+        ]
+
+        for state in unavailable {
+            let ran = Counter()
+            let model = makeModel(health: CaptureHealth(status: state)) { _ in
+                ran.increment()
+                return .finished(archived: 9)
+            }
+            await model.load()
+
+            await model.importFromStore()
+
+            XCTAssertFalse(model.canImportFromStore, "\(state) must not offer the import")
+            XCTAssertEqual(ran.value, 0, "\(state) must not run one either")
+            XCTAssertEqual(model.importState, .idle)
+        }
+    }
+
+    /// A failed import is reported rather than left spinning, and the button comes back.
+    func testAFailedImportIsReportedAndTheButtonReturns() async {
+        let model = makeModel(health: CaptureHealth(status: .running)) { _ in .failed }
+        await model.load()
+
+        await model.importFromStore()
+
+        XCTAssertEqual(model.importState, .failed)
+        XCTAssertTrue(model.canImportFromStore)
+    }
+
+    /// "Have I already done this?" has to be answerable without guessing: an import that
+    /// recovered nothing and an import that never ran look identical from the timeline.
+    func testWhenTheImportLastFinishedIsRead() async throws {
+        let archive = try XCTUnwrap(archive)
+        let model = makeModel()
+
+        await model.load()
+        XCTAssertNil(model.lastImportAt, "never run is its own answer")
+
+        let finished = Date(timeIntervalSince1970: 1_770_000_000)
+        try archive.saveLastImport(finished)
+        await model.load()
+
+        let lastImportAt = try XCTUnwrap(model.lastImportAt)
+        XCTAssertEqual(lastImportAt.timeIntervalSince1970, finished.timeIntervalSince1970, accuracy: 0.001)
+    }
+
+    /// The archive moved under the pane, so the pane re-reads it. Anything else leaves the
+    /// count and the size showing what they were before the import that just finished.
+    func testAFinishedImportRefreshesThePane() async throws {
+        let archive = try XCTUnwrap(archive)
+        let model = makeModel(health: CaptureHealth(status: .running)) { _ in
+            await MainActor.run {
+                try? Self.seed(archive, count: 3)
+                try? archive.saveLastImport(Date())
+            }
+            return .finished(archived: 3)
+        }
+        await model.load()
+        XCTAssertEqual(model.summary.notificationCount, 0)
+
+        await model.importFromStore()
+
+        XCTAssertEqual(model.summary.notificationCount, 3)
+        XCTAssertNotNil(model.lastImportAt)
     }
 
     // MARK: - The export
@@ -153,18 +255,18 @@ final class StatusSettingsModelTests: XCTestCase {
         private var count = 0
     }
 
-    private var archive: Archive?
-
-    private func makeModel(
-        health: CaptureHealth = CaptureHealth(),
-        fda: FullDiskAccessDisplayState = .denied
-    ) -> StatusSettingsModel {
-        let readHealth: @Sendable () async -> CaptureHealth = { health }
-        let readFDA: @Sendable () -> FullDiskAccessDisplayState = { fda }
-        return StatusSettingsModel(archive: archive, readCaptureHealth: readHealth, readFullDiskAccess: readFDA)
+    /// Holds what the pane looked like from *inside* a running import — the one moment the
+    /// test cannot observe from the outside, because `importFromStore()` has not returned.
+    /// Touched only on the main actor.
+    private final class ImportProbe: @unchecked Sendable {
+        var model: StatusSettingsModel?
+        var midFlight: ImportState?
+        var canImportMidFlight: Bool?
     }
 
-    private func seed(_ archive: Archive, count: Int = 1) throws {
+    private var archive: Archive?
+
+    private static func seed(_ archive: Archive, count: Int = 1) throws {
         let now = Date()
         let app = try archive.upsertApp(bundleID: "com.example.app", now: now)
         for index in 0 ..< count {
@@ -179,5 +281,20 @@ final class StatusSettingsModelTests: XCTestCase {
             )
             _ = try archive.insertOrUpdate(notification)
         }
+    }
+
+    private func makeModel(
+        health: CaptureHealth = CaptureHealth(),
+        fda: FullDiskAccessDisplayState = .denied,
+        runImport: @escaping StatusSettingsModel.ImportRunner = { _ in .failed }
+    ) -> StatusSettingsModel {
+        let readHealth: @Sendable () async -> CaptureHealth = { health }
+        let readFDA: @Sendable () -> FullDiskAccessDisplayState = { fda }
+        return StatusSettingsModel(
+            archive: archive,
+            readCaptureHealth: readHealth,
+            readFullDiskAccess: readFDA,
+            runImport: runImport
+        )
     }
 }

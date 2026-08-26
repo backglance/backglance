@@ -680,7 +680,7 @@ Permissions do not have their own table. Related state:
 
 - Probe result → `CaptureEngine` status is the single source of truth. UI derives from `CaptureStatus`, not from its own probe calls, so banner and icon can never disagree with capture.
 - Polling cadence: 30 s only while onboarding is visible; otherwise event-driven (activation, watcher EPERM). Idle CPU budget (< 0.1 %) forbids continuous polling.
-- First import runs exactly once per archive: guarded by `capture_state.last_import_at`. If FDA is granted days later, the import runs at that moment and the popover shows a one-line "Imported N notifications the system still had."
+- Setup runs the import once, guarded by `capture_state.last_import_at`; after that it is Settings ▸ Status that offers it, as often as the user asks (BACKGLANCE-262, [CAPTURE.md](CAPTURE.md#the-system-store-import)). Never automatically, and never twice from setup.
 - Notifications permission is requested only from an explicit user action; digest defaults to in-popover presentation.
 
 ## Edge Cases and Error Handling

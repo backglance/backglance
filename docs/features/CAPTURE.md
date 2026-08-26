@@ -22,7 +22,7 @@ This document describes continuous capture: how Backglance notices every notific
   - [Cursor persistence](#cursor-persistence)
   - [CaptureEngine](#captureengine)
   - [Pause semantics](#pause-semantics)
-  - [First-launch import](#first-launch-import)
+  - [The system-store import](#the-system-store-import)
 - [Edge Cases and Error Handling](#edge-cases-and-error-handling)
 - [Metrics and Logging](#metrics-and-logging)
 - [Testing Approach](#testing-approach)
@@ -124,7 +124,8 @@ Capture has almost no UI of its own; it publishes a `CaptureStatus` and the shel
 | Pause menu | `StatusItemController` right-click menu + `MenuBarPopoverView` toolbar | "Pause capture ▸ 15 minutes / 1 hour / Until tomorrow / Indefinitely", "Resume capture" |
 | `CaptureStatusView` | `Packages/BackglanceUI/Sources/BackglanceUI/Settings/CaptureStatusView.swift` | Settings ▸ Capture: status sentence, adapter id, "best-effort adapter" note on fallback, last tick time, counts (see [Metrics and Logging](#metrics-and-logging)) |
 | Settings ▸ Capture toggles | `SettingsViews` | "Import notifications received while paused" (default off), "Poll interval" is *not* exposed (fixed 15 s / 60 s) |
-| `ImportProgressView` | `Backglance/Scenes/Onboarding/ImportProgressView.swift` | First-launch import: determinate progress when the probe returned a count, "Imported N notifications from the last X days — this is all the system still had" on completion |
+| `ImportProgressView` | `Packages/BackglanceUI/Sources/BackglanceUI/Onboarding/ImportProgressView.swift` | The system-store import, in both places it runs: determinate progress when the probe returned a count, "Imported N notifications" + "This is everything the system still had." on completion |
+| `StatusSettingsView` ▸ Import | `Packages/BackglanceUI/Sources/BackglanceUI/Settings/StatusSettingsView.swift` | Settings ▸ Status: `last_import_at`, the "Import from the System Store Now" button, and the same `ImportProgressView` beneath it |
 | Degraded banner | `MenuBarPopoverView` | Persistent, non-modal banner: "Backglance can't read notifications yet — Grant Full Disk Access…" (see [PERMISSIONS_PRIVACY.md](./PERMISSIONS_PRIVACY.md#degraded-mode-without-fda)) |
 
 > ✅ **Do:** render capture state as a value (`CaptureStatus`) in one place. There are no modal alerts on the capture path — degraded is a state, not an error.
@@ -862,7 +863,7 @@ public extension Archive {
 
 ### CaptureEngine
 
-The engine is an actor: the single owner of the adapter, the cursor and the status. The listing below is the complete v1.0 engine minus the import progress plumbing shown separately in [First-launch import](#first-launch-import).
+The engine is an actor: the single owner of the adapter, the cursor and the status. The listing below is the complete v1.0 engine minus the import progress plumbing shown separately in [The system-store import](#the-system-store-import).
 
 ```swift
 // Packages/BackglanceCapture/Sources/BackglanceCapture/CaptureEngine.swift
@@ -1132,9 +1133,15 @@ Pause is a promise: *nothing delivered while paused is archived*. That is why th
 
 > ℹ️ **Info:** The Settings label reads *Import notifications received while paused: off*. Under it, one sentence: "When off, notifications that arrive during a pause are never archived, even if the system still has them."
 
-### First-launch import
+### The system-store import
 
-Onboarding offers a single choice — "Import the notifications macOS still has?" — with a count when the probe could produce one ("About 1,240 notifications from the last 6 days"). Import walks the store from `rec_id 0` in batches of 500, tags rows `source = 'import'`, dedupes against anything live capture already archived, and leaves the live cursor alone (it already sits at the tail).
+Import walks the store from `rec_id 0` in batches of 500, tags rows `source = 'import'`, dedupes against anything live capture already archived, and leaves the live cursor alone (it already sits at the tail).
+
+**Two places ask for it, and they are the only two.** Onboarding's last screen runs it once, on the launch that granted Full Disk Access. Settings ▸ Status offers it every time thereafter (`StatusSettingsModel.importFromStore()`, BACKGLANCE-262), which is what makes the backfill reachable for the two people who need it most: whoever skipped it during setup, and whoever granted access days later.
+
+Both are explicit. A fresh archive starts at the tail on purpose — see `CaptureEngine.bootstrap` — because backfilling on its own would archive a backlog nobody chose to keep, and "it was already on your Mac" is not consent. Pressing the button is the consent; there is no confirmation sheet in front of it, and no prompt that offers it unasked.
+
+Quitting Backglance for a week is *not* what the import is for. `bootstrap()` reloads the persisted cursor rather than parking at the tail, so the next tick catches up on everything with a higher `rec_id` on its own. What the import reaches is the other direction: rows still in Apple's store but *older* than the cursor, which nothing else will ever go back for.
 
 ```swift
 // Packages/BackglanceCapture/Sources/BackglanceCapture/CaptureEngine+Import.swift
@@ -1154,17 +1161,14 @@ public struct ImportSummary: Sendable, Equatable {
     public var excluded: Int
     public var failed: Int
     public var oldest: Date?
-    /// "Imported 1,187 notifications from the last 6 days — this is all the system still had."
-    public var userSentence: String {
-        let days = oldest.map { max(1, Int(Date().timeIntervalSince($0) / 86_400)) }
-        let span = days.map { " from the last \($0) day\($0 == 1 ? "" : "s")" } ?? ""
-        return "Imported \(archived.formatted()) notification\(archived == 1 ? "" : "s")\(span) — this is all the system still had."
-    }
+    // No `userSentence` here: the completion copy lives with the view that draws it
+    // (`ImportProgressView.countSentence`), where the string catalog's plural variations
+    // actually resolve (BACKGLANCE-216).
 }
 
 extension CaptureEngine {
-    /// First-launch import. Safe to run again (dedupe by store_rec_id / uuid); Settings ▸ Capture
-    /// exposes it as "Import again", mostly for people who granted FDA late.
+    /// The system-store import. Safe to run again (dedupe by store_rec_id / uuid), which is
+    /// what lets Settings ▸ Status offer it as often as the user wants it.
     @discardableResult
     public func importExisting(progress: (@Sendable (ImportProgress) async -> Void)? = nil) async throws -> ImportSummary {
         guard let adapter = currentAdapter() else {
@@ -1207,12 +1211,13 @@ extension CaptureEngine {
 }
 ```
 
-UX rules for the import screen:
+UX rules, wherever the import is shown:
 
-- Progress is determinate when `probe()` returned a count, indeterminate otherwise.
+- Progress is determinate when `probe()` returned a count, indeterminate otherwise. `ImportProgressView` draws both surfaces; only its accessibility-identifier prefix differs (`onboarding.` / `status.`).
 - The completion sentence always ends with "this is all the system still had". No apology, no upsell, no "enable X to get more".
 - Import runs on the engine actor, so live ticks queue behind it; the popover keeps working on the archive meanwhile.
 - Cancelling keeps what was imported; `last_import_at` is not written, so Settings still offers "Import".
+- Settings ▸ Status shows `last_import_at` beside the button, and disables the button while capture is paused or degraded, while an integrity check or diagnostics export is running, and while an import is already under way. A disabled button says why.
 - Budget: 10k store records in under 10 s on Apple silicon ([../deployment/PERFORMANCE_GUIDE.md](../deployment/PERFORMANCE_GUIDE.md)).
 
 ## Edge Cases and Error Handling

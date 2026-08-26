@@ -110,8 +110,43 @@ extension AppDelegate {
             },
             saveDiagnostics: { [weak self] options in
                 await MainActor.run { self?.saveDiagnostics(archive: archive, options: options) }
+            },
+            runImport: { [weak self] report in
+                await self?.runImport(reporting: report) ?? .failed
             }
         )
+    }
+
+    /// The system-store import, on demand from Settings ▸ Status.
+    ///
+    /// The same call `OnboardingWindowController` makes on the last setup screen, translated
+    /// the same way: the engine's `ImportProgress` and `ImportSummary` become the `ImportState`
+    /// the UI draws, because `BackglanceUI` cannot see `BackglanceCapture`.
+    ///
+    /// Failure is reported, not thrown. Nothing here is fatal — live capture is unaffected,
+    /// whatever was archived stays, and the pane says the import did not finish rather than
+    /// leaving a spinner running (BACKGLANCE-262).
+    @MainActor
+    private func runImport(
+        reporting report: @escaping @MainActor @Sendable (ImportState) -> Void
+    ) async -> ImportState {
+        guard let engine else {
+            return .failed
+        }
+        do {
+            let summary = try await engine.importExisting { progress in
+                await MainActor.run {
+                    report(.running(archived: progress.archived, expectedTotal: progress.expectedTotal))
+                }
+            }
+            return .finished(archived: summary.archived)
+        } catch {
+            // Content-free by construction, like every other line the app logs: a
+            // `CaptureError`'s own description, or the failure's type and nothing else.
+            let detail = (error as? CaptureError)?.logDescription ?? String(describing: type(of: error))
+            Log.capture.error("settings import failed: \(detail)")
+            return .failed
+        }
     }
 
     /// Builds the bundle, then asks where to put it.

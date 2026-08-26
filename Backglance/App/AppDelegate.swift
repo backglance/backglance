@@ -365,7 +365,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // First-launch import is *not* started here. Live capture begins at the store's
         // tail, and backfilling what the store already holds is an explicit step the user
         // agrees to, with its own progress UI, in the onboarding milestone
-        // (docs/features/CAPTURE.md#first-launch-import).
+        // (docs/features/CAPTURE.md#the-system-store-import).
         Task { await engine.start() }
     }
 

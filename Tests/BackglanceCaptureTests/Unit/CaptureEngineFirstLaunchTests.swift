@@ -8,7 +8,7 @@ import XCTest
 /// A fresh archive starts at the store's *tail*: everything already there predates the
 /// install, and archiving it is `importExisting()`'s job — an explicit step the user
 /// consents to, recorded as `source = 'import'`. Getting this wrong would silently
-/// swallow a backlog nobody asked for (docs/features/CAPTURE.md#first-launch-import).
+/// swallow a backlog nobody asked for (docs/features/CAPTURE.md#the-system-store-import).
 ///
 /// ⚠️ Nothing here reads `~/Library`: every store is a `MiniatureStore` in a temp
 /// directory.
@@ -57,7 +57,7 @@ final class CaptureEngineFirstLaunchTests: XCTestCase {
     /// predates the install, so live capture starts *after* it rather than swallowing a
     /// backlog the user never agreed to archive. Backfilling it is `importExisting()`'s
     /// job, and it records those rows as `source = 'import'`
-    /// (docs/features/CAPTURE.md#first-launch-import).
+    /// (docs/features/CAPTURE.md#the-system-store-import).
     func testAFirstLaunchStartsAtTheStoreTailRatherThanArchivingTheBacklog() async throws {
         let engine = try XCTUnwrap(engine)
         let archive = try XCTUnwrap(archive)

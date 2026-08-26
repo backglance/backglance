@@ -452,7 +452,15 @@
       "extractionState": "manual",
       "localizations": {}
     },
+    "Capture is paused. Resume it first — an import reads every notification the system still has, which is the one thing pausing is for.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
     "Capture isn't running.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Capture isn’t reading the system store, so there is nothing to import from.": {
       "extractionState": "manual",
       "localizations": {}
     },
@@ -849,8 +857,17 @@
       "extractionState": "manual",
       "localizations": {}
     },
+    "Import": {
+      "comment": "Section header: the on-demand system-store import",
+      "extractionState": "manual",
+      "localizations": {}
+    },
     "Import Rules…": {
       "comment": "Menu item: loads rules from a JSON file",
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Import from the System Store Now": {
       "extractionState": "manual",
       "localizations": {}
     },
@@ -923,6 +940,11 @@
     },
     "Last capture": {
       "comment": "Label: when capture last read the store",
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Last import": {
+      "comment": "Label: when the system-store import last finished",
       "extractionState": "manual",
       "localizations": {}
     },
@@ -1937,6 +1959,10 @@
       "localizations": {}
     },
     "macOS hasn’t created a notification database on this Mac yet.": {
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "macOS keeps only a few days of notifications and prunes the rest. Backglance archives new ones as they arrive; this reaches back for whatever the system still has — the same import setup offers, for anyone who skipped it or granted access later. Nothing is imported unless you ask, and asking twice is safe: anything already archived is skipped.": {
       "extractionState": "manual",
       "localizations": {}
     },

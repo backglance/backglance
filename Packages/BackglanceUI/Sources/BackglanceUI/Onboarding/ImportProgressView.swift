@@ -35,7 +35,11 @@ public enum ImportState: Equatable, Sendable {
 
 // MARK: - ImportProgressView
 
-/// The first-launch import, while it runs and after it stops.
+/// The system-store import, while it runs and after it stops.
+///
+/// Drawn in two places: setup's last screen, and Settings ▸ Status, which offers the same
+/// import afterwards (BACKGLANCE-262). One view rather than two, because the sentence below
+/// is the part that matters and it must not drift between them.
 ///
 /// The line that does the real work here is the last one: *this is everything the system
 /// still had*. macOS prunes its own notification store after a few days, so a new user who
@@ -44,12 +48,19 @@ public enum ImportState: Equatable, Sendable {
 /// already gone. It is the single most important piece of copy in onboarding, and it is why
 /// the finished state says it every time rather than only when the count looks low.
 ///
-/// See docs/features/CAPTURE.md#first-launch-import.
+/// See docs/features/CAPTURE.md#the-system-store-import.
 public struct ImportProgressView: View {
     // MARK: Lifecycle
 
-    public init(progress: ImportState) {
+    /// - Parameters:
+    ///   - progress: what to draw.
+    ///   - identifierPrefix: what the accessibility identifiers are namespaced under. Setup is
+    ///     no longer the only place this appears — Settings ▸ Status offers the same import
+    ///     after the fact (BACKGLANCE-262) — and a UI test looking for `onboarding.import.*`
+    ///     in a settings window would be asserting on the wrong surface.
+    public init(progress: ImportState, identifierPrefix: String = "onboarding") {
         self.progress = progress
+        self.identifierPrefix = identifierPrefix
     }
 
     // MARK: Public
@@ -65,7 +76,7 @@ public struct ImportProgressView: View {
 
             case let .finished(archived):
                 Text(countSentence(archived: archived))
-                    .accessibilityIdentifier("onboarding.import.finished")
+                    .accessibilityIdentifier("\(identifierPrefix).import.finished")
                 Text(String(
                     localized: "This is everything the system still had.",
                     comment: "Shown under the finished import count; \"the system\" is macOS's own notification store"
@@ -78,7 +89,7 @@ public struct ImportProgressView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("onboarding.import.failed")
+                    .accessibilityIdentifier("\(identifierPrefix).import.failed")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -93,6 +104,7 @@ public struct ImportProgressView: View {
     }
 
     private let progress: ImportState
+    private let identifierPrefix: String
 
     @ViewBuilder
     private func running(archived: Int, expectedTotal: Int?) -> some View {
@@ -100,11 +112,11 @@ public struct ImportProgressView: View {
         // percentage and then jumps is worse than one that honestly says "working".
         if let expectedTotal, expectedTotal > 0 {
             ProgressView(value: Double(archived), total: Double(expectedTotal))
-                .accessibilityIdentifier("onboarding.import.progress")
+                .accessibilityIdentifier("\(identifierPrefix).import.progress")
         } else {
             ProgressView()
                 .progressViewStyle(.linear)
-                .accessibilityIdentifier("onboarding.import.progress")
+                .accessibilityIdentifier("\(identifierPrefix).import.progress")
         }
 
         Text(countSentence(archived: archived))

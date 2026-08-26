@@ -10,7 +10,14 @@ import SwiftUI
 /// anyone notices something is missing. This pane is where the answer lives, in the plainest
 /// words available, next to the button that packages it for someone who can help.
 ///
-/// See docs/operations/MONITORING_LOGGING.md#health-indicators-in-the-ui.
+/// It is also the only place outside setup that can run the system-store import
+/// (BACKGLANCE-262). That is deliberate rather than tidy: someone who skipped the import
+/// during onboarding, or granted Full Disk Access days later, has notifications sitting in
+/// Apple's store that no other part of the app will ever reach back for — and the question
+/// they arrive with, "is anything missing", is the question this pane already answers.
+///
+/// See docs/operations/MONITORING_LOGGING.md#health-indicators-in-the-ui and
+/// docs/features/CAPTURE.md#the-system-store-import.
 public struct StatusSettingsView: View {
     // MARK: Lifecycle
 
@@ -23,6 +30,7 @@ public struct StatusSettingsView: View {
     public var body: some View {
         Form {
             captureSection
+            importSection
             archiveSection
             diagnosticsSection
         }
@@ -114,6 +122,46 @@ public struct StatusSettingsView: View {
             )
     }
 
+    /// "3 days ago", or "Never". The second answer is the one that matters: a user who
+    /// skipped the import during setup has notifications sitting in Apple's store that
+    /// nothing else in the app will ever reach back for, and this row is where they find out.
+    private var lastImportDescription: String {
+        guard let lastImportAt = model.lastImportAt else {
+            return String(
+                localized: "Never",
+                comment: "Status value: no import from the system store has ever finished"
+            )
+        }
+        return lastImportAt.formatted(.relative(presentation: .named))
+    }
+
+    /// Why the button is unavailable, when it is and the reason is not simply that an import
+    /// is already under way. A disabled control with no explanation reads as a broken one.
+    private var importUnavailableReason: String? {
+        guard !model.canImportFromStore, !model.importState.isRunning else {
+            return nil
+        }
+        switch model.health.status {
+        case .running:
+            return nil
+
+        case .paused:
+            return String(
+                localized: """
+                Capture is paused. Resume it first — an import reads every notification the \
+                system still has, which is the one thing pausing is for.
+                """,
+                comment: "Why the import button is unavailable: the user paused capture"
+            )
+
+        default:
+            return String(
+                localized: "Capture isn’t reading the system store, so there is nothing to import from.",
+                comment: "Why the import button is unavailable: capture is degraded or not running"
+            )
+        }
+    }
+
     private var captureSection: some View {
         Section {
             LabeledContent(
@@ -160,6 +208,51 @@ public struct StatusSettingsView: View {
             .accessibilityIdentifier("status.fda")
         } header: {
             Text(String(localized: "Capture", comment: "Label and section header: the notification-capture subsystem"))
+        }
+    }
+
+    private var importSection: some View {
+        Section {
+            LabeledContent(
+                String(localized: "Last import", comment: "Label: when the system-store import last finished"),
+                value: lastImportDescription
+            )
+            .accessibilityIdentifier("status.import.last")
+
+            Button(String(
+                localized: "Import from the System Store Now",
+                comment: "Button: archives whatever macOS’s own notification store still holds"
+            )) {
+                Task { await model.importFromStore() }
+            }
+            .disabled(!model.canImportFromStore)
+            .accessibilityIdentifier("status.import.run")
+
+            if model.importState != .idle {
+                ImportProgressView(progress: model.importState, identifierPrefix: "status")
+            }
+
+            if let reason = importUnavailableReason {
+                Label(reason, systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("status.import.unavailable")
+            }
+        } header: {
+            Text(String(localized: "Import", comment: "Section header: the on-demand system-store import"))
+        } footer: {
+            Text(String(
+                localized: """
+                macOS keeps only a few days of notifications and prunes the rest. Backglance \
+                archives new ones as they arrive; this reaches back for whatever the system still \
+                has — the same import setup offers, for anyone who skipped it or granted access \
+                later. Nothing is imported unless you ask, and asking twice is safe: anything \
+                already archived is skipped.
+                """,
+                comment: "Footer under the import button: what the import can and cannot recover"
+            ))
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 

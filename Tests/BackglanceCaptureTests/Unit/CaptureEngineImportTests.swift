@@ -87,6 +87,31 @@ final class CaptureEngineImportTests: XCTestCase {
         XCTAssertEqual(count, 3)
     }
 
+    /// The case most likely to write a second copy of everything, and the reason Settings can
+    /// offer the import as often as it likes (BACKGLANCE-262).
+    ///
+    /// `handleStoreReset()` clears every `store_rec_id` when macOS replaces its own database,
+    /// which leaves an import with nothing but `uuid` to recognise rows by. That has to be
+    /// enough: the rows are refreshed in place rather than inserted again.
+    func testReimportingAfterAStoreResetWritesNoSecondCopy() async throws {
+        let engine = try XCTUnwrap(engine)
+        let archive = try XCTUnwrap(archive)
+        try Self.makeStore(at: XCTUnwrap(storeURL), notifications: 3)
+        await engine.start()
+        _ = try await engine.importExisting()
+
+        try archive.forgetStoreRecordIDs()
+        let second = try await engine.importExisting()
+
+        let stored = try await archive.pool.read { db in try ArchivedNotification.fetchAll(db) }
+        XCTAssertEqual(stored.count, 3, "the uuid fallback has to catch what store_rec_id no longer can")
+        XCTAssertEqual(Set(stored.map(\.uuid)).count, 3)
+        XCTAssertEqual(stored.compactMap(\.storeRecId).count, 3, "and the refreshed rows get their ids back")
+        // Refreshed rows count as archived, the same as they do on the onboarding screen: the
+        // number is "rows this import wrote to", not "rows that did not exist before".
+        XCTAssertEqual(second.archived, 3)
+    }
+
     func testImportRecordsWhenItFinished() async throws {
         let engine = try XCTUnwrap(engine)
         let archive = try XCTUnwrap(archive)
